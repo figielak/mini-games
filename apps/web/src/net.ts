@@ -1,7 +1,8 @@
 import { Client, type Room } from "@colyseus/sdk";
 import type { LobbyView } from "@mini-games/games";
 
-const client = new Client(import.meta.env.DEV ? "http://localhost:2567" : location.origin);
+// W dev serwer gry stoi obok Vite na porcie 2567 tego samego hosta (działa też z telefonu w LAN).
+const client = new Client(import.meta.env.DEV ? `http://${location.hostname}:2567` : location.origin);
 
 const TOKEN_KEY = "mg.token";
 const NICK_KEY = "mg.nick";
