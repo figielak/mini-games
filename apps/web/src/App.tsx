@@ -1,30 +1,41 @@
-import { Client } from "@colyseus/sdk";
+import type { Room } from "@colyseus/sdk";
+import type { LobbyView } from "@mini-games/games";
+import { CloseCode } from "@colyseus/sdk";
 import { useEffect, useState } from "react";
-
-const endpoint = import.meta.env.DEV ? "http://localhost:2567" : location.origin;
+import { forgetRoom, resumeRoom, watchLobby } from "./net.ts";
+import { Home } from "./screens/Home.tsx";
+import { Lobby } from "./screens/Lobby.tsx";
 
 export function App() {
-  const [status, setStatus] = useState("łączenie…");
+  const [room, setRoom] = useState<Room | null>(null);
+  const [resuming, setResuming] = useState(true);
+  const [view, setView] = useState<LobbyView | null>(null);
+  const [dropped, setDropped] = useState(false);
+  const [notice, setNotice] = useState<string>();
 
   useEffect(() => {
-    let left = false;
-    const joining = new Client(endpoint).joinOrCreate("hello");
-    joining
-      .then((room) => {
-        if (left) return void room.leave();
-        room.onMessage("hello", ({ clients }: { clients: number }) =>
-          setStatus(`połączono (graczy w pokoju: ${clients})`),
-        );
-        room.onLeave(() => setStatus("rozłączono"));
-      })
-      .catch((e) => setStatus(`błąd: ${e.message}`));
-    return () => {
-      left = true;
-      joining.then((room) => room.leave(), () => {});
-    };
+    resumeRoom().then((r) => {
+      setRoom(r);
+      setResuming(false);
+    });
   }, []);
 
-  return (
-    <main className="grid min-h-dvh place-items-center p-4 text-xl">{status}</main>
-  );
+  useEffect(() => {
+    if (!room) return;
+    const off = watchLobby(room, setView);
+    room.onDrop(() => setDropped(true));
+    room.onReconnect(() => setDropped(false));
+    room.onLeave((code) => {
+      forgetRoom();
+      setRoom(null);
+      setView(null);
+      setDropped(false);
+      if (code !== CloseCode.CONSENTED) setNotice("Połączenie z pokojem zostało zamknięte.");
+    });
+    return off;
+  }, [room]);
+
+  if (resuming) return <main className="min-h-[100dvh]" aria-busy />;
+  if (!room) return <Home onRoom={setRoom} notice={notice} />;
+  return <Lobby view={view} me={room.sessionId} dropped={dropped} onLeave={() => room.leave()} />;
 }

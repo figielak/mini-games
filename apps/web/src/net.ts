@@ -1,0 +1,84 @@
+import { Client, type Room } from "@colyseus/sdk";
+import type { LobbyView } from "@mini-games/games";
+
+const client = new Client(import.meta.env.DEV ? "http://localhost:2567" : location.origin);
+
+const TOKEN_KEY = "mg.token";
+const NICK_KEY = "mg.nick";
+
+// localStorage potrafi rzucić (tryb prywatny, zablokowane dane), a bez niego aplikacja dalej ma działać.
+function read(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+function write(key: string, value: string | null) {
+  try {
+    if (value === null) localStorage.removeItem(key);
+    else localStorage.setItem(key, value);
+  } catch {}
+}
+
+export const savedNick = () => read(NICK_KEY) ?? "";
+
+// Serwer wysyła stan lobby od razu po dołączeniu, zanim React podepnie nasłuch,
+// więc nasłuch wisi tu od początku, a ostatni stan czeka na komponent.
+const lobbies = new WeakMap<Room, { view: LobbyView | null; listener?: (v: LobbyView) => void }>();
+
+export function watchLobby(room: Room, listener: (v: LobbyView) => void) {
+  const entry = lobbies.get(room)!;
+  entry.listener = listener;
+  if (entry.view) listener(entry.view);
+  return () => (entry.listener = undefined);
+}
+
+function remember(room: Room, nick?: string) {
+  const entry: { view: LobbyView | null; listener?: (v: LobbyView) => void } = { view: null };
+  lobbies.set(room, entry);
+  room.onMessage("lobby", (v: LobbyView) => {
+    entry.view = v;
+    entry.listener?.(v);
+  });
+  write(TOKEN_KEY, room.reconnectionToken);
+  if (nick) write(NICK_KEY, nick);
+  room.onReconnect(() => write(TOKEN_KEY, room.reconnectionToken));
+  return room;
+}
+
+export const createRoom = async (nick: string) => remember(await client.create("lobby", { nick }), nick);
+
+export const joinRoom = async (code: string, nick: string) =>
+  remember(await client.joinById(code, { nick }), nick);
+
+/** Wraca do pokoju sprzed odświeżenia strony. Jedna próba na załadowanie strony: token działa tylko raz. */
+let resuming: Promise<Room | null> | undefined;
+export const resumeRoom = () => (resuming ??= tryResume());
+
+/** Kod z linku udostępnienia (`/?kod=ABCD`). */
+export const codeFromUrl = () => new URLSearchParams(location.search).get("kod")?.toUpperCase() ?? "";
+
+async function tryResume(): Promise<Room | null> {
+  const token = read(TOKEN_KEY);
+  if (!token) return null;
+  // Token ma postać "KOD:sesja". Link do innego pokoju wygrywa z powrotem do starego.
+  const linked = codeFromUrl();
+  if (linked && linked !== token.split(":")[0]) return null;
+  try {
+    return remember(await client.reconnect(token));
+  } catch {
+    write(TOKEN_KEY, null);
+    return null;
+  }
+}
+
+export const forgetRoom = () => write(TOKEN_KEY, null);
+
+export function errorText(e: unknown): string {
+  const message = e instanceof Error ? e.message : String(e);
+  if (/not found|invalid/i.test(message)) return "Nie ma pokoju o tym kodzie.";
+  if (/locked|full/i.test(message)) return "Ten pokój jest już pełny.";
+  if (/failed to fetch|network/i.test(message)) return "Brak połączenia z serwerem.";
+  return message;
+}

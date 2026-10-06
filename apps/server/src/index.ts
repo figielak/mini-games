@@ -2,7 +2,7 @@ import { fileURLToPath } from "node:url";
 import { Server } from "@colyseus/core";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import express from "express";
-import { HelloRoom } from "./HelloRoom.ts";
+import { LobbyRoom } from "./LobbyRoom.ts";
 
 const port = Number(process.env.PORT ?? 2567);
 const webDist = fileURLToPath(new URL("../../web/dist", import.meta.url));
@@ -17,6 +17,6 @@ const server = new Server({
   },
 });
 
-server.define("hello", HelloRoom);
+server.define("lobby", LobbyRoom);
 await server.listen(port);
 console.log(`listening on :${port}`);

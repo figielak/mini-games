@@ -1,5 +1,34 @@
-node_modules
-dist
+# Zależności i build
+node_modules/
+dist/
+*.tsbuildinfo
+.vite/
+coverage/
+
+# Sekrety
 .env
-*.db
+.env.*
+!.env.example
+# Klucze tunelu Cloudflare (credentials.json, cert.pem); config.yml zostaje w repo
 cloudflared/*.json
+cloudflared/*.pem
+
+# Dane
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Logi
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Narzędzia
+.playwright-mcp/
+
+# System i edytory
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
