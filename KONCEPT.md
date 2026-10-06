@@ -1,0 +1,159 @@
+# games.figielak.dev — koncept
+
+Prywatna platforma z grami multiplayer w przeglądarce, do grania ze znajomymi na wykładach.
+Jedna strona, kod pokoju, każdy gra na swoim telefonie.
+
+## 1. Założenia
+
+- **Do 6 graczy naraz** w pokoju, kilka pokoi równolegle.
+- **Mobile-first**: telefon w pionie, bez instalacji (PWA z ikoną na ekranie głównym).
+- **Bez kont**: gracz wpisuje nick i kod pokoju. Token sesji w `localStorage` pozwala wrócić do gry po odświeżeniu strony.
+- **Dostęp**: strona publiczna, ale do gry trzeba znać kod pokoju. Brak publicznej listy pokoi.
+- **Odporność na słabe Wi-Fi**: automatyczne ponowne łączenie, stan gry zawsze po stronie serwera.
+- **Tryb wykładowy**: domyślnie bez dźwięku, ciemny motyw, wibracje zamiast powiadomień, limit czasu na turę.
+
+## 2. Gry
+
+### 2.1 Kampus Tycoon (klon Business Tour)
+
+Główna gra platformy. Zachowuje rdzeń mechaniki oryginału, ale ma własny motyw i dodatki.
+Mechanik można się inspirować, natomiast nazwy, grafiki i logo oryginału nie są kopiowane.
+
+**Motyw:** Politechnika Rzeszowska i Rzeszów. Pola to budynki kampusu, wydziały i znane miejsca w mieście
+(np. Rynek, Zamek Lubomirskich, Bulwary nad Wisłokiem, Millenium Hall). Ostateczna lista pól do ustalenia.
+
+**Rdzeń (jak w oryginale):**
+- plansza 32 pól, rzut dwiema kośćmi, dublet daje dodatkowy rzut,
+- kupowanie pól i płacenie czynszu,
+- grupy kolorów (np. kierunki studiów); posiadanie całej grupy zwiększa czynsz,
+- rozbudowa pól aż do landmarku,
+- **wykupienie pola** od innego gracza za wielokrotność ceny (landmarku nie da się wykupić),
+- zwycięstwo przez bankructwo przeciwników albo przez monopol (np. 3 pełne grupy kolorów).
+
+**Własne dodatki (propozycje):**
+| Oryginał | Kampus Tycoon |
+|---|---|
+| Start | **Immatrykulacja**: premia za przejście |
+| Więzienie | **Kolokwium**: tracisz turę albo zdajesz rzutem dubletu |
+| Mistrzostwa świata | **Juwenalia**: wybrane pole ma podwójny czynsz |
+| Podróż | **Bilet MPK**: przeskok na dowolne pole w następnej turze |
+| Karty szansy | **Karty Dziekanatu**: stypendium, warunek, poprawka itp. |
+
+**Długość partii:** maksymalnie około 45 minut. Po limicie rund (np. 20) albo czasu wygrywa
+gracz z największym majątkiem (gotówka + wartość pól i budynków).
+
+### 2.2 Poprawka (gra karciana typu Uno)
+
+- 2–6 graczy, własne karty, nazwy i grafiki.
+- Ukryte informacje: każdy widzi tylko swoją rękę (filtrowanie stanu per gracz).
+
+### 2.3 Statki i Pięć w rzędzie
+
+- Proste gry 1v1, zbudowane jako pierwsze, żeby przetestować cały przepływ platformy.
+- Statki również wymagają ukrywania stanu (plansza przeciwnika).
+
+## 3. Architektura
+
+```
+Telefon (PWA, React)  ⇄  WebSocket  ⇄  Serwer Colyseus (Node)
+                                          │
+                                          ├─ logika gier (czyste funkcje TS)
+                                          └─ SQLite (zapis stanu pokoi)
+```
+
+**Zasada:** serwer jest jedynym źródłem prawdy. Klient wysyła intencje („rzucam kośćmi”),
+serwer je waliduje, losuje, liczy nowy stan i rozsyła każdemu graczowi jego widok.
+
+### Interfejs gry
+
+Każda gra to moduł niezależny od sieci i UI:
+
+```ts
+interface GameDefinition<State, Move> {
+  id: string;
+  name: string;
+  minPlayers: number;
+  maxPlayers: number;
+  setup(players: PlayerId[], rng: Rng): State;
+  validateMove(state: State, player: PlayerId, move: Move): boolean;
+  applyMove(state: State, player: PlayerId, move: Move, rng: Rng): State;
+  playerView(state: State, player: PlayerId): unknown; // ukrywanie informacji
+  isOver(state: State): { winner?: PlayerId; ranking?: PlayerId[] } | null;
+}
+```
+
+**Platforma (skorupa)** jest wspólna dla wszystkich gier: pokoje z 4-znakowym kodem
+(bez mylących znaków typu O/0, I/1), lobby z wyborem gry, nicki i kolory graczy,
+reconnect, tablica wyników, rewanż, sprzątanie pokoi po godzinie bezczynności.
+
+**Synchronizacja:** stan gry to zwykły obiekt TS. Po każdym ruchu serwer wysyła wiadomość
+z `playerView` osobno do każdego gracza, zamiast pełnej synchronizacji Schema z Colyseus.
+Prościej i bezpiecznie dla gier z ukrytymi informacjami.
+
+## 4. Stack
+
+| Warstwa | Technologia |
+|---|---|
+| Język | TypeScript (wszędzie) |
+| Monorepo | pnpm workspaces |
+| Serwer / pokoje | Colyseus (Node.js) |
+| Walidacja wiadomości | zod |
+| Frontend | Vite + React |
+| Style / animacje | Tailwind, Motion |
+| Plansza | SVG / CSS Grid |
+| PWA | vite-plugin-pwa |
+| Trwałość stanu | SQLite (better-sqlite3) |
+| Testy | Vitest (szczególnie zasady Kampus Tycoon) |
+| CI/CD | GitHub Actions → obraz Dockera |
+
+## 5. Struktura repozytorium
+
+```
+games/
+├─ packages/
+│  ├─ core/        # typy, interfejs GameDefinition, RNG, utilsy
+│  └─ games/       # kampus-tycoon/, poprawka/, statki/, piec-w-rzedzie/
+├─ apps/
+│  ├─ server/      # Colyseus, pokoje, SQLite, Dockerfile
+│  └─ web/         # React PWA
+├─ docker-compose.yml
+└─ KONCEPT.md
+```
+
+## 6. Hosting
+
+- **Raspberry Pi** w homelabie, kontener Docker obok istniejących usług.
+- **Cloudflare Tunnel** (`cloudflared`) wystawia `games.figielak.dev` bez otwierania portów; obsługuje WebSockety.
+- Jeden kontener serwuje zbudowany frontend i WebSockety.
+- `mem_limit: 256m` w docker-compose, żeby gry nie zagroziły innym usługom.
+  Spodziewane zużycie: ~100–150 MB RAM przy kilku pokojach.
+- SQLite w wolumenie Dockera, objęty istniejącym backupem homelaba.
+- Plan B: ten sam obraz na Cloud Run (`max-instances=1`, timeout 60 min, SQLite → Firestore).
+
+## 7. Bezpieczeństwo i fair play
+
+- Rzuty kośćmi i tasowanie kart tylko na serwerze.
+- Walidacja każdego ruchu (czy to tura gracza, czy ruch jest dozwolony, czy stać go na zakup).
+- Rate limiting wiadomości i limit liczby pokoi na IP.
+- Brak danych osobowych: tylko nick i losowy token sesji.
+
+## 8. Plan prac
+
+| Etap | Zakres | Cel |
+|---|---|---|
+| 0 | Monorepo, Docker, tunnel, „hello world” pod subdomeną | Infrastruktura działa |
+| 1 | Skorupa: pokoje, kody, lobby, nicki, reconnect | Platforma |
+| 2 | Pięć w rzędzie | Pierwsza gra end-to-end, rewanż |
+| 3 | Statki | Ukrywanie stanu (`playerView`) |
+| 4 | Kampus Tycoon: rdzeń (ruch, kupno, czynsz, budowanie, bankructwo) | Grywalna wersja główna |
+| 5 | Kampus Tycoon: dodatki (Kolokwium, Juwenalia, karty, wykupienie, limit czasu) | Pełna wersja |
+| 6 | Poprawka | Gra karciana |
+| 7 | PWA, animacje, statystyki, szlify | Polerka |
+
+## 9. Otwarte kwestie
+
+- Lista 32 pól Kampus Tycoon i podział na grupy kolorów.
+- Balans ekonomii (ceny, czynsze, premia za start), do dopracowania po testach z grupą.
+- Treść Kart Dziekanatu i zestaw kart specjalnych w Poprawce.
+- Czy dodać statystyki między sesjami (ranking po nicku) bez wprowadzania kont.
+- Własna nazwa całej platformy.

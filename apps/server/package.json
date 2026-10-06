@@ -1,0 +1,19 @@
+{
+  "name": "server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/index.ts",
+    "start": "node src/index.ts",
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "@colyseus/core": "^0.18.18",
+    "@colyseus/ws-transport": "^0.18.4",
+    "@mini-games/games": "workspace:*",
+    "express": "^5.2.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6"
+  }
+}

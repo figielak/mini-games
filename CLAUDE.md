@@ -1,0 +1,1 @@
+@KONCEPT.md

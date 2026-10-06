@@ -1,0 +1,16 @@
+{
+  "name": "mini-games",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.9.1",
+  "scripts": {
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "build": "pnpm -r build"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.3"
+  }
+}
