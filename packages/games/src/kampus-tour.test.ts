@@ -946,3 +946,43 @@ describe("wybór postaci", () => {
     }
   });
 });
+
+describe("statystyki do podsumowania partii", () => {
+  test("po setupie: majątek startowy jako pierwszy punkt wykresu, liczniki na zero", () => {
+    const s = game.setup([A, B], createRng(1));
+    expect(view(s).stats).toEqual({
+      wealth: { [A]: [START_CASH], [B]: [START_CASH + SEAT_BONUS] },
+      rentPaid: { [A]: 0, [B]: 0 },
+      tileIncome: {},
+      doubles: { [A]: 0, [B]: 0 },
+    });
+  });
+
+  test("czynsz: płacący ma go w rentPaid, pole w tileIncome", () => {
+    let s = roll(with2(two(), { owners: { 4: B } }), A, 1, 3);
+    expect(view(s).stats.rentPaid[A]).toBe(2);
+    expect(view(s).stats.tileIncome[4]).toBe(2);
+    s = play(s, A, { type: "skip" });
+    s = roll(s, B, 5, 6);
+    s = roll(s, A, 1, 1); // z 4 na 6: Rektorat jest wolny, czynsz tylko z poprzedniego razu
+    expect(view(s).stats.rentPaid).toEqual({ [A]: 2, [B]: 0 });
+  });
+
+  test("dublety liczone na gracza", () => {
+    let s = roll(two(), A, 1, 1);
+    s = play(s, A, { type: "skip" });
+    s = roll(s, A, 2, 3);
+    expect(view(s).stats.doubles).toEqual({ [A]: 1, [B]: 0 });
+  });
+
+  test("koniec rundy dopisuje majątek każdego gracza (gotówka + pola + budynki)", () => {
+    let s = with2(two(), { owners: { 3: A }, levels: { 3: 1 } });
+    s = roll(s, A, 5, 6);
+    s = roll(s, B, 5, 6);
+    expect(view(s).round).toBe(2);
+    const wealthA = view(s).cash[A] + price(3) + buildCost(3, 0, 1);
+    expect(view(s).stats.wealth[A].at(-1)).toBe(wealthA);
+    expect(view(s).stats.wealth[B].at(-1)).toBe(view(s).cash[B]);
+    expect(view(s).stats.wealth[A]).toHaveLength(2);
+  });
+});
