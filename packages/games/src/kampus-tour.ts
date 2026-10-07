@@ -58,7 +58,7 @@ export type Move = { type: "roll" } | { type: "buy" } | { type: "skip" } | { typ
 
 /** Co się wydarzyło w ostatnim ruchu; UI zamienia to na tekst. */
 export type Event = {
-  type: "allowance" | "buy" | "skip" | "rent" | "tax" | "sell" | "bankrupt";
+  type: "allowance" | "buy" | "set" | "skip" | "rent" | "tax" | "sell" | "bankrupt";
   player: PlayerId;
   amount?: number;
   tile?: number;
@@ -102,6 +102,11 @@ const priceOf = (tile: number) => {
   const t = BOARD[tile];
   return t.kind === "property" || t.kind === "utility" ? t.price : 0;
 };
+/** Komplet, do którego należy pole: grupa albo para Ksero i Stołówka. */
+export function setOf(tile: number): number[] {
+  const t = BOARD[tile];
+  return t.kind === "utility" ? UTILITIES : t.kind === "property" ? GROUPS[t.group] : [];
+}
 const saleValue = (tile: number) => Math.floor(priceOf(tile) / 2);
 const owned = (s: State, p: PlayerId) => Object.keys(s.owners).map(Number).filter((i) => s.owners[i] === p);
 const wealth = (s: State, p: PlayerId) => s.cash[p] + owned(s, p).reduce((sum, i) => sum + priceOf(i), 0);
@@ -211,12 +216,11 @@ export const kampusTour: GameDefinition<State, Move> = {
     if (move.type === "buy") {
       const tile = s.positions[player];
       const amount = priceOf(tile);
-      return finish({
-        ...s,
-        owners: { ...s.owners, [tile]: player },
-        cash: { ...s.cash, [player]: s.cash[player] - amount },
-        events: [...s.events, { type: "buy" as const, player, amount, tile }].slice(-LOG),
-      });
+      const bought = log(
+        { ...s, owners: { ...s.owners, [tile]: player }, cash: { ...s.cash, [player]: s.cash[player] - amount } },
+        { type: "buy", player, amount, tile },
+      );
+      return finish(setOf(tile).every((i) => bought.owners[i] === player) ? log(bought, { type: "set", player, tile }) : bought);
     }
 
     if (move.type === "sell") {

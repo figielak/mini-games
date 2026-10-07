@@ -149,6 +149,17 @@ body::before {
   }
 }
 
+/* Świeżo zebrany komplet w Kampus Tour: pola pulsują kolorem gracza (--glow). */
+@keyframes set-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+  50% {
+    box-shadow: 0 0 18px 2px var(--glow);
+  }
+}
+
 /* Turlanie kostki w Kampus Tour. */
 @keyframes dice-tumble {
   0%,

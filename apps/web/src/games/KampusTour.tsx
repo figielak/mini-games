@@ -16,6 +16,7 @@ import {
   ForkKnife,
   GraduationCap,
   type Icon,
+  Star,
   Printer,
   Sun,
   WifiSlash,
@@ -30,6 +31,7 @@ import {
   type KampusMove,
   type KampusTourView,
   kampusBaseRent as baseRent,
+  kampusSetOf as setOf,
   type GameResult,
   type LobbyPlayer,
 } from "@mini-games/games";
@@ -201,6 +203,13 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
   const settledEvents = useRef(view.events);
   if (settled) settledEvents.current = view.events;
   const recent = settledEvents.current.slice(-2);
+  // Świeżo zebrany komplet: jego pola chwilę pulsują w kolorze gracza.
+  const lastEvent = settledEvents.current.at(-1);
+  const fresh = lastEvent?.type === "set" ? setOf(lastEvent.tile!) : [];
+  const complete = (i: number) => {
+    const owner = view.owners[i];
+    return !!owner && setOf(i).every((t) => view.owners[t] === owner);
+  };
   const player = (id: string) => players.find((p) => p.id === id);
   const color = (id: string) => player(id)?.color ?? "#8b8b92";
   const nick = (id: string) => player(id)?.nick ?? "Gracz";
@@ -230,6 +239,8 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
         return `${who} płaci ${e.amount} zł za ${BOARD[e.tile!].name} → ${nick(e.to!)}`;
       case "tax":
         return `${who} płaci ${e.amount} zł za akademik`;
+      case "set":
+        return `${who} ma komplet: ${setOf(e.tile!).map((t) => SHORT[t] ?? BOARD[t].name).join(" + ")}!`;
       case "skip":
         return `${who} pomija ${BOARD[e.tile!].name}`;
       case "sell":
@@ -449,7 +460,7 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
                 : tile.kind === "karty"
                   ? mix(CARDS_COLOR, 14)
                   : owner
-                    ? mix(color(owner), 25)
+                    ? mix(color(owner), complete(i) ? 45 : 25)
                     : undefined;
               return (
                 <button
@@ -459,25 +470,35 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
                   aria-pressed={selected === i}
                   className={`relative flex flex-col items-center justify-center overflow-hidden rounded-sm bg-[color-mix(in_srgb,var(--color-fg)_12%,var(--color-bg))] transition-opacity ${
                     sellable || deciding === i ? "z-10 outline-2 outline-accent" : selected === i ? "outline-2 outline-fg" : ""
-                  } ${deciding !== null && deciding !== i ? "opacity-35" : ""}`}
+                  } ${deciding !== null && deciding !== i ? "opacity-35" : ""} ${fresh.includes(i) ? "animate-[set-glow_0.9s_ease-in-out_4]" : ""}`}
                   style={{
                     gridColumn: x + 1,
                     gridRow: y + 1,
                     backgroundColor: background,
+                    ["--glow" as string]: owner ? color(owner) : undefined,
                     // Ramka i poświata tylko dla pola, na którym dzieje się akcja.
                     boxShadow: deciding === i ? "0 0 16px var(--color-accent)" : undefined,
                   }}
                   onClick={() => setSelected(selected === i ? null : i)}
                 >
                   {tileFace(i)}
-                  {/* Właściciel: stała kropka w jego kolorze w rogu pola (i lekki odcień tła). */}
-                  {owner && (
-                    <span
-                      className="absolute top-0.5 right-0.5 size-3 rounded-full border-2 border-bg"
-                      style={{ backgroundColor: color(owner) }}
-                      aria-label={`Właściciel: ${nick(owner)}`}
-                    />
-                  )}
+                  {/* Właściciel: stała kropka w jego kolorze w rogu pola (i lekki odcień tła); przy komplecie gwiazdka. */}
+                  {owner &&
+                    (complete(i) ? (
+                      <Star
+                        size={16}
+                        weight="fill"
+                        className="absolute top-0 right-0 drop-shadow-[0_0_1.5px_var(--color-bg)]"
+                        style={{ color: color(owner) }}
+                        aria-label={`Komplet: ${nick(owner)}`}
+                      />
+                    ) : (
+                      <span
+                        className="absolute top-0.5 right-0.5 size-3 rounded-full border-2 border-bg"
+                        style={{ backgroundColor: color(owner) }}
+                        aria-label={`Właściciel: ${nick(owner)}`}
+                      />
+                    ))}
                 </button>
               );
             })}
@@ -497,7 +518,11 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
               {recent.length > 0 && (
                 <ul className="text-center text-sm font-medium">
                   {recent.map((e, i) => (
-                    <li key={i} className={i === recent.length - 1 ? "text-fg" : "text-fg-muted"}>
+                    <li
+                      key={i}
+                      className={e.type === "set" ? "font-semibold" : i === recent.length - 1 ? "text-fg" : "text-fg-muted"}
+                      style={e.type === "set" ? { color: color(e.player) } : undefined}
+                    >
                       {describe(e)}
                     </li>
                   ))}

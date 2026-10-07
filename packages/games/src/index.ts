@@ -12,6 +12,7 @@ export {
   BOARD as KAMPUS_BOARD,
   baseRent as kampusBaseRent,
   ROUNDS as KAMPUS_ROUNDS,
+  setOf as kampusSetOf,
   UTILITY_RATES as KAMPUS_UTILITY_RATES,
   type Event as KampusEvent,
   type Move as KampusMove,
