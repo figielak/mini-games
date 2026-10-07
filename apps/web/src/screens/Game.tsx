@@ -1,6 +1,7 @@
 import { ArrowCounterClockwise, Timer, UsersThree } from "@phosphor-icons/react";
-import { GAMES, type PiecWRzedzieView, type RoomView, type StatkiView } from "@mini-games/games";
+import { type ChinczykView, GAMES, type PiecWRzedzieView, type RoomView, type StatkiView } from "@mini-games/games";
 import { useEffect, useMemo, useState } from "react";
+import { Chinczyk } from "../games/Chinczyk.tsx";
 import { PiecWRzedzie } from "../games/PiecWRzedzie.tsx";
 import { Statki } from "../games/Statki.tsx";
 import { Screen, type Send } from "./ui.tsx";
@@ -89,6 +90,29 @@ export function Game({ view, me, dropped, send }: Props) {
           canMove={myTurn}
           onMove={(move) => send("move", move)}
         />
+      )}
+
+      {def.id === "chinczyk" && (
+        <Chinczyk
+          view={game.view as ChinczykView}
+          me={me}
+          players={view.players}
+          canMove={myTurn}
+          onMove={(move) => send("move", move)}
+        />
+      )}
+
+      {view.phase === "over" && game.result?.ranking && game.result.ranking.length > 2 && (
+        <ol className="tile flex flex-col gap-1 p-4">
+          {game.result.ranking.map((id, i) => (
+            <li key={id} className="flex items-center gap-3">
+              <span className="w-5 font-mono text-fg-muted">{i + 1}.</span>
+              <span className="size-2.5 rounded-full" style={{ backgroundColor: view.players.find((p) => p.id === id)?.color }} aria-hidden />
+              {nick(id)}
+              {id === me && <span className="text-fg-muted"> (ty)</span>}
+            </li>
+          ))}
+        </ol>
       )}
 
       {view.phase === "over" && (
