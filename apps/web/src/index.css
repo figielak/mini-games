@@ -182,6 +182,21 @@ body::before {
   }
 }
 
+/* Pływająca kwota przy panelu gracza w Kampus Tour. */
+@keyframes float-up {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-32px);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

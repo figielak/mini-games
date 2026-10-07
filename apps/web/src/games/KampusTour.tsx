@@ -13,6 +13,7 @@ import {
   DiceThree,
   DiceTwo,
   Exam,
+  Warning,
   ForkKnife,
   GraduationCap,
   Buildings,
@@ -27,6 +28,7 @@ import {
   KAMPUS_ALLOWANCE as ALLOWANCE,
   KAMPUS_BOARD as BOARD,
   KAMPUS_CARDS as CARDS,
+  KAMPUS_GROUPS as GROUPS,
   KAMPUS_ROUNDS as ROUNDS,
   KAMPUS_UTILITY_RATES as UTILITY_RATES,
   type KampusEvent,
@@ -245,6 +247,40 @@ function Dice({ values, rolling }: { values: [number, number]; rolling: boolean 
   );
 }
 
+/** Zmiany gotówki jako pływające kwoty (+8 zł, −8 zł) przy panelach graczy; znikają po animacji. */
+function useFloats(ids: string[], cash: Record<string, number>) {
+  const [floats, setFloats] = useState<{ key: number; player: string; amount: number }[]>([]);
+  const prev = useRef(cash);
+  const next = useRef(0);
+  useEffect(() => {
+    const before = prev.current;
+    prev.current = cash;
+    const added = ids.filter((p) => cash[p] !== before[p]).map((p) => ({ key: next.current++, player: p, amount: cash[p] - before[p] }));
+    if (!added.length) return;
+    setFloats((f) => [...f, ...added]);
+    // Bez sprzątania w cleanupie: kolejna zmiana gotówki nie może zatrzymać usuwania poprzednich kwot.
+    setTimeout(() => setFloats((f) => f.filter((x) => !added.includes(x))), 1700);
+  }, [cash, ids]);
+  return floats;
+}
+
+/** Gracz, który właśnie zebrał 2. pełną grupę (o krok od monopolu); dismiss chowa ostrzeżenie u tego gracza. */
+function useMonopolyWarning(ids: string[], owners: Record<number, string>, monopoly: string | null) {
+  const [player, setPlayer] = useState<string | null>(null);
+  const key = JSON.stringify(owners);
+  // null przy pierwszym renderze: po odświeżeniu strony stary stan nie wywołuje ostrzeżenia.
+  const prev = useRef<Record<string, number> | null>(null);
+  useEffect(() => {
+    const counts = Object.fromEntries(ids.map((p) => [p, GROUPS.filter((g) => g.every((i) => owners[i] === p)).length]));
+    const before = prev.current;
+    prev.current = counts;
+    if (!before || monopoly) return;
+    const warned = ids.find((p) => counts[p] === 2 && before[p] < 2);
+    if (warned) setPlayer(warned);
+  }, [key]);
+  return { player, dismiss: () => setPlayer(null) };
+}
+
 /** Pole planszy 12×6 → [kolumna, wiersz], od lewego górnego rogu zgodnie z ruchem wskazówek zegara. */
 function cell(i: number): [number, number] {
   if (i <= 11) return [i, 0];
@@ -264,6 +300,16 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
   // Podczas animacji widać zdarzenia sprzed rzutu; nowe pojawiają się po dojściu pionka.
   const settledEvents = useRef(view.events);
   if (settled) settledEvents.current = view.events;
+  // Gotówka i pola tak samo: zmieniają się dopiero po dojściu pionka.
+  const settledCash = useRef(view.cash);
+  const settledOwners = useRef(view.owners);
+  if (settled) {
+    settledCash.current = view.cash;
+    settledOwners.current = view.owners;
+  }
+  const cash = settledCash.current;
+  const floats = useFloats(view.players, cash);
+  const warning = useMonopolyWarning(view.players, settledOwners.current, view.monopoly);
   const recent = settledEvents.current.slice(-2);
   // Świeżo zebrany komplet: jego pola chwilę pulsują w kolorze gracza.
   const lastEvent = settledEvents.current.at(-1);
@@ -345,6 +391,9 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
   /** Sprzedaż bankowi: połowa ceny pola z budynkami. */
   const value = (tile: number) => price(tile) + buildCost(tile, 0, level(tile));
   const saleValue = (tile: number) => Math.floor(value(tile) / 2);
+  /** Majątek jak w rankingu po ostatniej rundzie: gotówka + pola z budynkami. */
+  const wealth = (id: string) =>
+    cash[id] + Object.keys(settledOwners.current).map(Number).filter((i) => settledOwners.current[i] === id).reduce((sum, i) => sum + value(i), 0);
   /** Poziomy, które gracz na turze może teraz zbudować na swoim polu. */
   const buildChoices = () => {
     const from = level(here);
@@ -587,12 +636,30 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
                 {nick(id)}
                 {id === me && " (ty)"}
               </span>
-              <span className="font-mono text-sm text-fg">{out ? "bankrut" : `${view.cash[id]} zł`}</span>
+              <span className="font-mono text-sm text-fg">{out ? "bankrut" : `${cash[id]} zł`}</span>
+              {!out && (
+                <span title="Majątek: gotówka + pola z budynkami">
+                  majątek <span className="font-mono text-fg">{wealth(id)}</span>
+                </span>
+              )}
               {!out && <span>{fields(Object.values(view.owners).filter((o) => o === id).length)}</span>}
               {view.kolokwium.includes(id) && <span className="font-medium text-[#ff6369]">na Kolokwium</span>}
               {(view.passes[id] ?? 0) > 0 && <span className="text-fg">Zaliczenie ×{view.passes[id]}</span>}
               {view.mpk.includes(id) && <span className="font-medium text-[#3dd68c]">Bilet MPK</span>}
               {ranking.includes(id) && <span className="font-mono">{ranking.indexOf(id) + 1}. miejsce</span>}
+              {floats
+                .filter((f) => f.player === id)
+                .map((f) => (
+                  <span
+                    key={f.key}
+                    className="pointer-events-none absolute top-1/3 left-1/2 -translate-x-1/2 animate-[float-up_1.6s_ease-out_forwards] font-mono text-base font-bold whitespace-nowrap drop-shadow-[0_1px_2px_rgb(0_0_0/0.9)]"
+                    style={{ color: f.amount > 0 ? "#3dd68c" : "#ff6369" }}
+                    aria-hidden
+                  >
+                    {f.amount > 0 ? "+" : "−"}
+                    {Math.abs(f.amount)} zł
+                  </span>
+                ))}
             </div>
           );
         })}
@@ -825,6 +892,43 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
                 ) : (
                   <p className="mt-2 text-sm text-fg-muted">{nick(view.turn!)} czyta kartę…</p>
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Ostrzeżenie: ktoś ma 2 pełne grupy, trzecia to monopol i koniec gry. */}
+        {warning.player && !over && (
+          <div className="absolute inset-0 z-30 grid place-items-center bg-bg/60 backdrop-blur-sm">
+            <div
+              role="alertdialog"
+              aria-label="Groźba monopolu"
+              className="flex w-80 animate-[card-in_0.35s_ease-out] flex-col overflow-hidden rounded-inset border border-line bg-surface shadow-[0_16px_48px_rgb(0_0_0/0.7)]"
+            >
+              <div className="flex items-center gap-2 px-4 py-2.5 text-bg" style={{ backgroundColor: color(warning.player) }}>
+                <Warning size={22} weight="fill" aria-hidden />
+                <span className="text-xs font-semibold tracking-wide uppercase">Groźba monopolu</span>
+              </div>
+              <div className="flex flex-col gap-2 p-4 text-center">
+                <h2 className="text-lg font-semibold">
+                  {warning.player === me ? "Masz 2 pełne grupy!" : `${nick(warning.player)} ma 2 pełne grupy!`}
+                </h2>
+                <p className="text-sm text-fg-muted">
+                  {warning.player === me ? "Jeszcze jedna i wygrywasz przez monopol." : "Jeszcze jedna i wygrywa przez monopol. Nie oddawaj pól z grup, które zaczął zbierać."}
+                </p>
+                {/* Grupy, które zaczął zbierać: ile pól już ma. */}
+                <ul className="flex flex-wrap justify-center gap-1.5 text-xs">
+                  {GROUPS.map((g, k) => ({ k, mine: g.filter((i) => view.owners[i] === warning.player).length, total: g.length }))
+                    .filter(({ mine, total }) => mine > 0 && mine < total)
+                    .map(({ k, mine, total }) => (
+                      <li key={k} className="rounded-full border px-2 py-0.5" style={{ borderColor: GROUP_COLORS[k] }}>
+                        {GROUP_NAMES[k]} {mine}/{total}
+                      </li>
+                    ))}
+                </ul>
+                <button type="button" className="btn btn-primary mt-2" autoFocus onClick={warning.dismiss}>
+                  OK
+                </button>
               </div>
             </div>
           </div>

@@ -11,6 +11,7 @@ export {
   ALLOWANCE as KAMPUS_ALLOWANCE,
   BOARD as KAMPUS_BOARD,
   CARDS as KAMPUS_CARDS,
+  GROUPS as KAMPUS_GROUPS,
   baseRent as kampusBaseRent,
   buildCost as kampusBuildCost,
   LANDMARK as KAMPUS_LANDMARK,
