@@ -7,7 +7,7 @@ export const START_CASH = 200;
 /** Premia startowa za każde dalsze miejsce w kolejce: wyrównuje przewagę pierwszego ruchu (symulacja botów). */
 export const SEAT_BONUS = 20;
 /** Kieszonkowe za przejście przez Początek. */
-export const ALLOWANCE = 20;
+export const ALLOWANCE = 40;
 const TAX = 15;
 
 /** Grupy (pory dnia studenta): cena i pola [indeks, nazwa]. Skrajne grupy po 2 pola, jak w Monopoly. */
@@ -259,10 +259,10 @@ export function buildCost(tile: number, from: number, to: number): number {
   return cost;
 }
 
-/** Najwyższy możliwy poziom: landmark tylko z kompletem grupy; Ksero, Stołówka i reszta bez budowy. */
+/** Najwyższy możliwy poziom: bez kompletu grupy tylko poziom 1; Ksero, Stołówka i reszta bez budowy. */
 export function maxLevel(owners: Record<number, PlayerId>, tile: number): number {
   if (BOARD[tile].kind !== "property") return 0;
-  return setOf(tile).every((i) => owners[i] === owners[tile]) ? LANDMARK : LANDMARK - 1;
+  return setOf(tile).every((i) => owners[i] === owners[tile]) ? LANDMARK : 1;
 }
 
 /** Wartość pola z budynkami: cena + koszt budowy. */
@@ -563,9 +563,13 @@ export const kampusTour: GameDefinition<State, Move> = {
 
     if (move.type === "travel") {
       // Rzut tylko do czynszu za Ksero i Stołówkę (oczka × stawka); ruch nie zależy od oczek.
+      // Jazda MPK nie daje kieszonkowego za Początek: inaczej bilet byłby darmowym kompletem z premią.
       const dice: [number, number] = [Math.floor(rng() * 6) + 1, Math.floor(rng() * 6) + 1];
-      const left = log({ ...s, dice, mpk: s.mpk.filter((p) => p !== player), doubles: 0 }, { type: "travel", player, tile: move.tile });
-      return land(moveTo(left, player, move.tile), player);
+      const left = log(
+        { ...s, dice, mpk: s.mpk.filter((p) => p !== player), doubles: 0, positions: { ...s.positions, [player]: move.tile } },
+        { type: "travel", player, tile: move.tile },
+      );
+      return land(left, player);
     }
 
     if (move.type === "buyout") {

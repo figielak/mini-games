@@ -839,7 +839,8 @@ describe("wykupienie", () => {
   const onTheirs = (patch: Parameters<typeof with2>[1] = {}) => roll(with2(two(), { owners: { 4: B }, ...patch }), A, 1, 3);
 
   test("po czynszu można wykupić pole za 2× wartość, pieniądze dostaje właściciel", () => {
-    let s = onTheirs({ levels: { 4: 1 } }); // wartość 15 + 8, czynsz 6 zł
+    // A ma resztę grupy (3, 6), więc wykup zamyka komplet. Wartość 15 + 8, czynsz 6 zł.
+    let s = onTheirs({ owners: { 3: A, 4: B, 6: A }, levels: { 4: 1 } });
     expect(view(s).phase).toBe("buyout");
     expect(game.waitingFor(s)).toEqual([A]);
     expect(game.validateMove(s, B, { type: "buyout" })).toBe(false);
@@ -848,8 +849,8 @@ describe("wykupienie", () => {
     expect(view(s).levels[4]).toBe(1);
     expect(view(s).cash[A]).toBe(START_CASH - 6 - 46);
     expect(view(s).cash[B]).toBe(START_CASH + 6 + 46);
-    expect(view(s).events.at(-1)).toEqual({ type: "buyout", player: A, tile: 4, amount: 46, to: B });
-    // Po wykupie można budować jak na własnym polu.
+    expect(view(s).events).toContainEqual({ type: "buyout", player: A, tile: 4, amount: 46, to: B });
+    // Po wykupie można budować jak na własnym polu (tu z kompletem, więc wyżej niż poziom 1).
     expect(view(s).phase).toBe("build");
   });
 

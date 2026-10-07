@@ -139,7 +139,7 @@ const CORNERS: Record<string, { icon: Icon; color: string; sub: string; info: st
     icon: Bus,
     color: "#3dd68c",
     sub: "dowolne pole",
-    info: "Tura się kończy, a w następnej zamiast rzutu możesz pojechać na dowolne pole (mijając Początek, dostajesz kieszonkowe). Zwykły rzut zużywa bilet.",
+    info: "Tura się kończy, a w następnej zamiast rzutu możesz pojechać na dowolne pole (bez kieszonkowego za Początek). Zwykły rzut zużywa bilet.",
   },
 };
 /** Rodzaj pola specjalnego w okienku (pola bez paska grupy). */
@@ -625,7 +625,7 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
         ["Zabudowa", level(i) ? levelName(level(i)) : "brak"],
       );
       if (view.juwenalia?.tile === i) rows.push(["Juwenalia", `czynsz ×${view.juwenalia.factor}`]);
-      text = "Budujesz po staniu na swoim polu. Landmark tylko z kompletem grupy.";
+      text = "Budujesz po staniu na swoim polu. Bez kompletu grupy tylko poziom 1.";
     } else if (tile.kind === "utility") {
       text = "Pole usługowe: można je kupić, ale nie można na nim budować. Czynsz zależy od rzutu, a z oboma (Ksero i Stołówka) jest wyższy.";
       rows.push(
@@ -937,7 +937,7 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
                 {settled && canMove && view.phase === "build" && (
                   <p className="text-center text-sm font-medium">
                     Budujesz: {BOARD[here].name}
-                    {maxLevel(owners, here) < LANDMARK && " · landmark po zebraniu kompletu"}
+                    {maxLevel(owners, here) < LANDMARK && " · wyższe poziomy po zebraniu kompletu"}
                   </p>
                 )}
 
