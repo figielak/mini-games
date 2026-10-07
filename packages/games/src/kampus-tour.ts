@@ -192,6 +192,18 @@ export interface State {
   monopoly: PlayerId | null;
   /** Ostatnie zdarzenia (najwyżej LOG), żeby gracz, który odwrócił wzrok, wiedział, co się stało. */
   events: Event[];
+  /** Dane do podsumowania partii. */
+  stats: Stats;
+}
+
+export interface Stats {
+  /** Majątek na początku każdej rundy (pierwszy punkt: po setupie). */
+  wealth: Record<PlayerId, number[]>;
+  /** Ile kto zapłacił czynszu. */
+  rentPaid: Record<PlayerId, number>;
+  /** Ile czynszu przyniosło pole. */
+  tileIncome: Record<number, number>;
+  doubles: Record<PlayerId, number>;
 }
 
 /** Widok bez kolejności talii (to byłaby wiedza o przyszłych kartach). */
@@ -215,7 +227,19 @@ const moveSchema = z.discriminatedUnion("type", [
 
 const LOG = 4;
 const current = (s: State) => s.players[s.turn];
-const log = (s: State, e: Event): State => ({ ...s, events: [...s.events, e].slice(-LOG) });
+/** Zdarzenie do historii; czynsz liczy się też do statystyk (każdy czynsz przechodzi tędy). */
+const log = (s: State, e: Event): State => ({
+  ...s,
+  events: [...s.events, e].slice(-LOG),
+  stats:
+    e.type === "rent"
+      ? {
+          ...s.stats,
+          rentPaid: { ...s.stats.rentPaid, [e.player]: s.stats.rentPaid[e.player] + e.amount! },
+          tileIncome: { ...s.stats.tileIncome, [e.tile!]: (s.stats.tileIncome[e.tile!] ?? 0) + e.amount! },
+        }
+      : s.stats,
+});
 const priceOf = (tile: number) => {
   const t = BOARD[tile];
   return t.kind === "property" || t.kind === "utility" ? t.price : 0;
@@ -279,7 +303,12 @@ function endTurn(s: State): State {
   do turn = (turn + 1) % s.players.length;
   while (s.bankrupt.includes(s.players[turn]));
   const round = turn <= s.turn ? s.round + 1 : s.round;
-  return { ...s, turn, round, doubles: 0, phase: round > ROUNDS ? "over" : "roll" };
+  // Nowa runda: punkt majątku każdego gracza do wykresu w podsumowaniu.
+  const stats =
+    round > s.round
+      ? { ...s.stats, wealth: Object.fromEntries(s.players.map((p) => [p, [...s.stats.wealth[p], wealth(s, p)]])) }
+      : s.stats;
+  return { ...s, turn, round, doubles: 0, stats, phase: round > ROUNDS ? "over" : "roll" };
 }
 
 /** Koniec rozstrzygania pola: dublet daje kolejny rzut, chyba że to trzeci z rzędu. */
@@ -472,6 +501,12 @@ export const kampusTour: GameDefinition<State, Move> = {
       festivals: 0,
       mpk: [],
       monopoly: null,
+      stats: {
+        wealth: Object.fromEntries(players.map((p, i) => [p, [START_CASH + SEAT_BONUS * i]])),
+        rentPaid: Object.fromEntries(players.map((p) => [p, 0])),
+        tileIncome: {},
+        doubles: Object.fromEntries(players.map((p) => [p, 0])),
+      },
     };
   },
 
@@ -589,7 +624,13 @@ export const kampusTour: GameDefinition<State, Move> = {
     const dice: [number, number] = [Math.floor(rng() * 6) + 1, Math.floor(rng() * 6) + 1];
     const double = dice[0] === dice[1];
     // Zwykły rzut zużywa niewykorzystany Bilet MPK.
-    let next: State = { ...s, dice, doubles: double ? s.doubles + 1 : 0, mpk: s.mpk.filter((p) => p !== player) };
+    let next: State = {
+      ...s,
+      dice,
+      doubles: double ? s.doubles + 1 : 0,
+      mpk: s.mpk.filter((p) => p !== player),
+      stats: double ? { ...s.stats, doubles: { ...s.stats.doubles, [player]: s.stats.doubles[player] + 1 } } : s.stats,
+    };
 
     if (s.kolokwium.includes(player)) {
       next = { ...next, kolokwium: s.kolokwium.filter((p) => p !== player) };
@@ -623,6 +664,7 @@ export const kampusTour: GameDefinition<State, Move> = {
     turn: s.phase === "over" ? null : current(s),
     phase: s.phase,
     characters: s.characters,
+    stats: s.stats,
     dice: s.dice,
     round: Math.min(s.round, ROUNDS),
     debt: s.debt,

@@ -23,6 +23,7 @@ export {
   UTILITY_RATES as KAMPUS_UTILITY_RATES,
   type Event as KampusEvent,
   type Move as KampusMove,
+  type Stats as KampusStats,
   type TileKind as KampusTileKind,
   type View as KampusTourView,
 } from "./kampus-tour.ts";

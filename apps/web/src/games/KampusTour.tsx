@@ -55,6 +55,7 @@ import {
   type LobbyPlayer,
 } from "@mini-games/games";
 import { type ReactNode, useEffect, useRef, useState } from "react";
+import { KampusSummary } from "./KampusSummary.tsx";
 
 interface Props {
   view: KampusTourView;
@@ -169,10 +170,10 @@ const groupChip = (group: number) => {
 /** Status gracza w panelu: zaokrąglony znaczek z ikoną. */
 const badge = (BadgeIcon: Icon, text: string, color: string) => (
   <span
-    className="flex items-center gap-1 rounded-full px-1.5 py-px text-[10px] leading-tight font-medium whitespace-nowrap text-fg"
+    className="flex max-w-full items-center gap-0.5 rounded-full px-1 py-px text-[9px] leading-tight font-medium whitespace-nowrap text-fg"
     style={{ backgroundColor: `color-mix(in srgb, ${color} 22%, var(--color-surface))`, boxShadow: `inset 0 0 0 1px ${color}` }}
   >
-    <BadgeIcon size={11} weight="fill" style={{ color }} aria-hidden />
+    <BadgeIcon size={10} weight="fill" className="shrink-0" style={{ color }} aria-hidden />
     {text}
   </span>
 );
@@ -361,22 +362,30 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
     settledOwners.current = view.owners;
     settledLevels.current = view.levels;
   }
+  // Plansza i panele pokazują właścicieli i zabudowę z tej samej chwili co gotówkę: po dojściu pionka.
+  const owners = settledOwners.current;
+  const levels = settledLevels.current;
   const cash = settledCash.current;
   const floats = useFloats(view.players, cash);
-  const warning = useMonopolyWarning(view.players, settledOwners.current, view.monopoly);
+  const warning = useMonopolyWarning(view.players, owners, view.monopoly);
   const recent = settledEvents.current.slice(-3);
   // Świeżo zebrany komplet: jego pola chwilę pulsują w kolorze gracza.
   const lastEvent = settledEvents.current.at(-1);
   const fresh = lastEvent?.type === "set" ? setOf(lastEvent.tile!) : [];
   const complete = (i: number) => {
-    const owner = view.owners[i];
-    return !!owner && setOf(i).every((t) => view.owners[t] === owner);
+    const owner = owners[i];
+    return !!owner && setOf(i).every((t) => owners[t] === owner);
   };
   const player = (id: string) => players.find((p) => p.id === id);
   const color = (id: string) => player(id)?.color ?? "#8b8b92";
   const nick = (id: string) => player(id)?.nick ?? "Gracz";
   const seat = (id: string) => view.players.indexOf(id);
   const over = result !== null;
+  // Podsumowanie otwiera się samo po każdej partii; „Plansza” je chowa.
+  const [summaryHidden, setSummaryHidden] = useState(false);
+  useEffect(() => {
+    if (!over) setSummaryHidden(false);
+  }, [over]);
   const ranking = result?.ranking ?? [];
   const selling = canMove && view.phase === "sell";
   /** Wybór pola na Juwenalia albo cel jazdy MPK: przycisk w okienku pola. */
@@ -385,7 +394,7 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
   const nextFactor = view.festivals + 2;
   /** Czy pole można teraz wybrać; null, gdy nic się nie wybiera (wtedy nic nie przygasa). */
   const pickable = (i: number): boolean | null =>
-    selling || festive ? view.owners[i] === me : traveling ? i !== view.positions[me] : null;
+    selling || festive ? owners[i] === me : traveling ? i !== view.positions[me] : null;
 
   const status = over
     ? result.winner === me
@@ -444,21 +453,21 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
   const here = view.turn ? view.positions[view.turn] : 0;
   /** Pole, o którego kupnie właśnie się decyduje: unosi się i świeci kolorem gracza (reszta planszy zostaje czytelna). */
   const deciding = settled && !over && (view.phase === "buy" || view.phase === "build" || view.phase === "buyout") ? here : null;
-  const level = (tile: number) => view.levels[tile] ?? 0;
+  const level = (tile: number) => levels[tile] ?? 0;
   /** Sprzedaż bankowi: połowa ceny pola z budynkami. */
   const value = (tile: number) => price(tile) + buildCost(tile, 0, level(tile));
   const saleValue = (tile: number) => Math.floor(value(tile) / 2);
   /** Pola gracza w panelu: ten sam moment co gotówka (po dojściu pionka), żeby liczby do siebie pasowały. */
-  const ownedBy = (id: string) => Object.keys(settledOwners.current).map(Number).filter((i) => settledOwners.current[i] === id);
+  const ownedBy = (id: string) => Object.keys(owners).map(Number).filter((i) => owners[i] === id);
   /** Majątek jak w rankingu po ostatniej rundzie: gotówka + ceny pól + koszt budynków. */
   const wealth = (id: string) =>
-    cash[id] + ownedBy(id).reduce((sum, i) => sum + price(i) + buildCost(i, 0, settledLevels.current[i] ?? 0), 0);
+    cash[id] + ownedBy(id).reduce((sum, i) => sum + value(i), 0);
   /** Ile zapłaci ten, kto stanie na cudzym polu (z kompletem, budynkami i Juwenaliami); Ksero i Stołówka: mnożnik oczek. */
   const rentNow = (i: number): ReactNode => {
     const t = BOARD[i];
-    const owner = view.owners[i];
+    const owner = owners[i];
     if (t.kind === "utility") {
-      const count = BOARD.filter((b, j) => b.kind === "utility" && view.owners[j] === owner).length;
+      const count = BOARD.filter((b, j) => b.kind === "utility" && owners[j] === owner).length;
       return (
         <span className="inline-flex items-center gap-px font-mono">
           <DiceFive size={12} weight="fill" aria-label="oczka" />×{UTILITY_RATES[count - 1]}
@@ -473,14 +482,14 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
   const buildChoices = () => {
     const from = level(here);
     const options: number[] = [];
-    for (let l = from + 1; l <= maxLevel(view.owners, here); l++) if (buildCost(here, from, l) <= view.cash[view.turn!]) options.push(l);
+    for (let l = from + 1; l <= maxLevel(owners, here); l++) if (buildCost(here, from, l) <= view.cash[view.turn!]) options.push(l);
     return options;
   };
 
   /** Co daje kupno: czynsz i ile pól z grupy gracz już ma. */
   function buyInfo(i: number) {
     const t = BOARD[i];
-    const owns = (match: (j: number) => boolean) => BOARD.filter((_, j) => match(j) && view.owners[j] === view.turn).length;
+    const owns = (match: (j: number) => boolean) => BOARD.filter((_, j) => match(j) && owners[j] === view.turn).length;
     if (t.kind === "utility") {
       const utilities = BOARD.map((b, j) => (b.kind === "utility" ? j : -1)).filter((j) => j >= 0);
       return `Czynsz: oczka × ${UTILITY_RATES[0]} zł · z obiema: oczka × ${UTILITY_RATES[1]} zł · masz ${owns((j) => utilities.includes(j))}/${utilities.length}`;
@@ -526,7 +535,7 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
   /** Zawartość pola na planszy, zależnie od rodzaju. */
   function tileFace(i: number) {
     const tile = BOARD[i];
-    const sellable = selling && view.owners[i] === me;
+    const sellable = selling && owners[i] === me;
 
     if (tile.kind in CORNERS) {
       const corner = CORNERS[tile.kind];
@@ -551,7 +560,7 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
     const priceTag = (
       <span className="text-[12px] leading-none font-semibold text-fg">
         {/* Wolne pole: cena kupna; czyjeś: czynsz za stanięcie. */}
-        {tile.kind === "karty" ? "\u00a0" : sellable ? zl(`+${saleValue(i)}`) : view.owners[i] ? rentNow(i) : zl(price(i))}
+        {tile.kind === "karty" ? "\u00a0" : sellable ? zl(`+${saleValue(i)}`) : owners[i] ? rentNow(i) : zl(price(i))}
       </span>
     );
     // Pola specjalne: duża ikona zamiast paska grupy.
@@ -599,7 +608,7 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
   /** Szczegóły pola w okienku: pełna nazwa, zasady, czynsze i właściciel. */
   function tileInfo(i: number) {
     const tile = BOARD[i];
-    const owner = view.owners[i];
+    const owner = owners[i];
     const rows: [string, string][] = [];
     let text: string | null = null;
     let accent = SPECIAL_COLOR;
@@ -734,7 +743,7 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
               )}
               {!out && <span className="text-fg-muted">{fields(ownedBy(id).length)}</span>}
               {view.kolokwium.includes(id) && badge(Exam, "Kolokwium", CORNERS.kolokwium.color)}
-              {(view.passes[id] ?? 0) > 0 && badge(Cards, `Zaliczenie ×${view.passes[id]}`, SPECIAL_COLOR)}
+              {(view.passes[id] ?? 0) > 0 && badge(Cards, view.passes[id] > 1 ? `Zaliczenie ×${view.passes[id]}` : "Zaliczenie", SPECIAL_COLOR)}
               {view.mpk.includes(id) && badge(Bus, "Bilet MPK", CORNERS.mpk.color)}
               {ranking.includes(id) && <span className="font-mono">{ranking.indexOf(id) + 1}. miejsce</span>}
               {floats
@@ -770,7 +779,7 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
           >
             {BOARD.map((tile, i) => {
               const [x, y] = cell(i);
-              const owner = view.owners[i];
+              const owner = owners[i];
               const sellable = (selling || festive) && owner === me;
               const background =
                 tile.kind in CORNERS
@@ -921,14 +930,14 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
                 {settled && canMove && view.phase === "buy" && <p className="text-center text-sm font-medium">{buyInfo(here)}</p>}
                 {settled && canMove && view.phase === "buyout" && (
                   <p className="text-center text-sm font-medium">
-                    2× wartość pola · pieniądze dostaje {nick(view.owners[here])}
+                    2× wartość pola · pieniądze dostaje {nick(owners[here])}
                   </p>
                 )}
                 {traveling && <p className="text-center text-sm font-medium">Masz Bilet MPK: stuknij dowolne pole i jedź albo rzuć kośćmi</p>}
                 {settled && canMove && view.phase === "build" && (
                   <p className="text-center text-sm font-medium">
                     Budujesz: {BOARD[here].name}
-                    {maxLevel(view.owners, here) < LANDMARK && " · landmark po zebraniu kompletu"}
+                    {maxLevel(owners, here) < LANDMARK && " · landmark po zebraniu kompletu"}
                   </p>
                 )}
 
@@ -955,6 +964,11 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
                   </ul>
                 )}
                 {actions && <div className="flex w-full max-w-xs gap-2">{actions}</div>}
+                {over && summaryHidden && view.stats && (
+                  <button type="button" className="btn btn-ghost min-h-9 px-4 text-sm" onClick={() => setSummaryHidden(false)}>
+                    Podsumowanie
+                  </button>
+                )}
               </div>
 
               {selected !== null && tileInfo(selected)}
@@ -1035,6 +1049,19 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
           </div>
         )}
 
+        {over && settled && !summaryHidden && view.stats && (
+          <KampusSummary
+            title={status}
+            stats={view.stats}
+            players={ranking.length ? ranking : view.players}
+            nick={nick}
+            color={color}
+            finalWealth={wealth}
+            actions={actions}
+            onClose={() => setSummaryHidden(true)}
+          />
+        )}
+
         {/* Ostrzeżenie: ktoś ma 2 pełne grupy, trzecia to monopol i koniec gry. */}
         {warning.player && !over && (
           <div className="absolute inset-0 z-30 grid place-items-center bg-bg/60 backdrop-blur-sm">
@@ -1056,7 +1083,7 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
                 </p>
                 {/* Grupy, które zaczął zbierać: ile pól już ma. */}
                 <ul className="flex flex-wrap justify-center gap-1.5 text-xs">
-                  {GROUPS.map((g, k) => ({ k, mine: g.filter((i) => view.owners[i] === warning.player).length, total: g.length }))
+                  {GROUPS.map((g, k) => ({ k, mine: g.filter((i) => owners[i] === warning.player).length, total: g.length }))
                     .filter(({ mine, total }) => mine > 0 && mine < total)
                     .map(({ k, mine, total }) => (
                       <li key={k} className="rounded-full border px-1.5 py-0.5" style={{ borderColor: GROUP_COLORS[k] }}>
