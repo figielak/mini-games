@@ -33,7 +33,7 @@ import {
   type GameResult,
   type LobbyPlayer,
 } from "@mini-games/games";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 
 interface Props {
   view: KampusTourView;
@@ -109,6 +109,31 @@ function fields(n: number) {
   return `${n} ${few ? "pola" : "pól"}`;
 }
 
+const reducedMotion = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/**
+ * Pozycje pionków do wyświetlenia: po rzucie pionek idzie pole po polu do pozycji z serwera.
+ * Długie skoki (powrót po zerwanym połączeniu) i ograniczony ruch w systemie: bez animacji.
+ */
+function useWalk(target: Record<string, number>): Record<string, number> {
+  const [shown, setShown] = useState(target);
+  useEffect(() => {
+    const behind = Object.keys(target).filter((p) => shown[p] !== target[p]);
+    if (behind.length === 0) return;
+    const far = behind.some((p) => shown[p] === undefined || (target[p] - shown[p] + BOARD.length) % BOARD.length > 12);
+    if (reducedMotion || far) return setShown(target);
+    const t = setTimeout(() => {
+      setShown((prev) => {
+        const next = { ...prev };
+        for (const p of behind) next[p] = (prev[p] + 1) % BOARD.length;
+        return next;
+      });
+    }, 110);
+    return () => clearTimeout(t);
+  }, [shown, target]);
+  return shown;
+}
+
 /** Pole planszy 12×6 → [kolumna, wiersz], od lewego górnego rogu zgodnie z ruchem wskazówek zegara. */
 function cell(i: number): [number, number] {
   if (i <= 11) return [i, 0];
@@ -119,6 +144,7 @@ function cell(i: number): [number, number] {
 
 export function KampusTour({ view, me, players, dropped, canMove, result, onMove, timer, actions }: Props) {
   const [selected, setSelected] = useState<number | null>(null);
+  const shown = useWalk(view.positions);
   const player = (id: string) => players.find((p) => p.id === id);
   const color = (id: string) => player(id)?.color ?? "#8b8b92";
   const nick = (id: string) => player(id)?.nick ?? "Gracz";
@@ -156,26 +182,45 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
   };
 
   const here = view.turn ? view.positions[view.turn] : 0;
+  /** Pole, o którego kupnie właśnie się decyduje: świeci, reszta planszy przygasa. */
+  const deciding = !over && view.phase === "buy" ? here : null;
+
+  /** Co daje kupno: czynsz i ile pól z grupy gracz już ma. */
+  function buyInfo(i: number) {
+    const t = BOARD[i];
+    const owns = (match: (j: number) => boolean) => BOARD.filter((_, j) => match(j) && view.owners[j] === view.turn).length;
+    if (t.kind === "utility") {
+      const utilities = BOARD.map((b, j) => (b.kind === "utility" ? j : -1)).filter((j) => j >= 0);
+      return `Czynsz: oczka × ${UTILITY_RATES[0]} zł (z oboma × ${UTILITY_RATES[1]}) · masz ${owns((j) => utilities.includes(j))}/${utilities.length}`;
+    }
+    if (t.kind !== "property") return null;
+    const group = BOARD.map((b, j) => (b.kind === "property" && b.group === t.group ? j : -1)).filter((j) => j >= 0);
+    return `Czynsz: ${baseRent(t.price)} zł (cała grupa ${baseRent(t.price) * 2} zł) · ${GROUP_NAMES[t.group]}: masz ${owns((j) => group.includes(j))}/${group.length}`;
+  }
 
   /** Żeton gracza: ikona w ciemnym kółku z jasną obwódką, widoczny na każdym kolorze pola. */
-  const token = (p: string, size: number) => {
+  const token = (p: string, size: number, first: boolean) => {
     const Pawn = SEAT_ICONS[seat(p)];
     return (
       <span
         key={p}
-        className="-ml-1.5 grid shrink-0 place-items-center rounded-full border-[1.5px] border-white bg-bg shadow-[0_1px_3px_rgb(0_0_0/0.7)] first:ml-0"
-        style={{ width: size, height: size }}
+        className="grid shrink-0 place-items-center rounded-full border-2 border-white bg-bg shadow-[0_1px_3px_rgb(0_0_0/0.7)]"
+        style={{ width: size, height: size, marginLeft: first ? 0 : -size * 0.45 }}
       >
         <Pawn size={size * 0.62} weight="fill" style={{ color: color(p) }} aria-label={nick(p)} />
       </span>
     );
   };
-  /** Pionki na polu: rząd lekko zachodzących na siebie żetonów. */
-  const tokens = (tile: number, size: number) => (
-    <span className="flex shrink-0 items-center justify-center" style={{ height: size }}>
-      {view.players.filter((p) => view.positions[p] === tile && !view.bankrupt.includes(p)).map((p) => token(p, size))}
-    </span>
-  );
+  /** Pionki na polu: rząd zachodzących na siebie żetonów; przy 3-4 graczach mniejsze, żeby zmieścić się w polu. */
+  const tokens = (tile: number, size: number) => {
+    const here = view.players.filter((p) => shown[p] === tile && !view.bankrupt.includes(p));
+    const s = here.length > 2 ? Math.round(size * 0.75) : size;
+    return (
+      <span className="flex shrink-0 items-center justify-center" style={{ height: size }}>
+        {here.map((p, i) => token(p, s, i === 0))}
+      </span>
+    );
+  };
 
   /** Zawartość pola na planszy, zależnie od rodzaju. */
   function tileFace(i: number) {
@@ -188,7 +233,7 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
         <>
           <corner.icon size={22} weight="fill" style={{ color: corner.color }} aria-hidden />
           <span className="px-1 text-center text-[11px] leading-tight font-semibold text-fg">{tile.name}</span>
-          {tokens(i, 18)}
+          {tokens(i, 26)}
         </>
       );
     }
@@ -214,11 +259,11 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
         {side ? (
           <span className="mb-0.5 flex items-center gap-1">
             {priceTag}
-            {tokens(i, 16)}
+            {tokens(i, 22)}
           </span>
         ) : (
           <>
-            <span className="mb-0.5">{tokens(i, 18)}</span>
+            <span className="mb-0.5">{tokens(i, 26)}</span>
             <span className="mb-0.5">{priceTag}</span>
           </>
         )}
@@ -354,15 +399,15 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
                   type="button"
                   aria-label={tile.name}
                   aria-pressed={selected === i}
-                  className={`relative flex flex-col items-center justify-center overflow-hidden rounded-sm bg-[color-mix(in_srgb,var(--color-fg)_12%,var(--color-bg))] ${
-                    sellable ? "outline-2 outline-accent" : selected === i ? "outline-2 outline-fg" : ""
-                  }`}
+                  className={`relative flex flex-col items-center justify-center overflow-hidden rounded-sm bg-[color-mix(in_srgb,var(--color-fg)_12%,var(--color-bg))] transition-opacity ${
+                    sellable || deciding === i ? "z-10 outline-2 outline-accent" : selected === i ? "outline-2 outline-fg" : ""
+                  } ${deciding !== null && deciding !== i ? "opacity-35" : ""}`}
                   style={{
                     gridColumn: x + 1,
                     gridRow: y + 1,
                     backgroundColor: background,
-                    // Właściciel: odcień tła i obwódka w jego kolorze.
-                    boxShadow: owner ? `inset 0 0 0 2px ${color(owner)}` : undefined,
+                    // Właściciel: odcień tła i obwódka w jego kolorze; pole do kupienia świeci.
+                    boxShadow: deciding === i ? "0 0 16px var(--color-accent)" : owner ? `inset 0 0 0 2px ${color(owner)}` : undefined,
                   }}
                   onClick={() => setSelected(selected === i ? null : i)}
                 >
@@ -417,6 +462,7 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
                 )}
                 {!over && !canMove && view.phase === "buy" && <p className="text-sm text-fg-muted">{nick(view.turn!)} decyduje o zakupie</p>}
               </div>
+              {canMove && view.phase === "buy" && <p className="text-center text-sm text-fg-muted">{buyInfo(here)}</p>}
 
               {!over && view.phase === "sell" && view.debt && (
                 <p className="text-center text-sm">
