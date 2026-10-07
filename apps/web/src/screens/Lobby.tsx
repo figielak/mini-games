@@ -1,25 +1,55 @@
-import { Check, Crown, ShareNetwork, SignOut, WifiSlash } from "@phosphor-icons/react";
-import { type LobbyView, MAX_PLAYERS } from "@mini-games/games";
+import { Check, Crown, Play, ShareNetwork, SignOut } from "@phosphor-icons/react";
+import { GAMES, MAX_PLAYERS, type RoomView } from "@mini-games/games";
 import { useState } from "react";
+import { Screen, type Send } from "./ui.tsx";
 
 interface Props {
-  view: LobbyView | null;
+  view: RoomView | null;
   me: string;
   dropped: boolean;
+  send: Send;
   onLeave: () => void;
 }
 
-export function Lobby({ view, me, dropped, onLeave }: Props) {
-  return (
-    <main className="mx-auto flex min-h-[100dvh] max-w-md flex-col gap-3 px-4 pt-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
-      {dropped && (
-        <p role="status" className="flex items-center gap-2 rounded-inset bg-accent-soft px-4 py-3 text-sm">
-          <WifiSlash size={18} aria-hidden />
-          Łączenie ponownie…
-        </p>
-      )}
+export function Lobby({ view, me, dropped, send, onLeave }: Props) {
+  const isHost = view?.hostId === me;
+  const def = view?.gameId ? GAMES[view.gameId] : undefined;
+  const startBlocker = !def
+    ? "Wybierz grę."
+    : view!.seats.length < def.minPlayers
+      ? `Zaznacz ${def.minPlayers} graczy do gry.`
+      : null;
 
+  return (
+    <Screen dropped={dropped}>
       {view ? <Code code={view.code} /> : <div className="tile h-36 animate-pulse" aria-label="Wczytywanie" />}
+
+      <section className="tile">
+        <h2 className="label mb-3">Gra</h2>
+        {isHost ? (
+          <div className="flex flex-col gap-2" role="radiogroup" aria-label="Wybór gry">
+            {Object.values(GAMES).map((g) => (
+              <button
+                key={g.id}
+                type="button"
+                role="radio"
+                aria-checked={view?.gameId === g.id}
+                className={`flex min-h-12 items-center justify-between rounded-inset border px-4 text-left transition-colors ${
+                  view?.gameId === g.id ? "border-accent bg-accent-soft" : "border-line hover:border-line-hover"
+                }`}
+                onClick={() => send("pickGame", { gameId: g.id })}
+              >
+                {g.name}
+                <span className="font-mono text-sm text-fg-muted">
+                  {g.minPlayers === g.maxPlayers ? g.minPlayers : `${g.minPlayers}-${g.maxPlayers}`} os.
+                </span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <p className={def ? "" : "text-fg-muted"}>{def ? def.name : "Gospodarz wybiera grę."}</p>
+        )}
+      </section>
 
       <section className="tile">
         <div className="mb-3 flex items-baseline justify-between">
@@ -32,23 +62,44 @@ export function Lobby({ view, me, dropped, onLeave }: Props) {
         </div>
         {view ? (
           <ul className="flex flex-col gap-1">
-            {view.players.map((p) => (
-              <li
-                key={p.id}
-                className={`flex min-h-11 items-center gap-3 rounded-inset px-3 transition-opacity ${p.connected ? "" : "opacity-50"}`}
-                style={{ backgroundColor: `color-mix(in srgb, ${p.color} 10%, transparent)` }}
-              >
-                <span className="size-3 shrink-0 rounded-full" style={{ backgroundColor: p.color }} aria-hidden />
-                <span className="truncate">
-                  {p.nick}
-                  {p.id === me && <span className="text-fg-muted"> (ty)</span>}
-                </span>
-                <span className="ml-auto flex items-center gap-2 text-sm text-fg-muted">
-                  {!p.connected && "rozłączony"}
-                  {p.id === view.hostId && <Crown size={18} weight="fill" aria-label="Gospodarz" />}
-                </span>
-              </li>
-            ))}
+            {view.players.map((p) => {
+              const seated = view.seats.includes(p.id);
+              const row = (
+                <>
+                  <span className="size-3 shrink-0 rounded-full" style={{ backgroundColor: p.color }} aria-hidden />
+                  <span className="truncate">
+                    {p.nick}
+                    {p.id === me && <span className="text-fg-muted"> (ty)</span>}
+                  </span>
+                  <span className="ml-auto flex items-center gap-2 text-sm text-fg-muted">
+                    {!p.connected && "rozłączony"}
+                    {def && (seated ? <span className="text-fg">gra</span> : "ogląda")}
+                    {p.id === view.hostId && <Crown size={18} weight="fill" aria-label="Gospodarz" />}
+                  </span>
+                </>
+              );
+              const className = `flex w-full min-h-11 items-center gap-3 rounded-inset px-3 text-left transition-opacity ${p.connected ? "" : "opacity-50"}`;
+              const style = { backgroundColor: `color-mix(in srgb, ${p.color} ${seated || !def ? 10 : 4}%, transparent)` };
+              return (
+                <li key={p.id}>
+                  {isHost && def ? (
+                    <button
+                      type="button"
+                      className={className}
+                      style={style}
+                      aria-pressed={seated}
+                      onClick={() => send("toggleSeat", { id: p.id })}
+                    >
+                      {row}
+                    </button>
+                  ) : (
+                    <div className={className} style={style}>
+                      {row}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         ) : (
           <div className="h-11 animate-pulse rounded-inset bg-surface-inset" />
@@ -56,20 +107,29 @@ export function Lobby({ view, me, dropped, onLeave }: Props) {
         {view?.players.length === 1 && (
           <p className="mt-3 text-sm text-fg-muted">Podaj znajomym kod pokoju, żeby dołączyli.</p>
         )}
+        {isHost && def && view!.players.length > 1 && (
+          <p className="mt-3 text-sm text-fg-muted">Dotknij gracza, żeby zmienić, kto gra.</p>
+        )}
       </section>
 
-      <section className="tile">
-        <h2 className="label mb-2">Gra</h2>
-        <p className="text-fg-muted">Wybór gry pojawi się wkrótce.</p>
-      </section>
-
-      <div className="mt-auto pt-6">
+      <div className="mt-auto flex flex-col gap-2 pt-6">
+        {isHost ? (
+          <>
+            {startBlocker && <p className="text-center text-sm text-fg-muted">{startBlocker}</p>}
+            <button type="button" className="btn btn-primary w-full" disabled={!!startBlocker} onClick={() => send("start")}>
+              <Play size={18} weight="fill" aria-hidden />
+              Start
+            </button>
+          </>
+        ) : (
+          view && <p className="text-center text-sm text-fg-muted">Czekamy, aż gospodarz zacznie.</p>
+        )}
         <button type="button" className="btn btn-ghost w-full" onClick={onLeave}>
           <SignOut size={18} aria-hidden />
           Wyjdź z pokoju
         </button>
       </div>
-    </main>
+    </Screen>
   );
 }
 

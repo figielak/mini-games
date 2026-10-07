@@ -1,25 +1,99 @@
 import { type AuthContext, type Client, CloseCode, matchMaker, Room, ServerError } from "@colyseus/core";
-import { cleanNick, type LobbyPlayer, type LobbyView, MAX_PLAYERS, PLAYER_COLORS, roomCode } from "@mini-games/games";
+import {
+  cleanNick,
+  createRng,
+  GAMES,
+  type GameDefinition,
+  type GameResult,
+  type LobbyPlayer,
+  MAX_PLAYERS,
+  type Phase,
+  PLAYER_COLORS,
+  type Rng,
+  ROOM_MESSAGES,
+  roomCode,
+  type RoomView,
+} from "@mini-games/games";
 
 const RECONNECT_SECONDS = 10 * 60; // telefon na wykładzie śpi między turami
 const IDLE_MS = 60 * 60 * 1000;
 const ROOMS_PER_IP = 3;
+const MESSAGES_PER_SECOND = 10;
 
 // ponytail: licznik w pamięci jednego procesu, wystarczy przy jednym kontenerze na Pi
 const roomsByIp = new Map<string, number>();
+
+type Timer = { clear(): void };
+
+interface Match {
+  def: GameDefinition<unknown, unknown>;
+  state: unknown;
+  rng: Rng;
+  result: GameResult | null;
+}
 
 export class LobbyRoom extends Room {
   maxClients = MAX_PLAYERS;
   private players = new Map<string, LobbyPlayer>();
   private hostId = "";
   private creatorIp: string | undefined;
-  private idle?: { clear(): void };
+  private idle?: Timer;
+
+  private phase: Phase = "lobby";
+  private gameId: string | null = null;
+  private seats: string[] = [];
+  private scores: Record<string, number> = {};
+  private match: Match | null = null;
+  private turnTimer?: Timer;
+  private turnEndsAt: number | null = null;
+  private messageCounts = new Map<string, { second: number; count: number }>();
 
   async onCreate() {
     let code = roomCode(Math.random);
     while ((await matchMaker.query({ roomId: code })).length > 0) code = roomCode(Math.random);
     this.roomId = code;
     this.touch();
+
+    this.on("pickGame", (client, { gameId }) => {
+      const def = GAMES[gameId];
+      if (!this.isHost(client) || this.phase !== "lobby" || !def) return;
+      this.gameId = gameId;
+      this.seats = [...this.players.keys()].slice(0, def.maxPlayers);
+    });
+
+    this.on("toggleSeat", (client, { id }) => {
+      const def = this.gameId ? GAMES[this.gameId] : undefined;
+      if (!this.isHost(client) || this.phase !== "lobby" || !def || !this.players.has(id)) return;
+      if (this.seats.includes(id)) this.seats = this.seats.filter((s) => s !== id);
+      else if (this.seats.length < def.maxPlayers) this.seats = [...this.seats, id];
+    });
+
+    this.on("start", (client) => {
+      const def = this.gameId ? GAMES[this.gameId] : undefined;
+      if (!this.isHost(client) || this.phase !== "lobby" || !def) return;
+      if (this.seats.length < def.minPlayers || this.seats.length > def.maxPlayers) return;
+      this.startMatch(def);
+    });
+
+    this.on("move", (client, raw) => {
+      if (this.phase !== "playing" || !this.match) return;
+      const move = this.match.def.moveSchema.safeParse(raw);
+      if (move.success) this.play(client.sessionId, move.data);
+    });
+
+    this.on("rematch", (client) => {
+      const def = this.gameId ? GAMES[this.gameId] : undefined;
+      if (!this.isHost(client) || this.phase !== "over" || !def) return;
+      // Na zmianę: kto zaczynał, w rewanżu rusza się ostatni.
+      this.seats = [...this.seats.slice(1), this.seats[0]];
+      this.startMatch(def);
+    });
+
+    this.on("toLobby", (client) => {
+      if (!this.isHost(client) || this.phase !== "over") return;
+      this.phase = "lobby";
+      this.match = null;
+    });
   }
 
   onAuth(_client: Client, options: { nick?: unknown }, context: AuthContext) {
@@ -42,6 +116,9 @@ export class LobbyRoom extends Room {
     const color = PLAYER_COLORS.find((c) => !taken.has(c))!;
     this.players.set(client.sessionId, { id: client.sessionId, nick: auth.nick, color, connected: true });
     if (!this.hostId) this.hostId = client.sessionId;
+    // Gra już wybrana i jest wolne miejsce: nowy gracz od razu gra, gospodarz nie musi go zaznaczać.
+    const def = this.gameId ? GAMES[this.gameId] : undefined;
+    if (this.phase === "lobby" && def && this.seats.length < def.maxPlayers) this.seats = [...this.seats, client.sessionId];
     this.update();
   }
 
@@ -61,21 +138,115 @@ export class LobbyRoom extends Room {
       }
     }
     this.players.delete(client.sessionId);
+    this.messageCounts.delete(client.sessionId);
     if (this.hostId === client.sessionId) this.hostId = this.players.keys().next().value ?? "";
+    if (this.seats.includes(client.sessionId)) {
+      this.seats = this.seats.filter((s) => s !== client.sessionId);
+      // Walkower: w grze 1v1 wygrywa ten, kto został.
+      if (this.phase === "playing") this.finish(this.seats.length === 1 ? { winner: this.seats[0] } : {});
+    }
     this.update();
   }
 
   onDispose() {
+    this.turnTimer?.clear();
     if (this.creatorIp === undefined) return;
     const left = (roomsByIp.get(this.creatorIp) ?? 1) - 1;
     if (left > 0) roomsByIp.set(this.creatorIp, left);
     else roomsByIp.delete(this.creatorIp);
   }
 
+  /** onMessage z limitem wiadomości na sekundę i walidacją zod; po każdej obsłużonej wiadomości rozsyła stan. */
+  private on<K extends keyof typeof ROOM_MESSAGES>(
+    type: K,
+    handler: (client: Client, payload: (typeof ROOM_MESSAGES)[K]["_output"]) => void,
+  ) {
+    this.onMessage(type, (client: Client, raw: unknown) => {
+      if (!this.withinRateLimit(client.sessionId)) return;
+      const parsed = ROOM_MESSAGES[type].safeParse(raw);
+      if (!parsed.success) return;
+      handler(client, parsed.data);
+      this.update();
+    });
+  }
+
+  private withinRateLimit(id: string) {
+    const second = Math.floor(Date.now() / 1000);
+    const entry = this.messageCounts.get(id);
+    if (!entry || entry.second !== second) {
+      this.messageCounts.set(id, { second, count: 1 });
+      return true;
+    }
+    return ++entry.count <= MESSAGES_PER_SECOND;
+  }
+
+  private isHost(client: Client) {
+    return client.sessionId === this.hostId;
+  }
+
+  private startMatch(def: GameDefinition<unknown, unknown>) {
+    const rng = createRng(crypto.getRandomValues(new Uint32Array(1))[0]);
+    this.match = { def, state: def.setup(this.seats, rng), rng, result: null };
+    this.phase = "playing";
+    this.startTurnTimer();
+  }
+
+  private play(player: string, move: unknown) {
+    const match = this.match!;
+    if (!match.def.validateMove(match.state, player, move)) return;
+    match.state = match.def.applyMove(match.state, player, move, match.rng);
+    const result = match.def.isOver(match.state);
+    if (result) this.finish(result);
+    else this.startTurnTimer();
+  }
+
+  private finish(result: GameResult) {
+    if (!this.match) return;
+    this.match.result = result;
+    this.phase = "over";
+    this.turnTimer?.clear();
+    this.turnEndsAt = null;
+    if (result.winner) this.scores[result.winner] = (this.scores[result.winner] ?? 0) + 1;
+  }
+
+  /** Po limicie czasu serwer wykonuje ruch za gracza, który nie zdążył. */
+  private startTurnTimer() {
+    this.turnTimer?.clear();
+    this.turnEndsAt = null;
+    const { def, state, rng } = this.match!;
+    const player = def.currentPlayer(state);
+    if (!def.turnSeconds || !def.timeoutMove || !player) return;
+    const ms = def.turnSeconds * 1000;
+    this.turnEndsAt = Date.now() + ms;
+    this.turnTimer = this.clock.setTimeout(() => {
+      this.play(player, def.timeoutMove!(this.match!.state, player, rng));
+      this.update();
+    }, ms);
+  }
+
   private update() {
-    const view: LobbyView = { code: this.roomId, hostId: this.hostId, players: [...this.players.values()] };
-    this.broadcast("lobby", view);
+    for (const client of this.clients) client.send("room", this.viewFor(client.sessionId));
     this.touch();
+  }
+
+  private viewFor(id: string): RoomView {
+    const match = this.match;
+    return {
+      code: this.roomId,
+      hostId: this.hostId,
+      players: [...this.players.values()],
+      phase: this.phase,
+      gameId: this.gameId,
+      seats: this.seats,
+      scores: this.scores,
+      game: match && {
+        // Obserwator dostaje widok gracza "", czyli bez czyichkolwiek ukrytych informacji.
+        view: match.def.playerView(match.state, this.seats.includes(id) ? id : ""),
+        turn: match.def.currentPlayer(match.state),
+        msLeft: this.turnEndsAt && Math.max(0, this.turnEndsAt - Date.now()),
+        result: match.result,
+      },
+    };
   }
 
   /** Pokój bez żadnej zmiany przez godzinę jest zamykany. */

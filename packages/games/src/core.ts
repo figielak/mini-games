@@ -1,19 +1,30 @@
+import type { z } from "zod";
+
 export type PlayerId = string;
 
 /** Zwraca liczbę z przedziału [0, 1). */
 export type Rng = () => number;
+
+export type GameResult = { winner?: PlayerId; ranking?: PlayerId[] };
 
 export interface GameDefinition<State, Move> {
   id: string;
   name: string;
   minPlayers: number;
   maxPlayers: number;
+  /** Kształt ruchu przychodzącego z sieci; reguły sprawdza dopiero validateMove. */
+  moveSchema: z.ZodType<Move>;
   setup(players: PlayerId[], rng: Rng): State;
   validateMove(state: State, player: PlayerId, move: Move): boolean;
   applyMove(state: State, player: PlayerId, move: Move, rng: Rng): State;
-  /** Widok stanu dla konkretnego gracza: tu ukrywamy informacje. */
+  /** Widok stanu dla konkretnego gracza: tu ukrywamy informacje. Obserwator dostaje widok dla "". */
   playerView(state: State, player: PlayerId): unknown;
-  isOver(state: State): { winner?: PlayerId; ranking?: PlayerId[] } | null;
+  isOver(state: State): GameResult | null;
+  /** Czyja tura; null po końcu gry. */
+  currentPlayer(state: State): PlayerId | null;
+  /** Limit czasu tury; po nim platforma wykonuje timeoutMove za gracza. */
+  turnSeconds?: number;
+  timeoutMove?(state: State, player: PlayerId, rng: Rng): Move;
 }
 
 /** mulberry32: mały, deterministyczny generator. Ten sam seed daje ten sam ciąg (testy, powtórki). */

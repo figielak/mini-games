@@ -204,3 +204,58 @@ describe("stan", () => {
     expect(game.playerView(state, A)).toEqual(game.playerView(state, B));
   });
 });
+
+describe("tura i limit czasu", () => {
+  test("currentPlayer wskazuje, czyja tura, a po końcu gry zwraca null", () => {
+    expect(game.currentPlayer(game.setup([A, B], rng))).toBe(A);
+    expect(game.currentPlayer(play([{ x: 7, y: 7 }]))).toBe(B);
+    const line = [3, 4, 5, 6, 7].map((x) => ({ x, y: 10 }));
+    const filler = [0, 3, 6, 9].map((x) => ({ x, y: 0 }));
+    expect(game.currentPlayer(play(interleave(line, filler)))).toBeNull();
+  });
+
+  test("ruch po limicie czasu jest dozwolony", () => {
+    const state = play([{ x: 7, y: 7 }]);
+    for (let seed = 0; seed < 50; seed++) {
+      const move = game.timeoutMove!(state, B, createRng(seed));
+      expect(game.validateMove(state, B, move)).toBe(true);
+    }
+  });
+
+  test("ruch po limicie trafia w jedyne wolne pole", () => {
+    const a: Move[] = [];
+    const b: Move[] = [];
+    for (let y = 0; y < SIZE; y++) {
+      for (let x = 0; x < SIZE; x++) ((x >> 1) + y) % 2 === 0 ? a.push({ x, y }) : b.push({ x, y });
+    }
+    const moves = interleave(a, b);
+    const last = moves.at(-1)!;
+    const state = play(moves.slice(0, -1));
+    expect(game.timeoutMove!(state, A, createRng(3))).toEqual(last);
+  });
+
+  test("limit czasu tury jest ustawiony", () => {
+    expect(game.turnSeconds).toBeGreaterThan(0);
+  });
+});
+
+describe("widok", () => {
+  test("pokazuje ostatni ruch i linię wygrywającą", () => {
+    const line = [3, 4, 5, 6, 7].map((x) => ({ x, y: 10 }));
+    const filler = [0, 3, 6, 9].map((x) => ({ x, y: 0 }));
+    const view = game.playerView(play(interleave(line, filler)), A) as {
+      lastMove: Move;
+      winLine: Move[];
+    };
+    expect(view.lastMove).toEqual({ x: 7, y: 10 });
+    expect(view.winLine).toHaveLength(5);
+    expect(view.winLine).toEqual(expect.arrayContaining(line));
+  });
+
+  test("schemat ruchu odrzuca śmieci z sieci", () => {
+    expect(game.moveSchema.safeParse({ x: 3, y: 4 }).success).toBe(true);
+    expect(game.moveSchema.safeParse({ x: "3", y: 4 }).success).toBe(false);
+    expect(game.moveSchema.safeParse({ x: 3 }).success).toBe(false);
+    expect(game.moveSchema.safeParse(null).success).toBe(false);
+  });
+});

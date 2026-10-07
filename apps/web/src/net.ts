@@ -1,5 +1,5 @@
 import { Client, type Room } from "@colyseus/sdk";
-import type { LobbyView } from "@mini-games/games";
+import type { RoomView } from "@mini-games/games";
 
 // W dev serwer gry stoi obok Vite na porcie 2567 tego samego hosta (działa też z telefonu w LAN).
 const client = new Client(import.meta.env.DEV ? `http://${location.hostname}:2567` : location.origin);
@@ -24,21 +24,21 @@ function write(key: string, value: string | null) {
 
 export const savedNick = () => read(NICK_KEY) ?? "";
 
-// Serwer wysyła stan lobby od razu po dołączeniu, zanim React podepnie nasłuch,
+// Serwer wysyła stan pokoju od razu po dołączeniu, zanim React podepnie nasłuch,
 // więc nasłuch wisi tu od początku, a ostatni stan czeka na komponent.
-const lobbies = new WeakMap<Room, { view: LobbyView | null; listener?: (v: LobbyView) => void }>();
+const rooms = new WeakMap<Room, { view: RoomView | null; listener?: (v: RoomView) => void }>();
 
-export function watchLobby(room: Room, listener: (v: LobbyView) => void) {
-  const entry = lobbies.get(room)!;
+export function watchRoom(room: Room, listener: (v: RoomView) => void) {
+  const entry = rooms.get(room)!;
   entry.listener = listener;
   if (entry.view) listener(entry.view);
   return () => (entry.listener = undefined);
 }
 
 function remember(room: Room, nick?: string) {
-  const entry: { view: LobbyView | null; listener?: (v: LobbyView) => void } = { view: null };
-  lobbies.set(room, entry);
-  room.onMessage("lobby", (v: LobbyView) => {
+  const entry: { view: RoomView | null; listener?: (v: RoomView) => void } = { view: null };
+  rooms.set(room, entry);
+  room.onMessage("room", (v: RoomView) => {
     entry.view = v;
     entry.listener?.(v);
   });

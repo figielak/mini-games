@@ -1,15 +1,16 @@
 import type { Room } from "@colyseus/sdk";
-import type { LobbyView } from "@mini-games/games";
+import type { RoomView } from "@mini-games/games";
 import { CloseCode } from "@colyseus/sdk";
 import { useEffect, useState } from "react";
-import { forgetRoom, resumeRoom, watchLobby } from "./net.ts";
+import { forgetRoom, resumeRoom, watchRoom } from "./net.ts";
 import { Home } from "./screens/Home.tsx";
+import { Game } from "./screens/Game.tsx";
 import { Lobby } from "./screens/Lobby.tsx";
 
 export function App() {
   const [room, setRoom] = useState<Room | null>(null);
   const [resuming, setResuming] = useState(true);
-  const [view, setView] = useState<LobbyView | null>(null);
+  const [view, setView] = useState<RoomView | null>(null);
   const [dropped, setDropped] = useState(false);
   const [notice, setNotice] = useState<string>();
 
@@ -22,7 +23,7 @@ export function App() {
 
   useEffect(() => {
     if (!room) return;
-    const off = watchLobby(room, setView);
+    const off = watchRoom(room, setView);
     room.onDrop(() => setDropped(true));
     room.onReconnect(() => setDropped(false));
     room.onLeave((code) => {
@@ -37,5 +38,7 @@ export function App() {
 
   if (resuming) return <main className="min-h-[100dvh]" aria-busy />;
   if (!room) return <Home onRoom={setRoom} notice={notice} />;
-  return <Lobby view={view} me={room.sessionId} dropped={dropped} onLeave={() => room.leave()} />;
+  const send = (type: string, payload?: unknown) => room.send(type, payload);
+  if (view && view.phase !== "lobby") return <Game view={view} me={room.sessionId} dropped={dropped} send={send} />;
+  return <Lobby view={view} me={room.sessionId} dropped={dropped} send={send} onLeave={() => room.leave()} />;
 }
