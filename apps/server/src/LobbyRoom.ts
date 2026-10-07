@@ -194,10 +194,14 @@ export class LobbyRoom extends Room {
   private play(player: string, move: unknown) {
     const match = this.match!;
     if (!match.def.validateMove(match.state, player, move)) return;
+    const before = match.def.waitingFor(match.state).join();
     match.state = match.def.applyMove(match.state, player, move, match.rng);
     const result = match.def.isOver(match.state);
-    if (result) this.finish(result);
-    else this.startTurnTimer();
+    if (result) return this.finish(result);
+    // Nowy limit, gdy zmienia się, na kogo czekamy, albo jeden gracz ma kolejny ruch (np. strzał po trafieniu).
+    // Przestawianie statków w fazie równoczesnej nie przedłuża czasu.
+    const after = match.def.waitingFor(match.state);
+    if (after.join() !== before || after.length === 1) this.startTurnTimer();
   }
 
   private finish(result: GameResult) {
@@ -214,12 +218,15 @@ export class LobbyRoom extends Room {
     this.turnTimer?.clear();
     this.turnEndsAt = null;
     const { def, state, rng } = this.match!;
-    const player = def.currentPlayer(state);
-    if (!def.turnSeconds || !def.timeoutMove || !player) return;
+    if (!def.turnSeconds || !def.timeoutMove || def.waitingFor(state).length === 0) return;
     const ms = def.turnSeconds * 1000;
     this.turnEndsAt = Date.now() + ms;
     this.turnTimer = this.clock.setTimeout(() => {
-      this.play(player, def.timeoutMove!(this.match!.state, player, rng));
+      // Ruch zastępczy za każdego, na kogo wciąż czekamy (w rozstawianiu może to być dwóch graczy).
+      for (const player of def.waitingFor(this.match!.state)) {
+        if (this.phase !== "playing") break;
+        this.play(player, def.timeoutMove!(this.match!.state, player, rng));
+      }
       this.update();
     }, ms);
   }
@@ -242,7 +249,7 @@ export class LobbyRoom extends Room {
       game: match && {
         // Obserwator dostaje widok gracza "", czyli bez czyichkolwiek ukrytych informacji.
         view: match.def.playerView(match.state, this.seats.includes(id) ? id : ""),
-        turn: match.def.currentPlayer(match.state),
+        waitingFor: match.def.waitingFor(match.state),
         msLeft: this.turnEndsAt && Math.max(0, this.turnEndsAt - Date.now()),
         result: match.result,
       },

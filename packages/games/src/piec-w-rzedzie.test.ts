@@ -206,12 +206,12 @@ describe("stan", () => {
 });
 
 describe("tura i limit czasu", () => {
-  test("currentPlayer wskazuje, czyja tura, a po końcu gry zwraca null", () => {
-    expect(game.currentPlayer(game.setup([A, B], rng))).toBe(A);
-    expect(game.currentPlayer(play([{ x: 7, y: 7 }]))).toBe(B);
+  test("waitingFor wskazuje, czyja tura, a po końcu gry jest pusty", () => {
+    expect(game.waitingFor(game.setup([A, B], rng))).toEqual([A]);
+    expect(game.waitingFor(play([{ x: 7, y: 7 }]))).toEqual([B]);
     const line = [3, 4, 5, 6, 7].map((x) => ({ x, y: 10 }));
     const filler = [0, 3, 6, 9].map((x) => ({ x, y: 0 }));
-    expect(game.currentPlayer(play(interleave(line, filler)))).toBeNull();
+    expect(game.waitingFor(play(interleave(line, filler)))).toEqual([]);
   });
 
   test("ruch po limicie czasu jest dozwolony", () => {

@@ -1,7 +1,8 @@
 import { ArrowCounterClockwise, Timer, UsersThree } from "@phosphor-icons/react";
-import { GAMES, type PiecWRzedzieView, type RoomView } from "@mini-games/games";
+import { GAMES, type PiecWRzedzieView, type RoomView, type StatkiView } from "@mini-games/games";
 import { useEffect, useMemo, useState } from "react";
 import { PiecWRzedzie } from "../games/PiecWRzedzie.tsx";
+import { Statki } from "../games/Statki.tsx";
 import { Screen, type Send } from "./ui.tsx";
 
 interface Props {
@@ -16,7 +17,8 @@ export function Game({ view, me, dropped, send }: Props) {
   const def = GAMES[view.gameId!];
   const nick = (id: string | undefined) => view.players.find((p) => p.id === id)?.nick ?? "Gracz";
   const seated = view.seats.includes(me);
-  const myTurn = view.phase === "playing" && game.turn === me;
+  const myTurn = view.phase === "playing" && game.waitingFor.includes(me);
+  const waitingNicks = game.waitingFor.filter((id) => id !== me).map(nick).join(" i ");
 
   // Tryb wykładowy: krótka wibracja zamiast dźwięku, gdy przychodzi moja tura.
   useEffect(() => {
@@ -31,8 +33,10 @@ export function Game({ view, me, dropped, send }: Props) {
           : `Wygrywa ${nick(game.result.winner)}`
         : "Remis"
       : myTurn
-        ? "Twoja tura"
-        : `Tura: ${nick(game.turn ?? undefined)}`;
+        ? (game.view as { phase?: string }).phase === "placing"
+          ? "Ustaw statki"
+          : "Twoja tura"
+        : `Czekamy na: ${waitingNicks}`;
 
   return (
     <Screen dropped={dropped}>
@@ -44,7 +48,7 @@ export function Game({ view, me, dropped, send }: Props) {
         <ul className="flex flex-wrap gap-2">
           {view.seats.map((id) => {
             const p = view.players.find((pl) => pl.id === id);
-            const active = view.phase === "playing" && game.turn === id;
+            const active = view.phase === "playing" && game.waitingFor.includes(id);
             return (
               <li
                 key={id}
@@ -71,6 +75,16 @@ export function Game({ view, me, dropped, send }: Props) {
       {def.id === "piec-w-rzedzie" && (
         <PiecWRzedzie
           view={game.view as PiecWRzedzieView}
+          players={view.players}
+          canMove={myTurn}
+          onMove={(move) => send("move", move)}
+        />
+      )}
+
+      {def.id === "statki" && (
+        <Statki
+          view={game.view as StatkiView}
+          me={me}
           players={view.players}
           canMove={myTurn}
           onMove={(move) => send("move", move)}

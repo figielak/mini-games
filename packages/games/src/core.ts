@@ -20,8 +20,8 @@ export interface GameDefinition<State, Move> {
   /** Widok stanu dla konkretnego gracza: tu ukrywamy informacje. Obserwator dostaje widok dla "". */
   playerView(state: State, player: PlayerId): unknown;
   isOver(state: State): GameResult | null;
-  /** Czyja tura; null po końcu gry. */
-  currentPlayer(state: State): PlayerId | null;
+  /** Na kogo czekamy (ruch po kolei: jedna osoba; faza równoczesna: kilka); [] po końcu gry. */
+  waitingFor(state: State): PlayerId[];
   /** Limit czasu tury; po nim platforma wykonuje timeoutMove za gracza. */
   turnSeconds?: number;
   timeoutMove?(state: State, player: PlayerId, rng: Rng): Move;

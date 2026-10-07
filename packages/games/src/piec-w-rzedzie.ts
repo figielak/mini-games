@@ -105,7 +105,7 @@ export const piecWRzedzie: GameDefinition<State, Move> = {
     return state.winLine ? { winner: state.players[state.turn === 0 ? 1 : 0] } : {};
   },
 
-  currentPlayer: (state) => (state.over ? null : state.players[state.turn]),
+  waitingFor: (state) => (state.over ? [] : [state.players[state.turn]]),
 
   timeoutMove(state, _player, rng) {
     const free = state.board.flatMap((cell, i) => (cell === null ? [i] : []));

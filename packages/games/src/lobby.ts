@@ -28,7 +28,8 @@ export interface RoomView {
   scores: Record<PlayerId, number>;
   game: {
     view: unknown;
-    turn: PlayerId | null;
+    /** Na kogo czekamy: gracz na turze albo kilku naraz (np. rozstawianie statków). */
+    waitingFor: PlayerId[];
     /** Ile zostało do końca tury; liczone od chwili odebrania wiadomości (zegary telefonu i serwera się różnią). */
     msLeft: number | null;
     result: GameResult | null;
