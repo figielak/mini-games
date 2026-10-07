@@ -8,41 +8,51 @@ export const START_CASH = 200;
 export const ALLOWANCE = 20;
 const TAX = 15;
 
-/** 8 grup po 3 pola, ceny rosną wzdłuż planszy. Balans: wszystkie kwoty liczone z ceny P. */
-export const GROUPS = [
-  [1, 2, 3],
-  [4, 6, 7],
-  [8, 9, 10],
-  [12, 14, 15],
-  [17, 18, 19],
-  [20, 22, 23],
-  [24, 25, 26],
-  [29, 30, 31],
+/** Grupy (pory dnia studenta): cena i pola [indeks, nazwa]. Skrajne grupy po 2 pola, jak w Monopoly. */
+const GROUP_DEFS: [price: number, tiles: [number, string][]][] = [
+  [10, [[1, "Automat z kawą"], [2, "Automat z przekąskami"]]],
+  [15, [[3, "Biblioteka PRz"], [4, "Hala sportowa PRz"], [6, "Rektorat"]]],
+  [20, [[8, "Wydział Mechaniczny"], [9, "Wydział Elektryczny"], [10, "Wydział Chemiczny"]]],
+  [25, [[12, "Hala Podpromie"], [14, "Stadion Stali"], [15, "Zalew Rzeszowski"]]],
+  [30, [[17, "Ulica 3 Maja"], [18, "Galeria Rzeszów"], [19, "Millenium Hall"]]],
+  [35, [[20, "Kino"], [22, "Kręgielnia"], [23, "Klub studencki"]]],
+  [40, [[24, "Bulwary nad Wisłokiem"], [25, "Okrągła kładka"], [26, "Pomnik Czynu Rewolucyjnego"]]],
+  [50, [[30, "Zamek Lubomirskich"], [31, "Rynek"]]],
 ];
-const GROUP_PRICES = [10, 15, 20, 25, 30, 35, 40, 50];
+export const GROUPS = GROUP_DEFS.map(([, tiles]) => tiles.map(([i]) => i));
+
+/** Ksero i Stołówka działają jak wodociągi: czynsz zależy od rzutu. */
+const UTILITIES = [7, 29];
+const UTILITY_PRICE = 30;
+/** Mnożnik sumy oczek przy 1 i 2 posiadanych. */
+const UTILITY_RATES = [2, 5];
 
 export type Tile =
-  | { kind: "start" | "kolokwium" | "juwenalia" | "mpk" | "karty" }
-  | { kind: "property"; group: number; price: number }
-  | { kind: "tax"; amount: number };
+  | { kind: "start" | "kolokwium" | "juwenalia" | "mpk" | "karty"; name: string }
+  | { kind: "property"; name: string; group: number; price: number }
+  | { kind: "utility"; name: string; price: number }
+  | { kind: "tax"; name: string; amount: number };
 export type TileKind = Tile["kind"];
 
 const SPECIAL: Record<number, Tile> = {
-  0: { kind: "start" },
-  5: { kind: "karty" },
-  11: { kind: "kolokwium" },
-  13: { kind: "karty" },
-  16: { kind: "juwenalia" },
-  21: { kind: "karty" },
-  27: { kind: "mpk" },
-  28: { kind: "tax", amount: TAX },
+  0: { kind: "start", name: "Początek dnia" },
+  5: { kind: "karty", name: "Karty Dziekanatu" },
+  7: { kind: "utility", name: "Ksero", price: UTILITY_PRICE },
+  11: { kind: "kolokwium", name: "Kolokwium" },
+  13: { kind: "karty", name: "Karty Dziekanatu" },
+  16: { kind: "juwenalia", name: "Juwenalia" },
+  21: { kind: "karty", name: "Karty Dziekanatu" },
+  27: { kind: "mpk", name: "Bilet MPK" },
+  28: { kind: "tax", name: "Opłata za akademik", amount: TAX },
+  29: { kind: "utility", name: "Stołówka", price: UTILITY_PRICE },
 };
 
+const PROPERTIES: Record<number, Tile> = Object.fromEntries(
+  GROUP_DEFS.flatMap(([price, tiles], group) => tiles.map(([i, name]) => [i, { kind: "property", name, group, price }])),
+);
+
 /** Pola zgodnie z ruchem wskazówek zegara od lewego górnego rogu planszy 12×6. */
-export const BOARD: Tile[] = Array.from({ length: SIZE }, (_, i) => {
-  const group = GROUPS.findIndex((g) => g.includes(i));
-  return group >= 0 ? { kind: "property", group, price: GROUP_PRICES[group] } : SPECIAL[i];
-});
+export const BOARD: Tile[] = Array.from({ length: SIZE }, (_, i) => SPECIAL[i] ?? PROPERTIES[i]);
 
 export type Move = { type: "roll" } | { type: "buy" } | { type: "skip" } | { type: "sell"; tile: number };
 
@@ -87,18 +97,23 @@ const moveSchema = z.discriminatedUnion("type", [
 const current = (s: State) => s.players[s.turn];
 const priceOf = (tile: number) => {
   const t = BOARD[tile];
-  return t.kind === "property" ? t.price : 0;
+  return t.kind === "property" || t.kind === "utility" ? t.price : 0;
 };
 const saleValue = (tile: number) => Math.floor(priceOf(tile) / 2);
 const owned = (s: State, p: PlayerId) => Object.keys(s.owners).map(Number).filter((i) => s.owners[i] === p);
 const wealth = (s: State, p: PlayerId) => s.cash[p] + owned(s, p).reduce((sum, i) => sum + priceOf(i), 0);
 
-/** Czynsz P/10; cała grupa w rękach jednego właściciela podwaja go. */
-export function rent(owners: Record<number, PlayerId>, tile: number): number {
+/** Czynsz P/10, cała grupa podwaja go; Ksero i Stołówka: suma oczek × stawka zależna od liczby posiadanych. */
+function rent(s: State, tile: number): number {
   const t = BOARD[tile];
+  const owner = s.owners[tile];
+  if (t.kind === "utility") {
+    const count = UTILITIES.filter((i) => s.owners[i] === owner).length;
+    return (s.dice![0] + s.dice![1]) * UTILITY_RATES[count - 1];
+  }
   if (t.kind !== "property") return 0;
   const base = Math.round(t.price / 10);
-  return GROUPS[t.group].every((i) => owners[i] === owners[tile]) ? base * 2 : base;
+  return GROUPS[t.group].every((i) => s.owners[i] === owner) ? base * 2 : base;
 }
 
 /** Tura przechodzi na następnego gracza, który nie zbankrutował. */
@@ -144,12 +159,12 @@ function land(s: State, player: PlayerId): State {
   const pos = s.positions[player];
   const tile = BOARD[pos];
   if (tile.kind === "tax") return pay({ ...s, events: [...s.events, { type: "tax", player, amount: tile.amount }] }, player, tile.amount, null);
-  if (tile.kind !== "property") return finish(s);
+  if (tile.kind !== "property" && tile.kind !== "utility") return finish(s);
 
   const owner = s.owners[pos];
   if (!owner) return s.cash[player] >= tile.price ? { ...s, phase: "buy" } : finish(s);
   if (owner === player) return finish(s);
-  const amount = rent(s.owners, pos);
+  const amount = rent(s, pos);
   return pay({ ...s, events: [...s.events, { type: "rent", player, amount, tile: pos, to: owner }] }, player, amount, owner);
 }
 

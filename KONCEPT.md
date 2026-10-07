@@ -152,7 +152,7 @@ games/
 
 ## 9. Otwarte kwestie
 
-- Nazwy pól Kampus Tour (układ ustalony: 8 grup po 3 pola, 10-50 zł, Opłata za akademik na polu 28).
+- Nazwy pól Kampus Tour ustalone (grupy jako pory dnia studenta, Ksero i Stołówka jak wodociągi); druga nazwa w grupie „Rano” robocza (Automat z przekąskami).
 - Balans ekonomii: start 200 zł, kieszonkowe 20 zł, czynsz P/10 (cała grupa x2); do dopracowania po testach z grupą, zwłaszcza partie we dwóch.
 - Treść Kart Dziekanatu i zestaw kart specjalnych w Poprawce.
 - Czy dodać statystyki między sesjami (ranking po nicku) bez wprowadzania kont.

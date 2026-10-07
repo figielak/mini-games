@@ -13,8 +13,10 @@ import {
   DiceThree,
   DiceTwo,
   Exam,
+  ForkKnife,
   GraduationCap,
   type Icon,
+  Printer,
   Sun,
   WifiSlash,
 } from "@phosphor-icons/react";
@@ -50,19 +52,13 @@ const SEAT_CORNERS = ["top-0 left-0", "top-0 right-0", "bottom-0 right-0", "bott
 /** Paski grup, celowo inne niż kolory graczy (tło pola w kolorze gracza oznacza właściciela). */
 const GROUP_COLORS = ["#a0785a", "#7cc4e6", "#d873b0", "#f0913c", "#e5484d", "#e8d44d", "#4caf7d", "#5b6fd6"];
 
-const TILES: Partial<Record<KampusTileKind, { icon: Icon; name?: string }>> = {
-  start: { icon: Sun, name: "Początek dnia" },
-  kolokwium: { icon: Exam, name: "Kolokwium" },
-  juwenalia: { icon: Confetti, name: "Juwenalia" },
-  mpk: { icon: Bus, name: "Bilet MPK" },
-  karty: { icon: Cards },
-  tax: { icon: Bed },
-};
+const ICONS: Partial<Record<KampusTileKind, Icon>> = { start: Sun, kolokwium: Exam, juwenalia: Confetti, mpk: Bus, karty: Cards, tax: Bed };
+const UTILITY_ICONS: Record<string, Icon> = { Ksero: Printer, Stołówka: ForkKnife };
 
 const mix = (color: string, percent: number) => `color-mix(in srgb, ${color} ${percent}%, var(--color-bg))`;
 const price = (tile: number) => {
   const t = BOARD[tile];
-  return t.kind === "property" ? t.price : t.kind === "tax" ? t.amount : 0;
+  return t.kind === "property" || t.kind === "utility" ? t.price : t.kind === "tax" ? t.amount : 0;
 };
 
 /** Pole planszy 12×6 → [kolumna, wiersz], od lewego górnego rogu zgodnie z ruchem wskazówek zegara. */
@@ -95,13 +91,13 @@ export function KampusTour({ view, me, players, dropped, canMove, ranking, onMov
       case "allowance":
         return `${who} dostaje ${e.amount} zł kieszonkowego`;
       case "buy":
-        return `${who} kupuje pole za ${e.amount} zł`;
+        return `${who} kupuje ${BOARD[e.tile!].name} za ${e.amount} zł`;
       case "rent":
-        return `${who} płaci ${e.amount} zł czynszu → ${nick(e.to!)}`;
+        return `${who} płaci ${e.amount} zł za ${BOARD[e.tile!].name} → ${nick(e.to!)}`;
       case "tax":
         return `${who} płaci ${e.amount} zł za akademik`;
       case "sell":
-        return `${who} sprzedaje pole za ${e.amount} zł`;
+        return `${who} sprzedaje ${BOARD[e.tile!].name} za ${e.amount} zł`;
       case "bankrupt":
         return `${who} bankrutuje`;
     }
@@ -142,7 +138,10 @@ export function KampusTour({ view, me, players, dropped, canMove, ranking, onMov
           >
             {BOARD.map((tile, i) => {
               const [x, y] = cell(i);
-              const info = TILES[tile.kind];
+              const TileIcon = tile.kind === "utility" ? UTILITY_ICONS[tile.name] : ICONS[tile.kind];
+              // Karty i akademik poznaje się po ikonie; reszta pól ma podpis.
+              const label = tile.kind !== "karty" && tile.kind !== "tax";
+              const priced = tile.kind === "property" || tile.kind === "utility" || tile.kind === "tax";
               const pawns = view.players.filter((p) => view.positions[p] === i && !view.bankrupt.includes(p));
               const owner = view.owners[i];
               const sellable = selling && owner === me;
@@ -151,14 +150,12 @@ export function KampusTour({ view, me, players, dropped, canMove, ranking, onMov
                   {tile.kind === "property" && (
                     <span className="absolute inset-x-0 top-0 h-1" style={{ backgroundColor: GROUP_COLORS[tile.group] }} aria-hidden />
                   )}
-                  {info && (
-                    <span className="flex flex-col items-center text-center text-[9px] leading-tight">
-                      <info.icon size={info.name ? 18 : 16} aria-hidden />
-                      {info.name}
-                    </span>
-                  )}
-                  {(tile.kind === "property" || tile.kind === "tax") && (
-                    <span className="absolute bottom-0.5 font-mono text-[9px]">{sellable ? `+${Math.floor(price(i) / 2)}` : price(i)} zł</span>
+                  <span className="flex flex-col items-center px-0.5 text-center text-[8px] leading-[1.1]">
+                    {TileIcon && <TileIcon size={16} aria-hidden />}
+                    {label && <span className="line-clamp-3 [overflow-wrap:anywhere]">{tile.name}</span>}
+                  </span>
+                  {priced && (
+                    <span className="font-mono text-[8px]">{sellable ? `+${Math.floor(price(i) / 2)}` : price(i)} zł</span>
                   )}
                   {pawns.length > 0 && (
                     <span className={`absolute inset-0 grid place-items-center p-0.5 ${pawns.length > 1 ? "grid-cols-2" : ""}`}>
@@ -179,7 +176,7 @@ export function KampusTour({ view, me, players, dropped, canMove, ranking, onMov
                   )}
                 </>
               );
-              const className = `relative grid place-items-center overflow-hidden rounded-[4px] bg-[color-mix(in_srgb,var(--color-fg)_9%,var(--color-bg))] text-fg-muted ${
+              const className = `relative flex flex-col items-center justify-center gap-0.5 overflow-hidden rounded-sm pt-1 bg-[color-mix(in_srgb,var(--color-fg)_9%,var(--color-bg))] text-fg-muted ${
                 sellable ? "outline-2 outline-accent" : ""
               }`;
               const style = { gridColumn: x + 1, gridRow: y + 1, backgroundColor: owner ? mix(color(owner), 30) : undefined };
@@ -189,13 +186,13 @@ export function KampusTour({ view, me, players, dropped, canMove, ranking, onMov
                   type="button"
                   className={className}
                   style={style}
-                  aria-label={`Sprzedaj pole za ${Math.floor(price(i) / 2)} zł`}
+                  aria-label={`Sprzedaj ${tile.name} za ${Math.floor(price(i) / 2)} zł`}
                   onClick={() => onMove({ type: "sell", tile: i })}
                 >
                   {content}
                 </button>
               ) : (
-                <div key={i} className={className} style={style}>
+                <div key={i} className={className} style={style} title={tile.name}>
                   {content}
                 </div>
               );
