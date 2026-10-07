@@ -58,7 +58,7 @@ export type Move = { type: "roll" } | { type: "buy" } | { type: "skip" } | { typ
 
 /** Co się wydarzyło w ostatnim ruchu; UI zamienia to na tekst. */
 export type Event = {
-  type: "allowance" | "buy" | "rent" | "tax" | "sell" | "bankrupt";
+  type: "allowance" | "buy" | "skip" | "rent" | "tax" | "sell" | "bankrupt";
   player: PlayerId;
   amount?: number;
   tile?: number;
@@ -82,6 +82,7 @@ export interface State {
   round: number;
   /** Niespłacony czynsz lub opłata (faza sprzedaży); to: null = bank. */
   debt: { amount: number; to: PlayerId | null } | null;
+  /** Ostatnie zdarzenia (najwyżej LOG), żeby gracz, który odwrócił wzrok, wiedział, co się stało. */
   events: Event[];
 }
 
@@ -94,7 +95,9 @@ const moveSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("sell"), tile: z.number().int().min(0).max(SIZE - 1) }),
 ]);
 
+const LOG = 4;
 const current = (s: State) => s.players[s.turn];
+const log = (s: State, e: Event): State => ({ ...s, events: [...s.events, e].slice(-LOG) });
 const priceOf = (tile: number) => {
   const t = BOARD[tile];
   return t.kind === "property" || t.kind === "utility" ? t.price : 0;
@@ -141,7 +144,7 @@ function goBankrupt(s: State, player: PlayerId, to: PlayerId | null): State {
     owners,
     debt: null,
     bankrupt: [...s.bankrupt, player],
-    events: [...s.events, { type: "bankrupt", player }],
+    events: [...s.events, { type: "bankrupt" as const, player }].slice(-LOG),
   };
   return next.players.length - next.bankrupt.length <= 1 ? { ...next, phase: "over" } : endTurn(next);
 }
@@ -161,14 +164,14 @@ function pay(s: State, player: PlayerId, amount: number, to: PlayerId | null): S
 function land(s: State, player: PlayerId): State {
   const pos = s.positions[player];
   const tile = BOARD[pos];
-  if (tile.kind === "tax") return pay({ ...s, events: [...s.events, { type: "tax", player, amount: tile.amount }] }, player, tile.amount, null);
+  if (tile.kind === "tax") return pay(log(s, { type: "tax", player, amount: tile.amount }), player, tile.amount, null);
   if (tile.kind !== "property" && tile.kind !== "utility") return finish(s);
 
   const owner = s.owners[pos];
   if (!owner) return s.cash[player] >= tile.price ? { ...s, phase: "buy" } : finish(s);
   if (owner === player) return finish(s);
   const amount = rent(s, pos);
-  return pay({ ...s, events: [...s.events, { type: "rent", player, amount, tile: pos, to: owner }] }, player, amount, owner);
+  return pay(log(s, { type: "rent", player, amount, tile: pos, to: owner }), player, amount, owner);
 }
 
 export const kampusTour: GameDefinition<State, Move> = {
@@ -203,7 +206,7 @@ export const kampusTour: GameDefinition<State, Move> = {
   },
 
   applyMove(s, player, move, rng: Rng) {
-    if (move.type === "skip") return finish(s);
+    if (move.type === "skip") return finish(log(s, { type: "skip", player, tile: s.positions[player] }));
 
     if (move.type === "buy") {
       const tile = s.positions[player];
@@ -212,7 +215,7 @@ export const kampusTour: GameDefinition<State, Move> = {
         ...s,
         owners: { ...s.owners, [tile]: player },
         cash: { ...s.cash, [player]: s.cash[player] - amount },
-        events: [...s.events, { type: "buy", player, amount, tile }],
+        events: [...s.events, { type: "buy" as const, player, amount, tile }].slice(-LOG),
       });
     }
 
@@ -224,7 +227,7 @@ export const kampusTour: GameDefinition<State, Move> = {
         ...s,
         owners,
         cash: { ...s.cash, [player]: s.cash[player] + amount },
-        events: [...s.events, { type: "sell", player, amount, tile: move.tile }],
+        events: [...s.events, { type: "sell" as const, player, amount, tile: move.tile }].slice(-LOG),
       };
       const debt = s.debt!;
       return next.cash[player] >= debt.amount ? pay(next, player, debt.amount, debt.to) : next;
@@ -233,7 +236,7 @@ export const kampusTour: GameDefinition<State, Move> = {
     const dice: [number, number] = [Math.floor(rng() * 6) + 1, Math.floor(rng() * 6) + 1];
     const to = s.positions[player] + dice[0] + dice[1];
     const passed = Math.floor(to / SIZE);
-    const events: Event[] = passed ? [{ type: "allowance", player, amount: passed * ALLOWANCE }] : [];
+    const events = passed ? [...s.events, { type: "allowance" as const, player, amount: passed * ALLOWANCE }].slice(-LOG) : s.events;
     return land(
       {
         ...s,

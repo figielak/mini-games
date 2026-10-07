@@ -197,6 +197,10 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
   const shown = useWalk(view.positions, rolling);
   // Komunikaty i decyzje dopiero, gdy pionek dojdzie na pole, żeby nie zdradzać wyniku przed animacją.
   const settled = !rolling && view.players.every((p) => shown[p] === view.positions[p]);
+  // Podczas animacji widać zdarzenia sprzed rzutu; nowe pojawiają się po dojściu pionka.
+  const settledEvents = useRef(view.events);
+  if (settled) settledEvents.current = view.events;
+  const recent = settledEvents.current.slice(-2);
   const player = (id: string) => players.find((p) => p.id === id);
   const color = (id: string) => player(id)?.color ?? "#8b8b92";
   const nick = (id: string) => player(id)?.nick ?? "Gracz";
@@ -226,6 +230,8 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
         return `${who} płaci ${e.amount} zł za ${BOARD[e.tile!].name} → ${nick(e.to!)}`;
       case "tax":
         return `${who} płaci ${e.amount} zł za akademik`;
+      case "skip":
+        return `${who} pomija ${BOARD[e.tile!].name}`;
       case "sell":
         return `${who} sprzedaje ${BOARD[e.tile!].name} za ${e.amount} zł`;
       case "bankrupt":
@@ -315,8 +321,8 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
           </span>
         ) : (
           <>
-            <span className="mb-0.5">{tokens(i, 26)}</span>
-            <span className="mb-0.5">{priceTag}</span>
+            <span className="mb-0.5 flex">{tokens(i, 26)}</span>
+            <span className="mb-1 flex">{priceTag}</span>
           </>
         )}
       </>
@@ -443,7 +449,7 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
                 : tile.kind === "karty"
                   ? mix(CARDS_COLOR, 14)
                   : owner
-                    ? mix(color(owner), 35)
+                    ? mix(color(owner), 25)
                     : undefined;
               return (
                 <button
@@ -458,12 +464,20 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
                     gridColumn: x + 1,
                     gridRow: y + 1,
                     backgroundColor: background,
-                    // Właściciel: odcień tła i obwódka w jego kolorze; pole do kupienia świeci.
-                    boxShadow: deciding === i ? "0 0 16px var(--color-accent)" : owner ? `inset 0 0 0 2px ${color(owner)}` : undefined,
+                    // Ramka i poświata tylko dla pola, na którym dzieje się akcja.
+                    boxShadow: deciding === i ? "0 0 16px var(--color-accent)" : undefined,
                   }}
                   onClick={() => setSelected(selected === i ? null : i)}
                 >
                   {tileFace(i)}
+                  {/* Właściciel: stała kropka w jego kolorze w rogu pola (i lekki odcień tła). */}
+                  {owner && (
+                    <span
+                      className="absolute top-0.5 right-0.5 size-3 rounded-full border-2 border-bg"
+                      style={{ backgroundColor: color(owner) }}
+                      aria-label={`Właściciel: ${nick(owner)}`}
+                    />
+                  )}
                 </button>
               );
             })}
@@ -480,10 +494,12 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
                   Łączenie ponownie…
                 </p>
               )}
-              {settled && view.events.length > 0 && (
-                <ul className="text-center text-sm font-medium text-fg">
-                  {view.events.map((e, i) => (
-                    <li key={i}>{describe(e)}</li>
+              {recent.length > 0 && (
+                <ul className="text-center text-sm font-medium">
+                  {recent.map((e, i) => (
+                    <li key={i} className={i === recent.length - 1 ? "text-fg" : "text-fg-muted"}>
+                      {describe(e)}
+                    </li>
                   ))}
                 </ul>
               )}
@@ -505,6 +521,7 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
                     </button>
                   </>
                 )}
+                {settled && !over && !canMove && view.phase === "roll" && <p className="text-sm text-fg-muted">{nick(view.turn!)} rzuca kośćmi…</p>}
                 {settled && !over && !canMove && view.phase === "buy" && <p className="text-sm text-fg-muted">{nick(view.turn!)} decyduje o zakupie</p>}
               </div>
               {settled && canMove && view.phase === "buy" && <p className="text-center text-sm text-fg-muted">{buyInfo(here)}</p>}
