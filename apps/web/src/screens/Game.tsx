@@ -1,9 +1,11 @@
 import { ArrowCounterClockwise, Timer, UsersThree } from "@phosphor-icons/react";
-import { type ChinczykView, GAMES, type KampusTourView, type PiecWRzedzieView, type RoomView, type StatkiView } from "@mini-games/games";
+import { type ChinczykView, GAMES, type KampusTourView, type PiecWRzedzieView, type RefleksView, type RoomView, type SimonView, type StatkiView } from "@mini-games/games";
 import { useEffect, useMemo, useState } from "react";
 import { Chinczyk } from "../games/Chinczyk.tsx";
 import { KampusTour } from "../games/KampusTour.tsx";
 import { PiecWRzedzie } from "../games/PiecWRzedzie.tsx";
+import { Refleks } from "../games/Refleks.tsx";
+import { Simon } from "../games/Simon.tsx";
 import { Statki } from "../games/Statki.tsx";
 import { Screen, type Send } from "./ui.tsx";
 
@@ -50,7 +52,9 @@ export function Game({ view, me, dropped, send }: Props) {
         ? game.result.winner === me
           ? "Wygrywasz!"
           : `Wygrywa ${nick(game.result.winner)}`
-        : "Remis"
+        : game.result?.ranking?.length === 1
+          ? "Koniec"
+          : "Remis"
       : myTurn
         ? (game.view as { phase?: string }).phase === "placing"
           ? "Ustaw statki"
@@ -120,7 +124,31 @@ export function Game({ view, me, dropped, send }: Props) {
         />
       )}
 
-      {view.phase === "over" && game.result?.ranking && game.result.ranking.length > 2 && (
+      {/* Klucz z wylosowanego wyzwania: rewanż montuje grę od nowa, bez stanu poprzedniej partii. */}
+      {def.id === "refleks" && (
+        <Refleks
+          key={(game.view as RefleksView).delays.join()}
+          view={game.view as RefleksView}
+          me={me}
+          players={view.players}
+          ranking={game.result?.ranking}
+          onMove={(move) => send("move", move)}
+        />
+      )}
+
+      {def.id === "simon" && (
+        <Simon
+          key={(game.view as SimonView).sequence.join("")}
+          view={game.view as SimonView}
+          me={me}
+          players={view.players}
+          ranking={game.result?.ranking}
+          onMove={(move) => send("move", move)}
+        />
+      )}
+
+      {/* Mini-gry pokazują ranking same, razem z wynikami. */}
+      {view.phase === "over" && !MINI_GAMES.has(def.id) && game.result?.ranking && game.result.ranking.length > 2 && (
         <ol className="tile flex flex-col gap-1 p-4">
           {game.result.ranking.map((id, i) => (
             <li key={id} className="flex items-center gap-3">
@@ -141,6 +169,8 @@ export function Game({ view, me, dropped, send }: Props) {
     </Screen>
   );
 }
+
+const MINI_GAMES = new Set(["refleks", "simon"]);
 
 function OverActions({ host, send }: { host: boolean; send: Send }) {
   if (!host) return <p className="text-center text-sm text-fg-muted">Czekamy na decyzję gospodarza.</p>;

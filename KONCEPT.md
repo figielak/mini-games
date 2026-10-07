@@ -52,6 +52,13 @@ gracz z największym majątkiem (gotówka + wartość pól i budynków).
 - Proste gry 1v1, zbudowane jako pierwsze, żeby przetestować cały przepływ platformy.
 - Statki również wymagają ukrywania stanu (plansza przeciwnika).
 
+### 2.4 Mini-gry (przerywniki)
+
+- **Refleks**: dotknij pola, gdy zmieni kolor; 30 s, wynik = liczba trafień (remis: niższa średnia reakcja), falstart kosztuje czas.
+- **Simon**: powtarzanie rosnącej sekwencji 4 kolorów, wynik = najdłuższa seria.
+- 1-6 graczy naraz, każdy gra u siebie to samo wyzwanie (wylosowane na serwerze), na końcu ranking.
+  Partia toczy się na kliencie (opóźnienie Wi-Fi zepsułoby pomiar), serwer dostaje tylko wynik i odrzuca nierealne wartości.
+
 ## 3. Architektura
 
 ```

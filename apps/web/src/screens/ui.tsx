@@ -17,3 +17,21 @@ export function Screen({ dropped, children }: { dropped: boolean; children: Reac
     </main>
   );
 }
+
+/** Wyniki mini-gry: wiersz na gracza, w kolejności rankingu po końcu partii. */
+export function Scores({ rows }: { rows: { id: string; nick: string; color?: string; me: boolean; score: string | null }[] }) {
+  return (
+    <ol className="tile flex flex-col gap-1 p-4">
+      {rows.map((r) => (
+        <li key={r.id} className="flex items-center gap-3">
+          <span className="size-2.5 rounded-full" style={{ backgroundColor: r.color }} aria-hidden />
+          <span className="flex-1">
+            {r.nick}
+            {r.me && <span className="text-fg-muted"> (ty)</span>}
+          </span>
+          <span className={`font-mono ${r.score === null ? "text-fg-muted" : ""}`}>{r.score ?? "gra…"}</span>
+        </li>
+      ))}
+    </ol>
+  );
+}

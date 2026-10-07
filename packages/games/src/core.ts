@@ -50,3 +50,14 @@ export function roomCode(rng: Rng): string {
   }
   return code;
 }
+
+/**
+ * Ranking gry, w której każdy oddaje jeden wynik (mini-gry). null, dopóki ktoś nie oddał.
+ * Przy remisie kolejność miejsc; zwycięzca tylko przy 2+ graczach i bez remisu na górze (solo nie nabija statystyk).
+ */
+export function rankResults<R>(players: PlayerId[], results: Record<PlayerId, R>, compare: (a: R, b: R) => number): GameResult | null {
+  if (!players.every((p) => p in results)) return null;
+  const ranking = [...players].sort((a, b) => compare(results[a], results[b]));
+  const clear = ranking.length > 1 && compare(results[ranking[0]], results[ranking[1]]) !== 0;
+  return clear ? { winner: ranking[0], ranking } : { ranking };
+}
