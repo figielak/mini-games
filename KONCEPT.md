@@ -14,7 +14,7 @@ Jedna strona, kod pokoju, każdy gra na swoim telefonie.
 
 ## 2. Gry
 
-### 2.1 Kampus Tycoon (klon Business Tour)
+### 2.1 Kampus Tour (klon Business Tour)
 
 Główna gra platformy. Zachowuje rdzeń mechaniki oryginału, ale ma własny motyw i dodatki.
 Mechanik można się inspirować, natomiast nazwy, grafiki i logo oryginału nie są kopiowane.
@@ -23,7 +23,7 @@ Mechanik można się inspirować, natomiast nazwy, grafiki i logo oryginału nie
 (np. Rynek, Zamek Lubomirskich, Bulwary nad Wisłokiem, Millenium Hall). Ostateczna lista pól do ustalenia.
 
 **Rdzeń (jak w oryginale):**
-- plansza 32 pól, rzut dwiema kośćmi, dublet daje dodatkowy rzut,
+- pozioma plansza 32 pól (prostokąt 12×6, rogi: Początek dnia, Kolokwium, Juwenalia, Bilet MPK), rzut dwiema kośćmi, dublet daje dodatkowy rzut,
 - kupowanie pól i płacenie czynszu,
 - grupy kolorów (np. kierunki studiów); posiadanie całej grupy zwiększa czynsz,
 - rozbudowa pól aż do landmarku,
@@ -31,9 +31,9 @@ Mechanik można się inspirować, natomiast nazwy, grafiki i logo oryginału nie
 - zwycięstwo przez bankructwo przeciwników albo przez monopol (np. 3 pełne grupy kolorów).
 
 **Własne dodatki (propozycje):**
-| Oryginał | Kampus Tycoon |
+| Oryginał | Kampus Tour |
 |---|---|
-| Start | **Immatrykulacja**: premia za przejście |
+| Start | **Początek dnia**: premia za przejście |
 | Więzienie | **Kolokwium**: tracisz turę albo zdajesz rzutem dubletu |
 | Mistrzostwa świata | **Juwenalia**: wybrane pole ma podwójny czynsz |
 | Podróż | **Bilet MPK**: przeskok na dowolne pole w następnej turze |
@@ -103,7 +103,7 @@ Prościej i bezpiecznie dla gier z ukrytymi informacjami.
 | Plansza | SVG / CSS Grid |
 | PWA | vite-plugin-pwa |
 | Trwałość stanu | SQLite (better-sqlite3) |
-| Testy | Vitest (szczególnie zasady Kampus Tycoon) |
+| Testy | Vitest (szczególnie zasady Kampus Tour) |
 | CI/CD | GitHub Actions → obraz Dockera |
 
 ## 5. Struktura repozytorium
@@ -145,14 +145,14 @@ games/
 | 1 | Skorupa: pokoje, kody, lobby, nicki, reconnect | Platforma |
 | 2 | Pięć w rzędzie | Pierwsza gra end-to-end, rewanż |
 | 3 | Statki | Ukrywanie stanu (`playerView`) |
-| 4 | Kampus Tycoon: rdzeń (ruch, kupno, czynsz, budowanie, bankructwo) | Grywalna wersja główna |
-| 5 | Kampus Tycoon: dodatki (Kolokwium, Juwenalia, karty, wykupienie, limit czasu) | Pełna wersja |
+| 4 | Kampus Tour: rdzeń (ruch, kupno, czynsz, budowanie, bankructwo) | Grywalna wersja główna |
+| 5 | Kampus Tour: dodatki (Kolokwium, Juwenalia, karty, wykupienie, limit czasu) | Pełna wersja |
 | 6 | Poprawka | Gra karciana |
 | 7 | PWA, animacje, statystyki, szlify | Polerka |
 
 ## 9. Otwarte kwestie
 
-- Lista 32 pól Kampus Tycoon i podział na grupy kolorów.
+- Lista 32 pól Kampus Tour i podział na grupy kolorów.
 - Balans ekonomii (ceny, czynsze, premia za start), do dopracowania po testach z grupą.
 - Treść Kart Dziekanatu i zestaw kart specjalnych w Poprawce.
 - Czy dodać statystyki między sesjami (ranking po nicku) bez wprowadzania kont.

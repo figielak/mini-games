@@ -1,7 +1,8 @@
 import { ArrowCounterClockwise, Timer, UsersThree } from "@phosphor-icons/react";
-import { type ChinczykView, GAMES, type PiecWRzedzieView, type RoomView, type StatkiView } from "@mini-games/games";
+import { type ChinczykView, GAMES, type KampusTourView, type PiecWRzedzieView, type RoomView, type StatkiView } from "@mini-games/games";
 import { useEffect, useMemo, useState } from "react";
 import { Chinczyk } from "../games/Chinczyk.tsx";
+import { KampusTour } from "../games/KampusTour.tsx";
 import { PiecWRzedzie } from "../games/PiecWRzedzie.tsx";
 import { Statki } from "../games/Statki.tsx";
 import { Screen, type Send } from "./ui.tsx";
@@ -25,6 +26,23 @@ export function Game({ view, me, dropped, send }: Props) {
   useEffect(() => {
     if (myTurn) navigator.vibrate?.(40);
   }, [myTurn]);
+
+  // Kampus Tour ma własny, poziomy układ na cały ekran: gracze w rogach, licznik i rewanż w środku planszy.
+  if (def.id === "kampus-tour") {
+    return (
+      <KampusTour
+        view={game.view as KampusTourView}
+        me={me}
+        players={view.players}
+        dropped={dropped}
+        canMove={myTurn}
+        ranking={game.result?.ranking ?? []}
+        onMove={(move) => send("move", move)}
+        timer={view.phase === "playing" && <Countdown game={game} />}
+        actions={view.phase === "over" && <OverActions host={view.hostId === me} send={send} />}
+      />
+    );
+  }
 
   const status =
     view.phase === "over"
@@ -117,22 +135,25 @@ export function Game({ view, me, dropped, send }: Props) {
 
       {view.phase === "over" && (
         <div className="mt-auto flex flex-col gap-2 pt-4">
-          {view.hostId === me ? (
-            <>
-              <button type="button" className="btn btn-primary w-full" onClick={() => send("rematch")}>
-                <ArrowCounterClockwise size={18} weight="bold" aria-hidden />
-                Rewanż
-              </button>
-              <button type="button" className="btn btn-ghost w-full" onClick={() => send("toLobby")}>
-                Do lobby
-              </button>
-            </>
-          ) : (
-            <p className="text-center text-sm text-fg-muted">Czekamy na decyzję gospodarza.</p>
-          )}
+          <OverActions host={view.hostId === me} send={send} />
         </div>
       )}
     </Screen>
+  );
+}
+
+function OverActions({ host, send }: { host: boolean; send: Send }) {
+  if (!host) return <p className="text-center text-sm text-fg-muted">Czekamy na decyzję gospodarza.</p>;
+  return (
+    <>
+      <button type="button" className="btn btn-primary w-full" onClick={() => send("rematch")}>
+        <ArrowCounterClockwise size={18} weight="bold" aria-hidden />
+        Rewanż
+      </button>
+      <button type="button" className="btn btn-ghost w-full" onClick={() => send("toLobby")}>
+        Do lobby
+      </button>
+    </>
   );
 }
 

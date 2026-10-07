@@ -132,6 +132,23 @@ body::before {
   }
 }
 
+/* Gry poziome (Kampus Tour): cały ekran, a w pionie obrót o 90°, żeby nie wymagać autoobrotu. */
+.landscape {
+  position: fixed;
+  inset: 0;
+}
+@media (orientation: portrait) {
+  .landscape {
+    inset: auto;
+    top: 0;
+    left: 100dvw;
+    width: 100dvh;
+    height: 100dvw;
+    transform-origin: top left;
+    transform: rotate(90deg);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
