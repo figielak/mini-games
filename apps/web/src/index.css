@@ -149,6 +149,20 @@ body::before {
   }
 }
 
+/* Turlanie kostki w Kampus Tour. */
+@keyframes dice-tumble {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  30% {
+    transform: translateY(-10px) rotate(-18deg);
+  }
+  60% {
+    transform: translateY(-4px) rotate(14deg);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

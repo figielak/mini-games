@@ -33,7 +33,7 @@ import {
   type GameResult,
   type LobbyPlayer,
 } from "@mini-games/games";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 
 interface Props {
   view: KampusTourView;
@@ -109,15 +109,19 @@ function fields(n: number) {
   return `${n} ${few ? "pola" : "pól"}`;
 }
 
+/** Tempo animacji: krok pionka o jedno pole i czas turlania kostek. */
+const STEP_MS = 220;
+const ROLL_MS = 700;
 const reducedMotion = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /**
  * Pozycje pionków do wyświetlenia: po rzucie pionek idzie pole po polu do pozycji z serwera.
  * Długie skoki (powrót po zerwanym połączeniu) i ograniczony ruch w systemie: bez animacji.
  */
-function useWalk(target: Record<string, number>): Record<string, number> {
+function useWalk(target: Record<string, number>, paused: boolean): Record<string, number> {
   const [shown, setShown] = useState(target);
   useEffect(() => {
+    if (paused) return;
     const behind = Object.keys(target).filter((p) => shown[p] !== target[p]);
     if (behind.length === 0) return;
     const far = behind.some((p) => shown[p] === undefined || (target[p] - shown[p] + BOARD.length) % BOARD.length > 12);
@@ -128,10 +132,54 @@ function useWalk(target: Record<string, number>): Record<string, number> {
         for (const p of behind) next[p] = (prev[p] + 1) % BOARD.length;
         return next;
       });
-    }, 110);
+    }, STEP_MS);
     return () => clearTimeout(t);
-  }, [shown, target]);
+  }, [shown, target, paused]);
   return shown;
+}
+
+/** Czy kostki się właśnie turlają: przez chwilę po każdym rzucie (rzut zawsze przesuwa jakiś pionek). */
+function useRolling(positions: Record<string, number>): boolean {
+  const key = JSON.stringify(positions);
+  const last = useRef(key);
+  const [rolling, setRolling] = useState(false);
+  useEffect(() => {
+    if (last.current === key) return;
+    last.current = key;
+    if (reducedMotion) return;
+    setRolling(true);
+    const t = setTimeout(() => setRolling(false), ROLL_MS);
+    return () => clearTimeout(t);
+  }, [key]);
+  return rolling;
+}
+
+/** Kostki: w trakcie turlania co chwilę losowe oczka i podskakiwanie, potem wynik z serwera. */
+function Dice({ values, rolling }: { values: [number, number]; rolling: boolean }) {
+  const [faces, setFaces] = useState(values);
+  useEffect(() => {
+    if (!rolling) return;
+    const id = setInterval(() => setFaces([1 + Math.floor(Math.random() * 6), 1 + Math.floor(Math.random() * 6)]), 90);
+    return () => clearInterval(id);
+  }, [rolling]);
+  const shown = rolling ? faces : values;
+  return (
+    <span className="flex gap-1" aria-label={rolling ? "Rzut kośćmi" : `Wyrzucono ${values[0]} i ${values[1]}`}>
+      {shown.map((d, i) => {
+        const Die = DICE[d - 1];
+        return (
+          <Die
+            key={i}
+            size={56}
+            weight="fill"
+            className={rolling ? "animate-[dice-tumble_0.3s_ease-in-out_infinite]" : ""}
+            style={{ animationDelay: `${i * 80}ms` }}
+            aria-hidden
+          />
+        );
+      })}
+    </span>
+  );
 }
 
 /** Pole planszy 12×6 → [kolumna, wiersz], od lewego górnego rogu zgodnie z ruchem wskazówek zegara. */
@@ -144,7 +192,11 @@ function cell(i: number): [number, number] {
 
 export function KampusTour({ view, me, players, dropped, canMove, result, onMove, timer, actions }: Props) {
   const [selected, setSelected] = useState<number | null>(null);
-  const shown = useWalk(view.positions);
+  const rolling = useRolling(view.positions);
+  // Pionek rusza dopiero, gdy kostki się zatrzymają.
+  const shown = useWalk(view.positions, rolling);
+  // Komunikaty i decyzje dopiero, gdy pionek dojdzie na pole, żeby nie zdradzać wyniku przed animacją.
+  const settled = !rolling && view.players.every((p) => shown[p] === view.positions[p]);
   const player = (id: string) => players.find((p) => p.id === id);
   const color = (id: string) => player(id)?.color ?? "#8b8b92";
   const nick = (id: string) => player(id)?.nick ?? "Gracz";
@@ -183,7 +235,7 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
 
   const here = view.turn ? view.positions[view.turn] : 0;
   /** Pole, o którego kupnie właśnie się decyduje: świeci, reszta planszy przygasa. */
-  const deciding = !over && view.phase === "buy" ? here : null;
+  const deciding = settled && !over && view.phase === "buy" ? here : null;
 
   /** Co daje kupno: czynsz i ile pól z grupy gracz już ma. */
   function buyInfo(i: number) {
@@ -428,7 +480,7 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
                   Łączenie ponownie…
                 </p>
               )}
-              {view.events.length > 0 && (
+              {settled && view.events.length > 0 && (
                 <ul className="text-center text-sm font-medium text-fg">
                   {view.events.map((e, i) => (
                     <li key={i}>{describe(e)}</li>
@@ -437,20 +489,13 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
               )}
 
               <div className="flex items-center gap-3">
-                {view.dice && (
-                  <span className="flex gap-1" aria-label={`Wyrzucono ${view.dice[0]} i ${view.dice[1]}`}>
-                    {view.dice.map((d, i) => {
-                      const Die = DICE[d - 1];
-                      return <Die key={i} size={56} weight="fill" aria-hidden />;
-                    })}
-                  </span>
-                )}
-                {canMove && view.phase === "roll" && (
+                {view.dice && <Dice values={view.dice} rolling={rolling} />}
+                {settled && canMove && view.phase === "roll" && (
                   <button type="button" className="btn btn-primary" onClick={() => onMove({ type: "roll" })}>
                     Rzuć kośćmi
                   </button>
                 )}
-                {canMove && view.phase === "buy" && (
+                {settled && canMove && view.phase === "buy" && (
                   <>
                     <button type="button" className="btn btn-primary" onClick={() => onMove({ type: "buy" })}>
                       Kup {SHORT[here] ?? BOARD[here].name} za {price(here)} zł
@@ -460,9 +505,9 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
                     </button>
                   </>
                 )}
-                {!over && !canMove && view.phase === "buy" && <p className="text-sm text-fg-muted">{nick(view.turn!)} decyduje o zakupie</p>}
+                {settled && !over && !canMove && view.phase === "buy" && <p className="text-sm text-fg-muted">{nick(view.turn!)} decyduje o zakupie</p>}
               </div>
-              {canMove && view.phase === "buy" && <p className="text-center text-sm text-fg-muted">{buyInfo(here)}</p>}
+              {settled && canMove && view.phase === "buy" && <p className="text-center text-sm text-fg-muted">{buyInfo(here)}</p>}
 
               {!over && view.phase === "sell" && view.debt && (
                 <p className="text-center text-sm">
