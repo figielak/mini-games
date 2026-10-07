@@ -303,6 +303,24 @@ describe("długi i bankructwo", () => {
   });
 });
 
+describe("historia zdarzeń", () => {
+  test("ostatnie zdarzenia zostają po kolejnych ruchach, najwyżej 4", () => {
+    let s = roll(two(), A, 1, 2); // A na 3
+    s = play(s, A, { type: "buy" });
+    s = roll(s, B, 2, 3); // B na Karty Dziekanatu: brak nowego zdarzenia
+    expect(view(s).events).toEqual([{ type: "buy", player: A, amount: 15, tile: 3 }]);
+    s = roll(s, A, 1, 3); // A na 7 (Ksero)
+    s = play(s, A, { type: "skip" });
+    expect(view(s).events.at(-1)).toEqual({ type: "skip", player: A, tile: 7 });
+
+    for (let i = 0; i < 4; i++) s = { ...s, events: [...s.events, { type: "allowance", player: B, amount: 20 }] };
+    s = roll(s, B, 6, 1); // B z 5 na 12: Hala Podpromie, faza kupna
+    s = play(s, B, { type: "buy" });
+    expect(view(s).events).toHaveLength(4);
+    expect(view(s).events.at(-1)).toEqual({ type: "buy", player: B, amount: 25, tile: 12 });
+  });
+});
+
 describe("limit czasu", () => {
   test("rzut w fazie rzutu, pominięcie w fazie kupna", () => {
     expect(game.timeoutMove!(two(), A, createRng(1))).toEqual({ type: "roll" });
