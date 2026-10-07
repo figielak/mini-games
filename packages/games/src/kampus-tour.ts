@@ -25,7 +25,7 @@ export const GROUPS = GROUP_DEFS.map(([, tiles]) => tiles.map(([i]) => i));
 const UTILITIES = [7, 29];
 const UTILITY_PRICE = 30;
 /** Mnożnik sumy oczek przy 1 i 2 posiadanych. */
-const UTILITY_RATES = [2, 5];
+export const UTILITY_RATES = [2, 5];
 
 export type Tile =
   | { kind: "start" | "kolokwium" | "juwenalia" | "mpk" | "karty"; name: string }
@@ -103,6 +103,9 @@ const saleValue = (tile: number) => Math.floor(priceOf(tile) / 2);
 const owned = (s: State, p: PlayerId) => Object.keys(s.owners).map(Number).filter((i) => s.owners[i] === p);
 const wealth = (s: State, p: PlayerId) => s.cash[p] + owned(s, p).reduce((sum, i) => sum + priceOf(i), 0);
 
+/** Czynsz bez budynków: P/10 w pełnych złotych. */
+export const baseRent = (price: number) => Math.round(price / 10);
+
 /** Czynsz P/10, cała grupa podwaja go; Ksero i Stołówka: suma oczek × stawka zależna od liczby posiadanych. */
 function rent(s: State, tile: number): number {
   const t = BOARD[tile];
@@ -112,7 +115,7 @@ function rent(s: State, tile: number): number {
     return (s.dice![0] + s.dice![1]) * UTILITY_RATES[count - 1];
   }
   if (t.kind !== "property") return 0;
-  const base = Math.round(t.price / 10);
+  const base = baseRent(t.price);
   return GROUPS[t.group].every((i) => s.owners[i] === owner) ? base * 2 : base;
 }
 
