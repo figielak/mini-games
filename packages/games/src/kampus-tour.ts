@@ -4,6 +4,8 @@ import type { GameDefinition, PlayerId, Rng } from "./core.ts";
 export const SIZE = 32;
 export const ROUNDS = 20;
 export const START_CASH = 200;
+/** Premia startowa za każde dalsze miejsce w kolejce: wyrównuje przewagę pierwszego ruchu (symulacja botów). */
+export const SEAT_BONUS = 20;
 /** Kieszonkowe za przejście przez Początek. */
 export const ALLOWANCE = 20;
 const TAX = 15;
@@ -28,7 +30,7 @@ const UTILITY_PRICE = 30;
 export const UTILITY_RATES = [2, 5];
 
 /** Czynsz z budynkami: ułamek ceny P dla poziomów 1-4 (bez mnożnika za komplet). */
-export const LEVEL_RENT = [0.5, 1.5, 3, 5];
+export const LEVEL_RENT = [0.4, 1, 2, 4];
 export const LANDMARK = LEVEL_RENT.length;
 
 export type Tile =
@@ -443,7 +445,7 @@ export const kampusTour: GameDefinition<State, Move> = {
       players,
       positions: Object.fromEntries(players.map((p) => [p, 0])),
       laps: Object.fromEntries(players.map((p) => [p, 0])),
-      cash: Object.fromEntries(players.map((p) => [p, START_CASH])),
+      cash: Object.fromEntries(players.map((p, i) => [p, START_CASH + SEAT_BONUS * i])),
       owners: {},
       levels: {},
       bankrupt: [],

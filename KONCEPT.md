@@ -153,7 +153,7 @@ games/
 ## 9. Otwarte kwestie
 
 - Nazwy pól Kampus Tour ustalone (grupy jako pory dnia studenta, Ksero i Stołówka jak wodociągi); druga nazwa w grupie „Rano” robocza (Automat z przekąskami).
-- Balans ekonomii: start 200 zł, kieszonkowe 20 zł, czynsz P/10 (cała grupa x2); do dopracowania po testach z grupą, zwłaszcza partie we dwóch.
+- Balans ekonomii: start 200 zł (+20 zł za każde dalsze miejsce), kieszonkowe 20 zł, czynsz P/10 (cała grupa x2), z budynkami 0,4P / P / 2P / 4P (ustalone symulacją botów); do sprawdzenia w testach z grupą. Pełne grupy są rzadkie (34-54% partii), więc monopol prawie się nie zdarza: rozważyć handel między graczami.
 - Zestaw kart specjalnych w Poprawce (talia 18 Kart Dziekanatu ustalona, w kodzie: CARDS w kampus-tour.ts).
 - Czy dodać statystyki między sesjami (ranking po nicku) bez wprowadzania kont.
 - Własna nazwa całej platformy.
