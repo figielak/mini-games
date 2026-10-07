@@ -108,7 +108,7 @@ export const CARDS: { title: string; text: string; effect: CardEffect }[] = [
 ];
 const PASS_CARD = CARDS.findIndex((c) => c.effect.kind === "pass");
 
-export type Move = { type: "roll" } | { type: "buy" } | { type: "skip" } | { type: "sell"; tile: number } | { type: "build"; level: number };
+export type Move = { type: "roll" } | { type: "card" } | { type: "buy" } | { type: "skip" } | { type: "sell"; tile: number } | { type: "build"; level: number };
 
 /** Co się wydarzyło w ostatnim ruchu; UI zamienia to na tekst. */
 export type Event = {
@@ -135,7 +135,7 @@ export interface State {
   /** Kolejność odpadania. */
   bankrupt: PlayerId[];
   turn: number;
-  phase: "roll" | "buy" | "build" | "sell" | "over";
+  phase: "roll" | "card" | "buy" | "build" | "sell" | "over";
   dice: [number, number] | null;
   /** Dublety z rzędu w tej turze. */
   doubles: number;
@@ -144,6 +144,8 @@ export interface State {
   debt: { amount: number; to: PlayerId[] } | null;
   /** Talia Kart Dziekanatu: dobiera się z początku, karta wraca na koniec. */
   deck: number[];
+  /** Wyciągnięta Karta Dziekanatu czekająca na odkrycie (faza card); efekt działa dopiero po ruchu card. */
+  card: number | null;
   /** Kto siedzi na Kolokwium. */
   kolokwium: PlayerId[];
   /** Zachowane karty „Zaliczenie w pierwszym terminie”. */
@@ -157,6 +159,7 @@ export type View = Omit<State, "turn" | "doubles" | "deck"> & { turn: PlayerId |
 
 const moveSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("roll") }),
+  z.object({ type: z.literal("card") }),
   z.object({ type: z.literal("buy") }),
   z.object({ type: z.literal("skip") }),
   z.object({ type: z.literal("sell"), tile: z.number().int().min(0).max(SIZE - 1) }),
@@ -290,11 +293,17 @@ function toKolokwium(s: State, player: PlayerId): State {
   );
 }
 
-/** Karta Dziekanatu: dobranie z wierzchu, powrót na spód (Zaliczenie zostaje u gracza), efekt. */
+/** Karta Dziekanatu: dobranie z wierzchu, powrót na spód (Zaliczenie zostaje u gracza); efekt po odkryciu. */
 function drawCard(s: State, player: PlayerId): State {
   const [id, ...rest] = s.deck;
-  const effect = CARDS[id].effect;
-  const next = log({ ...s, deck: effect.kind === "pass" ? rest : [...rest, id] }, { type: "card", player, tile: s.positions[player], card: id });
+  const deck = CARDS[id].effect.kind === "pass" ? rest : [...rest, id];
+  return log({ ...s, deck, phase: "card", card: id }, { type: "card", player, tile: s.positions[player], card: id });
+}
+
+/** Efekt odkrytej Karty Dziekanatu. */
+function applyCard(s: State, player: PlayerId): State {
+  const effect = CARDS[s.card!].effect;
+  const next: State = { ...s, card: null };
   const others = alive(next).filter((q) => q !== player);
   switch (effect.kind) {
     case "cash":
@@ -380,6 +389,7 @@ export const kampusTour: GameDefinition<State, Move> = {
       debt: null,
       events: [],
       deck,
+      card: null,
       kolokwium: [],
       passes: {},
     };
@@ -388,6 +398,7 @@ export const kampusTour: GameDefinition<State, Move> = {
   validateMove(s, player, move) {
     if (s.phase === "over" || current(s) !== player) return false;
     if (move.type === "roll") return s.phase === "roll";
+    if (move.type === "card") return s.phase === "card";
     if (move.type === "sell") return s.phase === "sell" && s.owners[move.tile] === player;
     if (move.type === "build") {
       const tile = s.positions[player];
@@ -406,6 +417,8 @@ export const kampusTour: GameDefinition<State, Move> = {
   applyMove(s, player, move, rng: Rng) {
     // Pominięcie zakupu jest zdarzeniem, pominięcie budowy nie.
     if (move.type === "skip") return finish(s.phase === "buy" ? log(s, { type: "skip", player, tile: s.positions[player] }) : s);
+
+    if (move.type === "card") return applyCard(s, player);
 
     if (move.type === "build") {
       const tile = s.positions[player];
@@ -485,6 +498,7 @@ export const kampusTour: GameDefinition<State, Move> = {
     debt: s.debt,
     events: s.events,
     deckSize: s.deck.length,
+    card: s.card,
     kolokwium: s.kolokwium,
     passes: s.passes,
   }),
@@ -500,6 +514,7 @@ export const kampusTour: GameDefinition<State, Move> = {
 
   timeoutMove(s, player) {
     if (s.phase === "buy" || s.phase === "build") return { type: "skip" };
+    if (s.phase === "card") return { type: "card" };
     if (s.phase === "sell") {
       const cheapest = owned(s, player).sort((a, b) => priceOf(a) - priceOf(b) || a - b)[0];
       return { type: "sell", tile: cheapest };

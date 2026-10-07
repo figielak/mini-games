@@ -267,11 +267,6 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
   const settledEvents = useRef(view.events);
   if (settled) settledEvents.current = view.events;
   const recent = settledEvents.current.slice(-2);
-  // Świeżo wylosowana Karta Dziekanatu: pokazana w środku, a pod nią to, co stało się po niej.
-  const cardAt = recent.findLastIndex((e) => e.type === "card");
-  const drawn = cardAt >= 0 ? recent[cardAt].card : undefined;
-  const drawnBy = cardAt >= 0 ? recent[cardAt].player : undefined;
-  const afterCard = cardAt >= 0 ? recent.slice(cardAt + 1) : [];
   // Świeżo zebrany komplet: jego pola chwilę pulsują w kolorze gracza.
   const lastEvent = settledEvents.current.at(-1);
   const fresh = lastEvent?.type === "set" ? setOf(lastEvent.tile!) : [];
@@ -653,23 +648,7 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
                     Łączenie ponownie…
                   </p>
                 )}
-                {drawn !== undefined ? (
-                  <div className="flex max-w-sm items-stretch overflow-hidden rounded-inset border border-line bg-surface text-left">
-                    <span className="grid w-9 shrink-0 place-items-center" style={{ backgroundColor: CARDS_COLOR }} aria-hidden>
-                      <Cards size={18} weight="fill" className="text-bg" />
-                    </span>
-                    <span className="px-3 py-1.5">
-                      <span className="block text-[10px] tracking-wide text-fg-muted uppercase">Karta Dziekanatu · {nick(drawnBy!)}</span>
-                      <span className="block text-sm font-semibold">{CARDS[drawn].title}</span>
-                      <span className="block text-xs text-fg-muted">{CARDS[drawn].text}</span>
-                      {afterCard.map((e, i) => (
-                        <span key={i} className="block text-xs text-fg">
-                          {describe(e)}
-                        </span>
-                      ))}
-                    </span>
-                  </div>
-                ) : recent.length > 0 && (
+                {recent.length > 0 && (
                   <ul className="text-center text-sm font-medium">
                     {recent.map((e, i) => (
                       <li
@@ -751,6 +730,33 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
             </div>
           </div>
         </div>
+
+        {/* Karta Dziekanatu: plansza się rozmywa, karta na środku, efekt dopiero po kliknięciu. */}
+        {settled && !over && view.phase === "card" && view.card !== null && (
+          <div className="absolute inset-0 z-20 grid place-items-center bg-bg/60 backdrop-blur-sm">
+            <div
+              role="dialog"
+              aria-label="Karta Dziekanatu"
+              className="flex w-72 animate-[card-in_0.35s_ease-out] flex-col overflow-hidden rounded-inset border border-line bg-surface shadow-[0_16px_48px_rgb(0_0_0/0.7)]"
+            >
+              <div className="flex items-center gap-2 px-4 py-2.5 text-bg" style={{ backgroundColor: CARDS_COLOR }}>
+                <Cards size={22} weight="fill" aria-hidden />
+                <span className="text-xs font-semibold tracking-wide uppercase">Karta Dziekanatu · {nick(view.turn!)}</span>
+              </div>
+              <div className="flex flex-col gap-2 p-4 text-center">
+                <h2 className="text-lg font-semibold">{CARDS[view.card].title}</h2>
+                <p className="text-sm text-fg-muted">{CARDS[view.card].text}</p>
+                {canMove ? (
+                  <button type="button" className="btn btn-primary mt-2" autoFocus onClick={() => onMove({ type: "card" })}>
+                    OK
+                  </button>
+                ) : (
+                  <p className="mt-2 text-sm text-fg-muted">{nick(view.turn!)} czyta kartę…</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </main>
   );

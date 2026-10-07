@@ -495,7 +495,9 @@ describe("budowanie", () => {
 });
 
 describe("Karty Dziekanatu", () => {
-  const draw = (s: State, title: string) => roll(top(s, title), A, 2, 3); // A z 0 na pole kart 5
+  /** Rzut na pole kart i odkrycie karty. */
+  const reveal = (s: State) => play(s, A, { type: "card" });
+  const draw = (s: State, title: string) => reveal(roll(top(s, title), A, 2, 3)); // A z 0 na pole kart 5
 
   test("talia: 18 kart, potasowana deterministycznie, kolejność ukryta w widoku", () => {
     expect(CARDS).toHaveLength(18);
@@ -505,6 +507,20 @@ describe("Karty Dziekanatu", () => {
     expect(game.setup([A, B], createRng(2)).deck).not.toEqual(s.deck);
     expect(view(s).deckSize).toBe(18);
     expect((view(s) as unknown as { deck?: unknown }).deck).toBeUndefined();
+  });
+
+  test("karta czeka na odkrycie: efekt dopiero po ruchu card, tylko gracza na turze", () => {
+    const s = roll(top(two(), "Stypendium rektora"), A, 2, 3);
+    expect(view(s).phase).toBe("card");
+    expect(view(s).card).toBe(card("Stypendium rektora"));
+    expect(view(s).cash[A]).toBe(START_CASH);
+    expect(game.validateMove(s, B, { type: "card" })).toBe(false);
+    expect(game.validateMove(s, A, { type: "roll" })).toBe(false);
+    expect(game.validateMove(two(), A, { type: "card" })).toBe(false);
+    expect(game.timeoutMove!(s, A)).toEqual({ type: "card" });
+    const after = reveal(s);
+    expect(view(after).card).toBeNull();
+    expect(view(after).cash[A]).toBe(START_CASH + 30);
   });
 
   test("dobrana karta jest zdarzeniem i wraca na spód talii", () => {
@@ -559,7 +575,7 @@ describe("Karty Dziekanatu", () => {
   });
 
   test("Spóźnienie na zajęcia: prosto na Kolokwium, bez kieszonkowego, nawet po dublecie koniec tury", () => {
-    const s = roll(top(with2(two(), { positions: { [A]: 3 } }), "Spóźnienie na zajęcia"), A, 1, 1);
+    const s = reveal(roll(top(with2(two(), { positions: { [A]: 3 } }), "Spóźnienie na zajęcia"), A, 1, 1));
     expect(view(s).positions[A]).toBe(11);
     expect(view(s).kolokwium).toEqual([A]);
     expect(view(s).cash[A]).toBe(START_CASH);
@@ -593,7 +609,7 @@ describe("Karty Dziekanatu", () => {
   });
 
   test("Juwenalia!: przejście przez Początek daje kieszonkowe", () => {
-    const s = roll(top(with2(two(), { positions: { [A]: 16 } }), "Juwenalia!"), A, 2, 3); // 21 → 16
+    const s = reveal(roll(top(with2(two(), { positions: { [A]: 16 } }), "Juwenalia!"), A, 2, 3)); // 21 → 16
     expect(view(s).positions[A]).toBe(16);
     expect(view(s).cash[A]).toBe(START_CASH + ALLOWANCE);
   });
@@ -611,7 +627,7 @@ describe("Karty Dziekanatu", () => {
     expect(view(s).positions[A]).toBe(7);
     expect(view(s).cash[A]).toBe(START_CASH - 20);
     // Z 13 najbliższa jest Stołówka (29).
-    const far = roll(top(with2(two(), { positions: { [A]: 8 } }), "Nocny autobus MPK"), A, 2, 3);
+    const far = reveal(roll(top(with2(two(), { positions: { [A]: 8 } }), "Nocny autobus MPK"), A, 2, 3));
     expect(view(far).positions[A]).toBe(29);
     expect(view(far).phase).toBe("buy");
   });
