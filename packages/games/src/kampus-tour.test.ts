@@ -321,6 +321,30 @@ describe("historia zdarzeń", () => {
   });
 });
 
+describe("komplet grupy", () => {
+  test("kupno ostatniego pola grupy daje zdarzenie kompletu", () => {
+    let s = with2(two(), { owners: { 30: A }, positions: { [A]: 26 } });
+    s = roll(s, A, 2, 3); // 31: Rynek
+    s = play(s, A, { type: "buy" });
+    expect(view(s).events.at(-1)).toEqual({ type: "set", player: A, tile: 31 });
+    expect(view(s).events.at(-2)).toEqual({ type: "buy", player: A, amount: 50, tile: 31 });
+  });
+
+  test("Ksero i Stołówka u jednego gracza to też komplet", () => {
+    let s = with2(two(), { owners: { 29: A } });
+    s = roll(s, A, 3, 4); // 7: Ksero
+    s = play(s, A, { type: "buy" });
+    expect(view(s).events.at(-1)).toEqual({ type: "set", player: A, tile: 7 });
+  });
+
+  test("bez pełnej grupy nie ma zdarzenia kompletu", () => {
+    let s = with2(two(), { owners: { 30: B }, positions: { [A]: 26 } });
+    s = roll(s, A, 2, 3);
+    s = play(s, A, { type: "buy" });
+    expect(view(s).events.at(-1)?.type).toBe("buy");
+  });
+});
+
 describe("limit czasu", () => {
   test("rzut w fazie rzutu, pominięcie w fazie kupna", () => {
     expect(game.timeoutMove!(two(), A, createRng(1))).toEqual({ type: "roll" });
