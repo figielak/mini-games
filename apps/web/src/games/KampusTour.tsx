@@ -140,13 +140,13 @@ function fields(n: number) {
 }
 
 /** Pochylenie planszy (2.5D): kąt, perspektywa i pomniejszenie, żeby bliższa krawędź nie wychodziła poza ekran. */
-const TILT = 20;
+const TILT = 10;
 const PERSPECTIVE = "1000px";
-const TILT_SCALE = 0.88;
+const TILT_SCALE = 0.95;
 const BOARD_WIDTH = "min(100cqw, calc(100cqh * 13 / 7))";
 /** Płaska nakładka na środek planszy: mniej więcej obszar wewnątrz pochylonego pierścienia pól. */
-const CENTER_WIDTH = `calc(${BOARD_WIDTH} * 0.68)`;
-const CENTER_HEIGHT = `calc(${BOARD_WIDTH} * 0.24)`;
+const CENTER_WIDTH = `calc(${BOARD_WIDTH} * 0.72)`;
+const CENTER_HEIGHT = `calc(${BOARD_WIDTH} * 0.27)`;
 const TILE_EDGE = "0 3px 0 rgb(0 0 0 / 0.45)";
 
 /** Tempo animacji: krok pionka o jedno pole i czas turlania kostek. */
@@ -278,7 +278,9 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
       case "tax":
         return `${who} płaci ${e.amount} zł za akademik`;
       case "set":
-        return `${who} ma komplet: ${setOf(e.tile!).map((t) => SHORT[t] ?? BOARD[t].name).join(" + ")}!`;
+        return `${who} ma komplet: ${setOf(e.tile!).map((t) => SHORT[t] ?? BOARD[t].name).join(" + ")}! ${
+          BOARD[e.tile!].kind === "utility" ? `Czynsz: oczka × ${UTILITY_RATES[1]} zł` : "Czynsz ×2, można stawiać landmark"
+        }`;
       case "build":
         return `${who} buduje ${BOARD[e.tile!].name}: ${levelName(e.level!)} za ${e.amount} zł`;
       case "skip":
@@ -357,7 +359,7 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
             {pawns > 0 && tokens(i, 22)}
           </span>
           <span className="px-1 text-center text-[11px] leading-none font-semibold text-fg">{tile.name}</span>
-          <span className={`mt-0.5 px-1 text-center text-[9px] leading-none whitespace-nowrap ${corner.soon ? "text-fg-muted italic" : "text-fg-muted"}`}>
+          <span className={`mt-0.5 px-1 text-center text-[10px] leading-none font-medium whitespace-nowrap ${corner.soon ? "text-fg/75 italic" : "text-fg/90"}`}>
             {corner.sub}
           </span>
         </>
@@ -551,7 +553,7 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
                   aria-label={tile.name}
                   aria-pressed={selected === i}
                   className={`relative flex flex-col items-center justify-center overflow-hidden rounded-sm bg-[color-mix(in_srgb,var(--color-fg)_12%,var(--color-bg))] transition-opacity ${
-                    sellable || deciding === i ? "z-10 outline-2 outline-accent" : selected === i ? "outline-2 outline-fg" : ""
+                    sellable ? "z-10 outline-2 outline-accent" : deciding === i ? "z-10 outline-2" : selected === i ? "outline-2 outline-fg" : ""
                   } ${deciding !== null && deciding !== i ? "opacity-35" : ""} ${fresh.includes(i) ? "animate-[set-glow_0.9s_ease-in-out_4]" : ""}`}
                   style={{
                     gridColumn: x + 1,
@@ -559,7 +561,9 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
                     backgroundColor: background,
                     ["--glow" as string]: owner ? color(owner) : undefined,
                     // Grubość pola (krawędź od spodu); poświata tylko dla pola, na którym dzieje się akcja.
-                    boxShadow: deciding === i ? `${TILE_EDGE}, 0 0 16px var(--color-accent)` : TILE_EDGE,
+                    // Pole decyzji świeci kolorem gracza, który decyduje (czerwień kojarzy się z Dziekanatem i długiem).
+                    outlineColor: deciding === i ? color(view.turn!) : undefined,
+                    boxShadow: deciding === i ? `${TILE_EDGE}, 0 0 16px ${color(view.turn!)}` : TILE_EDGE,
                   }}
                   onClick={() => setSelected(selected === i ? null : i)}
                 >
