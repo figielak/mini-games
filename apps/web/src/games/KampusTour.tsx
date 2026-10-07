@@ -350,9 +350,11 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
   // Gotówka i pola tak samo: zmieniają się dopiero po dojściu pionka.
   const settledCash = useRef(view.cash);
   const settledOwners = useRef(view.owners);
+  const settledLevels = useRef(view.levels);
   if (settled) {
     settledCash.current = view.cash;
     settledOwners.current = view.owners;
+    settledLevels.current = view.levels;
   }
   const cash = settledCash.current;
   const floats = useFloats(view.players, cash);
@@ -441,9 +443,11 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
   /** Sprzedaż bankowi: połowa ceny pola z budynkami. */
   const value = (tile: number) => price(tile) + buildCost(tile, 0, level(tile));
   const saleValue = (tile: number) => Math.floor(value(tile) / 2);
-  /** Majątek jak w rankingu po ostatniej rundzie: gotówka + pola z budynkami. */
+  /** Pola gracza w panelu: ten sam moment co gotówka (po dojściu pionka), żeby liczby do siebie pasowały. */
+  const ownedBy = (id: string) => Object.keys(settledOwners.current).map(Number).filter((i) => settledOwners.current[i] === id);
+  /** Majątek jak w rankingu po ostatniej rundzie: gotówka + ceny pól + koszt budynków. */
   const wealth = (id: string) =>
-    cash[id] + Object.keys(settledOwners.current).map(Number).filter((i) => settledOwners.current[i] === id).reduce((sum, i) => sum + value(i), 0);
+    cash[id] + ownedBy(id).reduce((sum, i) => sum + price(i) + buildCost(i, 0, settledLevels.current[i] ?? 0), 0);
   /** Ile zapłaci ten, kto stanie na cudzym polu (z kompletem, budynkami i Juwenaliami); Ksero i Stołówka: mnożnik oczek. */
   const rentNow = (i: number): ReactNode => {
     const t = BOARD[i];
@@ -707,12 +711,12 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
                 {id === me && " (ty)"}
               </span>
               <span className="text-sm">{out ? "bankrut" : zl(cash[id])}</span>
-              {!out && wealth(id) !== cash[id] && (
-                <span className="text-fg-muted" title="Majątek: gotówka + pola z budynkami">
+              {!out && (
+                <span className="text-fg-muted" title="Majątek: gotówka + ceny pól + koszt budynków">
                   majątek <span className="text-fg">{zl(wealth(id))}</span>
                 </span>
               )}
-              {!out && <span className="text-fg-muted">{fields(Object.values(view.owners).filter((o) => o === id).length)}</span>}
+              {!out && <span className="text-fg-muted">{fields(ownedBy(id).length)}</span>}
               {view.kolokwium.includes(id) && badge(Exam, "Kolokwium", CORNERS.kolokwium.color)}
               {(view.passes[id] ?? 0) > 0 && badge(Cards, `Zaliczenie ×${view.passes[id]}`, SPECIAL_COLOR)}
               {view.mpk.includes(id) && badge(Bus, "Bilet MPK", CORNERS.mpk.color)}
