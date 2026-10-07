@@ -133,6 +133,16 @@ function fields(n: number) {
   return `${n} ${few ? "pola" : "pól"}`;
 }
 
+/** Pochylenie planszy (2.5D): kąt, perspektywa i pomniejszenie, żeby bliższa krawędź nie wychodziła poza ekran. */
+const TILT = 20;
+const PERSPECTIVE = "1000px";
+const TILT_SCALE = 0.88;
+const BOARD_WIDTH = "min(100cqw, calc(100cqh * 13 / 7))";
+/** Płaska nakładka na środek planszy: mniej więcej obszar wewnątrz pochylonego pierścienia pól. */
+const CENTER_WIDTH = `calc(${BOARD_WIDTH} * 0.68)`;
+const CENTER_HEIGHT = `calc(${BOARD_WIDTH} * 0.24)`;
+const TILE_EDGE = "0 3px 0 rgb(0 0 0 / 0.45)";
+
 /** Tempo animacji: krok pionka o jedno pole i czas turlania kostek. */
 const STEP_MS = 220;
 const ROLL_MS = 700;
@@ -194,7 +204,7 @@ function Dice({ values, rolling }: { values: [number, number]; rolling: boolean 
         return (
           <Die
             key={i}
-            size={56}
+            size={44}
             weight="fill"
             className={rolling ? "animate-[dice-tumble_0.3s_ease-in-out_infinite]" : ""}
             style={{ animationDelay: `${i * 80}ms` }}
@@ -399,8 +409,8 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
 
     return (
       <div
-        className="z-10 flex flex-col gap-2 overflow-auto rounded-inset border border-line bg-surface p-3"
-        style={{ gridColumn: "2 / 12", gridRow: "2 / 6", borderTop: `6px solid ${accent}` }}
+        className="absolute inset-x-0 top-1/2 z-10 flex max-h-[calc(100cqh-1rem)] -translate-y-1/2 flex-col gap-2 overflow-auto rounded-inset border border-line bg-surface p-3 shadow-[0_12px_32px_rgb(0_0_0/0.6)]"
+        style={{ borderTop: `6px solid ${accent}` }}
       >
         <div className="flex items-start justify-between gap-2">
           <div>
@@ -468,15 +478,19 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
           );
         })}
 
-        {/* Plansza 13:7 (rogi 1,5 raza większe) możliwie duża w dostępnym miejscu (jednostki kontenera). */}
-        <div className="grid h-full w-full place-items-center" style={{ containerType: "size" }}>
+        {/* Plansza 13:7 (rogi 1,5 raza większe) możliwie duża w dostępnym miejscu (jednostki kontenera), lekko pochylona. */}
+        <div className="relative grid h-full w-full place-items-center" style={{ containerType: "size", perspective: PERSPECTIVE }}>
           <div
-            className="grid gap-[2px]"
+            className="grid gap-[3px] rounded-md p-[3px]"
             style={{
-              width: "min(100cqw, calc(100cqh * 13 / 7))",
+              width: BOARD_WIDTH,
               aspectRatio: "13 / 7",
               gridTemplateColumns: "1.5fr repeat(10, 1fr) 1.5fr",
               gridTemplateRows: "1.5fr repeat(4, 1fr) 1.5fr",
+              transform: `rotateX(${TILT}deg) scale(${TILT_SCALE})`,
+              // Podstawa planszy: krawędź od spodu i cień na „stole”.
+              backgroundColor: "color-mix(in srgb, var(--color-fg) 6%, var(--color-bg))",
+              boxShadow: "0 10px 0 color-mix(in srgb, var(--color-fg) 3%, var(--color-bg)), 0 28px 40px rgb(0 0 0 / 0.6)",
             }}
           >
             {BOARD.map((tile, i) => {
@@ -505,8 +519,8 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
                     gridRow: y + 1,
                     backgroundColor: background,
                     ["--glow" as string]: owner ? color(owner) : undefined,
-                    // Ramka i poświata tylko dla pola, na którym dzieje się akcja.
-                    boxShadow: deciding === i ? "0 0 16px var(--color-accent)" : undefined,
+                    // Grubość pola (krawędź od spodu); poświata tylko dla pola, na którym dzieje się akcja.
+                    boxShadow: deciding === i ? `${TILE_EDGE}, 0 0 16px var(--color-accent)` : TILE_EDGE,
                   }}
                   onClick={() => setSelected(selected === i ? null : i)}
                 >
@@ -532,65 +546,74 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
               );
             })}
 
-            <div className="flex flex-col items-center justify-center gap-1.5 overflow-hidden p-2" style={{ gridColumn: "2 / 12", gridRow: "2 / 6" }}>
-              <p className="label">
-                Kampus Tour · runda {view.round}/{ROUNDS}
-              </p>
-              {timer && <div className="w-full max-w-sm">{timer}</div>}
-              <h1 className="text-lg font-semibold">{status}</h1>
-              {dropped && (
-                <p role="status" className="flex items-center gap-2 text-sm text-accent">
-                  <WifiSlash size={16} aria-hidden />
-                  Łączenie ponownie…
-                </p>
-              )}
-              {recent.length > 0 && (
-                <ul className="text-center text-sm font-medium">
-                  {recent.map((e, i) => (
-                    <li
-                      key={i}
-                      className={e.type === "set" ? "font-semibold" : i === recent.length - 1 ? "text-fg" : "text-fg-muted"}
-                      style={e.type === "set" ? { color: color(e.player) } : undefined}
-                    >
-                      {describe(e)}
-                    </li>
-                  ))}
-                </ul>
-              )}
+            {/* Środek planszy pusty: treść leży w płaskiej nakładce poniżej, żeby tekst i przyciski nie były pochylone. */}
+            <div style={{ gridColumn: "2 / 12", gridRow: "2 / 6" }} />
+          </div>
 
-              <div className="flex items-center gap-3">
-                {view.dice && <Dice values={view.dice} rolling={rolling} />}
-                {settled && canMove && view.phase === "roll" && (
-                  <button type="button" className="btn btn-primary" onClick={() => onMove({ type: "roll" })}>
-                    Rzuć kośćmi
-                  </button>
+          <div className="pointer-events-none absolute inset-0 grid place-items-center">
+            <div className="pointer-events-auto relative" style={{ width: CENTER_WIDTH, height: CENTER_HEIGHT }}>
+              <div className="flex h-full flex-col items-center justify-center gap-1.5 overflow-hidden p-2">
+                <div className="flex w-full max-w-sm items-center gap-3">
+                  <span className="label shrink-0">
+                    Runda {view.round}/{ROUNDS}
+                  </span>
+                  {timer && <div className="flex-1">{timer}</div>}
+                </div>
+                <h1 className="text-lg font-semibold">{status}</h1>
+                {dropped && (
+                  <p role="status" className="flex items-center gap-2 text-sm text-accent">
+                    <WifiSlash size={16} aria-hidden />
+                    Łączenie ponownie…
+                  </p>
                 )}
-                {settled && canMove && view.phase === "buy" && (
-                  <>
-                    <button type="button" className="btn btn-primary" onClick={() => onMove({ type: "buy" })}>
-                      Kup {SHORT[here] ?? BOARD[here].name} za {price(here)} zł
-                    </button>
-                    <button type="button" className="btn btn-ghost" onClick={() => onMove({ type: "skip" })}>
-                      Pomiń
-                    </button>
-                  </>
+                {recent.length > 0 && (
+                  <ul className="text-center text-sm font-medium">
+                    {recent.map((e, i) => (
+                      <li
+                        key={i}
+                        className={e.type === "set" ? "font-semibold" : i === recent.length - 1 ? "text-fg" : "text-fg-muted"}
+                        style={e.type === "set" ? { color: color(e.player) } : undefined}
+                      >
+                        {describe(e)}
+                      </li>
+                    ))}
+                  </ul>
                 )}
-                {settled && !over && !canMove && view.phase === "roll" && <p className="text-sm text-fg-muted">{nick(view.turn!)} rzuca kośćmi…</p>}
-                {settled && !over && !canMove && view.phase === "buy" && <p className="text-sm text-fg-muted">{nick(view.turn!)} decyduje o zakupie</p>}
+
+                <div className="flex items-center gap-3">
+                  {view.dice && <Dice values={view.dice} rolling={rolling} />}
+                  {settled && canMove && view.phase === "roll" && (
+                    <button type="button" className="btn btn-primary" onClick={() => onMove({ type: "roll" })}>
+                      Rzuć kośćmi
+                    </button>
+                  )}
+                  {settled && canMove && view.phase === "buy" && (
+                    <>
+                      <button type="button" className="btn btn-primary" onClick={() => onMove({ type: "buy" })}>
+                        Kup {SHORT[here] ?? BOARD[here].name} za {price(here)} zł
+                      </button>
+                      <button type="button" className="btn btn-ghost" onClick={() => onMove({ type: "skip" })}>
+                        Pomiń
+                      </button>
+                    </>
+                  )}
+                  {settled && !over && !canMove && view.phase === "roll" && <p className="text-sm text-fg-muted">{nick(view.turn!)} rzuca kośćmi…</p>}
+                  {settled && !over && !canMove && view.phase === "buy" && <p className="text-sm text-fg-muted">{nick(view.turn!)} decyduje o zakupie</p>}
+                </div>
+                {settled && canMove && view.phase === "buy" && <p className="text-center text-sm text-fg-muted">{buyInfo(here)}</p>}
+
+                {!over && view.phase === "sell" && view.debt && (
+                  <p className="text-center text-sm">
+                    {selling
+                      ? `Brakuje ${view.debt.amount - view.cash[me]} zł. Stuknij swoje pole i sprzedaj je za pół ceny.`
+                      : `${nick(view.turn!)} sprzedaje pola, żeby spłacić ${view.debt.amount} zł`}
+                  </p>
+                )}
+                {actions && <div className="flex w-full max-w-xs gap-2">{actions}</div>}
               </div>
-              {settled && canMove && view.phase === "buy" && <p className="text-center text-sm text-fg-muted">{buyInfo(here)}</p>}
 
-              {!over && view.phase === "sell" && view.debt && (
-                <p className="text-center text-sm">
-                  {selling
-                    ? `Brakuje ${view.debt.amount - view.cash[me]} zł. Stuknij swoje pole i sprzedaj je za pół ceny.`
-                    : `${nick(view.turn!)} sprzedaje pola, żeby spłacić ${view.debt.amount} zł`}
-                </p>
-              )}
-              {actions && <div className="flex w-full max-w-xs gap-2">{actions}</div>}
+              {selected !== null && tileInfo(selected)}
             </div>
-
-            {selected !== null && tileInfo(selected)}
           </div>
         </div>
       </div>
