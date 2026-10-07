@@ -7,6 +7,7 @@ import { ALLOWANCE, BOARD, kampusTour as game, type Move, ROUNDS, SIZE, START_CA
 // - rzut dwiema kośćmi: Math.floor(rng() * 6) + 1 dwa razy, ruch o sumę,
 // - przejście przez pole 0 dolicza okrążenie i 20 zł kieszonkowego,
 // - wolne pole można kupić (jeśli stać) albo pominąć; na cudzym płaci się czynsz P/10, za całą grupę ×2,
+// - Ksero i Stołówka (jak wodociągi): czynsz = suma oczek × 2 zł, a gdy właściciel ma oba × 5 zł,
 // - pole 28 (Opłata za akademik) kosztuje 15 zł,
 // - brak gotówki: sprzedaż pól bankowi za połowę ceny, a gdy to nie wystarczy, bankructwo,
 // - dublet daje kolejny rzut; trzeci dublet z rzędu: ruch, ale koniec tury,
@@ -66,24 +67,34 @@ describe("plansza", () => {
 
   test("3 pola Karty Dziekanatu i Opłata za akademik na 28", () => {
     expect([5, 13, 21].map((i) => BOARD[i].kind)).toEqual(["karty", "karty", "karty"]);
-    expect(BOARD[28]).toEqual({ kind: "tax", amount: 15 });
+    expect(BOARD[28]).toEqual({ kind: "tax", name: "Opłata za akademik", amount: 15 });
   });
 
-  test("8 grup po 3 pola z cenami rosnącymi wzdłuż planszy", () => {
+  test("8 grup z nazwami, cenami rosnącymi wzdłuż planszy; skrajne grupy po 2 pola", () => {
     const groups = [
-      [[1, 2, 3], 10],
-      [[4, 6, 7], 15],
-      [[8, 9, 10], 20],
-      [[12, 14, 15], 25],
-      [[17, 18, 19], 30],
-      [[20, 22, 23], 35],
-      [[24, 25, 26], 40],
-      [[29, 30, 31], 50],
+      [10, [1, "Automat z kawą"], [2, "Automat z przekąskami"]],
+      [15, [3, "Biblioteka PRz"], [4, "Hala sportowa PRz"], [6, "Rektorat"]],
+      [20, [8, "Wydział Mechaniczny"], [9, "Wydział Elektryczny"], [10, "Wydział Chemiczny"]],
+      [25, [12, "Hala Podpromie"], [14, "Stadion Stali"], [15, "Zalew Rzeszowski"]],
+      [30, [17, "Ulica 3 Maja"], [18, "Galeria Rzeszów"], [19, "Millenium Hall"]],
+      [35, [20, "Kino"], [22, "Kręgielnia"], [23, "Klub studencki"]],
+      [40, [24, "Bulwary nad Wisłokiem"], [25, "Okrągła kładka"], [26, "Pomnik Czynu Rewolucyjnego"]],
+      [50, [30, "Zamek Lubomirskich"], [31, "Rynek"]],
     ] as const;
-    groups.forEach(([tiles, p], group) => {
-      for (const i of tiles) expect(BOARD[i], `pole ${i}`).toEqual({ kind: "property", group, price: p });
+    groups.forEach(([price, ...tiles], group) => {
+      for (const [i, name] of tiles) expect(BOARD[i], `pole ${i}`).toEqual({ kind: "property", name, group, price });
     });
-    expect(BOARD.filter((t) => t.kind === "property")).toHaveLength(24);
+    expect(BOARD.filter((t) => t.kind === "property")).toHaveLength(22);
+  });
+
+  test("Ksero (7) i Stołówka (29) jak wodociągi, po 30 zł", () => {
+    expect(BOARD[7]).toEqual({ kind: "utility", name: "Ksero", price: 30 });
+    expect(BOARD[29]).toEqual({ kind: "utility", name: "Stołówka", price: 30 });
+  });
+
+  test("wszystkie pola do kupienia razem kosztują 675 zł", () => {
+    const total = BOARD.reduce((sum, t) => sum + (t.kind === "property" || t.kind === "utility" ? t.price : 0), 0);
+    expect(total).toBe(675);
   });
 });
 
@@ -205,7 +216,7 @@ describe("czynsz i opłaty", () => {
   });
 
   test("cała grupa w rękach właściciela: czynsz ×2", () => {
-    const s = roll(with2(two(), { owners: { 4: B, 6: B, 7: B } }), A, 1, 3);
+    const s = roll(with2(two(), { owners: { 3: B, 4: B, 6: B } }), A, 1, 3);
     expect(view(s).cash[A]).toBe(START_CASH - 4);
     expect(view(s).cash[B]).toBe(START_CASH + 4);
   });
@@ -214,6 +225,31 @@ describe("czynsz i opłaty", () => {
     const s = roll(with2(two(), { owners: { 4: A } }), A, 1, 3);
     expect(view(s).cash[A]).toBe(START_CASH);
     expect(game.waitingFor(s)).toEqual([B]);
+  });
+
+  test("grupa z 2 pól: oba w rękach właściciela to czynsz ×2", () => {
+    const s = roll(with2(two(), { owners: { 30: B, 31: B }, positions: { [A]: 26 } }), A, 1, 3);
+    expect(view(s).cash[A]).toBe(START_CASH - 10);
+  });
+
+  test("Ksero: czynsz to suma oczek × 2 zł", () => {
+    const s = roll(with2(two(), { owners: { 7: B } }), A, 3, 4);
+    expect(view(s).positions[A]).toBe(7);
+    expect(view(s).cash[A]).toBe(START_CASH - 14);
+    expect(view(s).cash[B]).toBe(START_CASH + 14);
+  });
+
+  test("Ksero i Stołówka u jednego właściciela: suma oczek × 5 zł", () => {
+    const s = roll(with2(two(), { owners: { 7: B, 29: B } }), A, 3, 4);
+    expect(view(s).cash[A]).toBe(START_CASH - 35);
+  });
+
+  test("Ksero można kupić za 30 zł", () => {
+    let s = roll(two(), A, 3, 4);
+    expect(view(s).phase).toBe("buy");
+    s = play(s, A, { type: "buy" });
+    expect(view(s).owners[7]).toBe(A);
+    expect(view(s).cash[A]).toBe(START_CASH - 30);
   });
 
   test("Opłata za akademik: 15 zł dla banku", () => {
@@ -226,7 +262,7 @@ describe("czynsz i opłaty", () => {
 
 describe("długi i bankructwo", () => {
   test("brak gotówki: sprzedaż pól bankowi za połowę ceny, potem spłata", () => {
-    let s = with2(two(), { cash: { [A]: 3 }, owners: { 1: A, 29: A, 4: B, 6: B, 7: B } });
+    let s = with2(two(), { cash: { [A]: 3 }, owners: { 1: A, 29: A, 3: B, 4: B, 6: B } });
     s = roll(s, A, 1, 3); // czynsz 4 zł, A ma 3 zł
     expect(view(s).phase).toBe("sell");
     expect(view(s).debt).toEqual({ amount: 4, to: B });
@@ -244,7 +280,7 @@ describe("długi i bankructwo", () => {
   });
 
   test("gdy nawet sprzedaż nie wystarczy: bankructwo, gotówka dla wierzyciela", () => {
-    const s = roll(with2(two(), { cash: { [A]: 1 }, owners: { 4: B, 6: B, 7: B } }), A, 1, 3);
+    const s = roll(with2(two(), { cash: { [A]: 1 }, owners: { 3: B, 4: B, 6: B } }), A, 1, 3);
     expect(view(s).cash[B]).toBe(START_CASH + 1);
     expect(view(s).bankrupt).toEqual([A]);
     expect(game.isOver(s)).toEqual({ winner: B, ranking: [B, A] });
@@ -253,9 +289,9 @@ describe("długi i bankructwo", () => {
 
   test("bankrut traci pola i jest pomijany w kolejce", () => {
     // Czynsz za pełną grupę 50 zł to 10 zł; A ma 1 zł i pole warte 5 zł przy sprzedaży.
-    let s = with2(three(), { cash: { [A]: 1 }, owners: { 1: A, 29: B, 30: B, 31: B }, positions: { [A]: 26 } });
-    s = roll(s, A, 1, 2);
-    expect(view(s).positions[A]).toBe(29);
+    let s = with2(three(), { cash: { [A]: 1 }, owners: { 1: A, 30: B, 31: B }, positions: { [A]: 26 } });
+    s = roll(s, A, 1, 3);
+    expect(view(s).positions[A]).toBe(30);
     expect(view(s).bankrupt).toEqual([A]);
     expect(view(s).owners[1]).toBeUndefined();
     expect(game.isOver(s)).toBeNull();
@@ -275,7 +311,7 @@ describe("limit czasu", () => {
   });
 
   test("w fazie sprzedaży sprzedaje najtańsze pole", () => {
-    const s = roll(with2(two(), { cash: { [A]: 3 }, owners: { 29: A, 2: A, 4: B, 6: B, 7: B } }), A, 1, 3);
+    const s = roll(with2(two(), { cash: { [A]: 3 }, owners: { 29: A, 2: A, 3: B, 4: B, 6: B } }), A, 1, 3);
     expect(game.timeoutMove!(s, A, createRng(1))).toEqual({ type: "sell", tile: 2 });
   });
 });
@@ -285,7 +321,7 @@ describe("koniec gry", () => {
     let s = with2(three(), {
       round: ROUNDS,
       cash: { [A]: 50, [B]: 30, [C]: 60 },
-      owners: { 29: B },
+      owners: { 30: B },
     });
     s = roll(s, A, 2, 3); // każdy na Karty Dziekanatu, bez efektu
     s = roll(s, B, 2, 3);
