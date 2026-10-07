@@ -182,12 +182,12 @@ describe("rzut i ruch", () => {
     expect(game.waitingFor(s)).toEqual([B]);
   });
 
-  test("przejście przez start: okrążenie i 20 zł kieszonkowego", () => {
+  test("przejście przez start: okrążenie i 40 zł kieszonkowego", () => {
     const s = roll(with2(two(), { positions: { [A]: 27 } }), A, 2, 3);
     expect(view(s).positions[A]).toBe(0);
     expect(view(s).laps[A]).toBe(1);
     expect(view(s).cash[A]).toBe(START_CASH + ALLOWANCE);
-    expect(ALLOWANCE).toBe(20);
+    expect(ALLOWANCE).toBe(40);
   });
 
   test("dublet daje kolejny rzut (po decyzji o kupnie)", () => {
@@ -398,9 +398,9 @@ describe("komplet grupy", () => {
 });
 
 describe("budowanie", () => {
-  // Pole 17 (Ulica 3 Maja, grupa 17-18-19) kosztuje 30 zł: poziom 15 zł, landmark 30 zł.
+  // Pole 17 (Ulica 3 Maja, grupa 17-18-19) kosztuje 30 zł: poziom 15 zł, landmark 30 zł. Domyślnie z kompletem.
   const onOwn = (patch: Parameters<typeof with2>[1] = {}) =>
-    roll(with2(two(), { owners: { 17: A }, positions: { [A]: 14 }, ...patch }), A, 1, 2);
+    roll(with2(two(), { owners: { 17: A, 18: A, 19: A }, positions: { [A]: 14 }, ...patch }), A, 1, 2);
 
   test("koszt budowy: poziomy po P/2, landmark P", () => {
     expect(buildCost(17, 0, 1)).toBe(15);
@@ -428,12 +428,14 @@ describe("budowanie", () => {
     expect(view(built).cash[A]).toBe(START_CASH - 15);
   });
 
-  test("landmark tylko z kompletem grupy", () => {
-    expect(game.validateMove(onOwn({ levels: { 17: 3 } }), A, { type: "build", level: 4 })).toBe(false);
-    // Na poziomie 3 bez kompletu nie ma czego budować: tura idzie dalej.
-    expect(game.waitingFor(onOwn({ levels: { 17: 3 } }))).toEqual([B]);
+  test("bez kompletu tylko poziom 1, wyższe poziomy i landmark z kompletem grupy", () => {
+    const alone = onOwn({ owners: { 17: A } });
+    expect(game.validateMove(alone, A, { type: "build", level: 1 })).toBe(true);
+    expect(game.validateMove(alone, A, { type: "build", level: 2 })).toBe(false);
+    // Na poziomie 1 bez kompletu nie ma czego budować: tura idzie dalej.
+    expect(game.waitingFor(onOwn({ owners: { 17: A }, levels: { 17: 1 } }))).toEqual([B]);
 
-    let s = onOwn({ owners: { 17: A, 18: A, 19: A }, levels: { 17: 3 } });
+    let s = onOwn({ levels: { 17: 3 } });
     s = play(s, A, { type: "build", level: 4 });
     expect(view(s).levels[17]).toBe(4);
     expect(view(s).cash[A]).toBe(START_CASH - 30);
@@ -797,15 +799,16 @@ describe("Bilet MPK", () => {
     expect(game.waitingFor(s)).toEqual([B]);
   });
 
-  test("następna tura: jazda na dowolne pole przez Początek z kieszonkowym i rozliczeniem pola", () => {
+  test("następna tura: jazda na dowolne pole bez kieszonkowego za Początek, z rozliczeniem pola", () => {
     let s = roll(ticket(), B, 5, 6);
     s = with2(s, { owners: { 3: B } });
     s = play(s, A, { type: "travel", tile: 3 }, dice(1, 2));
     expect(view(s).positions[A]).toBe(3);
     expect(view(s).mpk).toEqual([]);
     expect(view(s).events).toContainEqual({ type: "travel", player: A, tile: 3 });
-    // +20 kieszonkowego, -2 czynszu za Bibliotekę.
-    expect(view(s).cash[A]).toBe(START_CASH + ALLOWANCE - 2);
+    // Bez kieszonkowego, -2 czynszu za Bibliotekę.
+    expect(view(s).cash[A]).toBe(START_CASH - 2);
+    expect(view(s).events.some((e) => e.type === "allowance")).toBe(false);
   });
 
   test("jazda na Ksero: czynsz z nowego rzutu, nie ze starych oczek", () => {
@@ -813,7 +816,7 @@ describe("Bilet MPK", () => {
     s = with2(s, { owners: { 7: B } });
     s = play(s, A, { type: "travel", tile: 7 }, dice(1, 2));
     expect(view(s).dice).toEqual([1, 2]);
-    expect(view(s).cash[A]).toBe(START_CASH + ALLOWANCE - 6); // 3 oczka × 2 zł
+    expect(view(s).cash[A]).toBe(START_CASH - 6); // 3 oczka × 2 zł
   });
 
   test("zwykły rzut zamiast jazdy zużywa bilet", () => {
