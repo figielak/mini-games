@@ -1,4 +1,5 @@
 import {
+  Backpack,
   Bed,
   Books,
   Bus,
@@ -17,6 +18,11 @@ import {
   Warning,
   ForkKnife,
   Buildings,
+  Coffee,
+  GraduationCap,
+  Headphones,
+  Laptop,
+  Scooter,
   type Icon,
   Star,
   Printer,
@@ -49,7 +55,6 @@ import {
   type LobbyPlayer,
 } from "@mini-games/games";
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { Figure } from "./kampus-figures.tsx";
 
 interface Props {
   view: KampusTourView;
@@ -64,6 +69,8 @@ interface Props {
   actions: ReactNode;
 }
 
+/** Ikony postaci (kolejność jak KAMPUS_CHARACTERS); celowo inne niż ikony grup. */
+const CHARACTER_ICONS: Icon[] = [Backpack, Coffee, Scooter, Laptop, Headphones, GraduationCap];
 const DICE = [DiceOne, DiceTwo, DiceThree, DiceFour, DiceFive, DiceSix];
 /** Rogi ekranu w kolejności miejsc, zgodnie z ruchem wskazówek zegara. */
 const SEAT_CORNERS = ["top-0 left-0", "top-0 right-0", "bottom-0 right-0", "bottom-0 left-0"];
@@ -490,18 +497,21 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
 
   /** Postać gracza; przed wyborem (i w starych partiach) zastępczo według miejsca przy stole. */
   const character = (p: string) => view.characters?.[p] ?? seat(p);
-  /** Żeton gracza: kółko w jego kolorze z ciemną figurką i białą obwódką, widoczne na każdym polu. */
-  const token = (p: string, size: number, first: boolean) => (
-    <span
-      key={p}
-      role="img"
-      aria-label={nick(p)}
-      className="grid shrink-0 place-items-center rounded-full border-2 border-white text-bg shadow-[0_2px_4px_rgb(0_0_0/0.8)]"
-      style={{ width: size, height: size, marginLeft: first ? 0 : -size * 0.45, backgroundColor: color(p) }}
-    >
-      <Figure character={character(p)} size={size * 0.82} cut={color(p)} />
-    </span>
-  );
+  /** Żeton gracza: kółko w jego kolorze z ciemną ikoną postaci i białą obwódką, widoczne na każdym polu. */
+  const token = (p: string, size: number, first: boolean) => {
+    const Pawn = CHARACTER_ICONS[character(p)];
+    return (
+      <span
+        key={p}
+        role="img"
+        aria-label={nick(p)}
+        className="grid shrink-0 place-items-center rounded-full border-2 border-white text-bg shadow-[0_2px_4px_rgb(0_0_0/0.8)]"
+        style={{ width: size, height: size, marginLeft: first ? 0 : -size * 0.45, backgroundColor: color(p) }}
+      >
+        <Pawn size={size * 0.6} weight="fill" />
+      </span>
+    );
+  };
   /** Pionki na polu: rząd zachodzących na siebie żetonów; przy 3-4 graczach mniejsze, żeby zmieścić się w polu. */
   const tokens = (tile: number, size: number) => {
     const here = view.players.filter((p) => shown[p] === tile && !view.bankrupt.includes(p));
@@ -699,6 +709,7 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
         style={{ width: stage.width, height: STAGE_H, zoom: stage.scale }}
       >
         {view.players.map((id, i) => {
+          const Pawn = CHARACTER_ICONS[character(id)];
           const active = !over && view.turn === id;
           const out = view.bankrupt.includes(id);
           return (
@@ -710,7 +721,7 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
               // Wszystkie panele mają ten sam kształt; gracz na turze tylko obwódkę i poświatę w swoim kolorze.
               style={active ? { borderColor: color(id), boxShadow: `0 0 14px ${mix(color(id), 55)}` } : undefined}
             >
-              <Figure character={character(id)} size={30} cut="var(--color-surface)" className="shrink-0" color={color(id)} />
+              <Pawn size={26} weight="fill" className="shrink-0" style={{ color: color(id) }} aria-hidden />
               <span className={`line-clamp-2 w-full leading-tight break-words ${out ? "line-through" : ""}`}>
                 {nick(id)}
                 {id === me && " (ty)"}
@@ -963,6 +974,7 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
               <div className="grid grid-cols-6 gap-2">
                 {CHARACTERS.map((name, k) => {
                   const owner = view.players.find((p) => view.characters[p] === k);
+                  const Pawn = CHARACTER_ICONS[k];
                   return (
                     <button
                       key={k}
@@ -980,7 +992,7 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
                             : { borderColor: "var(--color-line-hover)", color: canMove ? color(me) : "var(--color-fg-muted)" }
                         }
                       >
-                        <Figure character={k} size={44} cut={owner ? color(owner) : "var(--color-surface)"} />
+                        <Pawn size={30} weight="fill" aria-hidden />
                       </span>
                       <span className={owner ? "font-semibold" : "text-fg-muted"}>{owner ? nick(owner) : name}</span>
                     </button>

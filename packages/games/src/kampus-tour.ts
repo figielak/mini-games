@@ -197,8 +197,8 @@ export interface State {
 /** Widok bez kolejności talii (to byłaby wiedza o przyszłych kartach). */
 export type View = Omit<State, "turn" | "doubles" | "deck"> & { turn: PlayerId | null; deckSize: number };
 
-/** Postaci do wyboru na starcie; wygląd figurek jest w UI. */
-export const CHARACTERS = ["Z plecakiem", "Z kawą", "Na hulajnodze", "Z laptopem", "W słuchawkach", "Z książkami"];
+/** Postaci do wyboru na starcie; ikony są w UI. */
+export const CHARACTERS = ["Z plecakiem", "Z kawą", "Na hulajnodze", "Z laptopem", "W słuchawkach", "Absolwent"];
 
 const moveSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("pick"), character: z.number().int().min(0).max(CHARACTERS.length - 1) }),

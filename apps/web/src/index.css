@@ -208,10 +208,3 @@ body::before {
     transition-duration: 0.01ms !important;
   }
 }
-
-/* Figurki Kampus Tour: obrys w kolorze tła oddziela rekwizyt od sylwetki. */
-.cut {
-  stroke: var(--cut);
-  stroke-width: 1.6px;
-  paint-order: stroke;
-}
