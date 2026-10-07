@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { GameDefinition, PlayerId, Rng } from "./core.ts";
 
 export const SIZE = 32;
-export const ROUNDS = 20;
+export const ROUNDS = 40;
 export const START_CASH = 200;
 /** Premia startowa za każde dalsze miejsce w kolejce: wyrównuje przewagę pierwszego ruchu (symulacja botów). */
 export const SEAT_BONUS = 20;

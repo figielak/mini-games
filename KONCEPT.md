@@ -39,7 +39,7 @@ Mechanik można się inspirować, natomiast nazwy, grafiki i logo oryginału nie
 | Podróż | **Bilet MPK**: przeskok na dowolne pole w następnej turze |
 | Karty szansy | **Karty Dziekanatu**: stypendium, warunek, poprawka itp. |
 
-**Długość partii:** maksymalnie około 45 minut. Po limicie rund (np. 20) albo czasu wygrywa
+**Długość partii:** maksymalnie około 45 minut. Po limicie 40 rund wygrywa
 gracz z największym majątkiem (gotówka + wartość pól i budynków).
 
 ### 2.2 Poprawka (gra karciana typu Uno)
