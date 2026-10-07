@@ -3,6 +3,8 @@ services:
     image: ghcr.io/figielak/mini-games:latest
     restart: unless-stopped
     mem_limit: 256m
+    volumes:
+      - games-data:/app/data
 
   cloudflared:
     image: cloudflare/cloudflared:latest
@@ -12,3 +14,6 @@ services:
     restart: unless-stopped
     mem_limit: 64m
     depends_on: [games]
+
+volumes:
+  games-data:

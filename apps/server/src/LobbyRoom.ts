@@ -1,3 +1,5 @@
+import { mkdirSync } from "node:fs";
+import { dirname } from "node:path";
 import { type AuthContext, type Client, CloseCode, matchMaker, Room, ServerError } from "@colyseus/core";
 import {
   cleanNick,
@@ -14,6 +16,7 @@ import {
   roomCode,
   type RoomView,
 } from "@mini-games/games";
+import { openStats } from "./stats.ts";
 
 const RECONNECT_SECONDS = 10 * 60; // telefon na wykładzie śpi między turami
 const IDLE_MS = 60 * 60 * 1000;
@@ -22,6 +25,10 @@ const MESSAGES_PER_SECOND = 10;
 
 // ponytail: licznik w pamięci jednego procesu, wystarczy przy jednym kontenerze na Pi
 const roomsByIp = new Map<string, number>();
+
+const dbPath = process.env.DB_PATH ?? "data/games.db";
+mkdirSync(dirname(dbPath), { recursive: true });
+export const stats = openStats(dbPath);
 
 type Timer = { clear(): void };
 
@@ -210,7 +217,11 @@ export class LobbyRoom extends Room {
     this.phase = "over";
     this.turnTimer?.clear();
     this.turnEndsAt = null;
-    if (result.winner) this.scores[result.winner] = (this.scores[result.winner] ?? 0) + 1;
+    if (!result.winner) return;
+    this.scores[result.winner] = (this.scores[result.winner] ?? 0) + 1;
+    // Kto wyszedł w trakcie, nie siedzi już w seats, więc nie dostaje porażki.
+    const nick = (id: string) => this.players.get(id)?.nick ?? "?";
+    stats.record(this.gameId!, this.seats.map(nick), nick(result.winner));
   }
 
   /** Po limicie czasu serwer wykonuje ruch za gracza, który nie zdążył. */

@@ -101,8 +101,8 @@ Prościej i bezpiecznie dla gier z ukrytymi informacjami.
 | Frontend | Vite + React |
 | Style / animacje | Tailwind, Motion |
 | Plansza | SVG / CSS Grid |
-| PWA | vite-plugin-pwa |
-| Trwałość stanu | SQLite (better-sqlite3) |
+| PWA | manifest + ikony, bez service workera (gra i tak wymaga serwera) |
+| Trwałość stanu | SQLite (wbudowany `node:sqlite`) |
 | Testy | Vitest (szczególnie zasady Kampus Tour) |
 | CI/CD | GitHub Actions → obraz Dockera |
 
@@ -148,12 +148,11 @@ games/
 | 4 | Kampus Tour: rdzeń (ruch, kupno, czynsz, budowanie, bankructwo) | Grywalna wersja główna (gotowe) |
 | 5 | Kampus Tour: dodatki (Kolokwium, Juwenalia, karty, wykupienie, Bilet MPK, monopol) | Pełna wersja (gotowe) |
 | 6 | Poprawka | Gra karciana |
-| 7 | PWA, animacje, statystyki, szlify | Polerka |
+| 7 | PWA, animacje, statystyki, szlify | Polerka (PWA i ranking po nicku gotowe) |
 
 ## 9. Otwarte kwestie
 
 - Nazwy pól Kampus Tour ustalone (grupy jako pory dnia studenta, Ksero i Stołówka jak wodociągi); druga nazwa w grupie „Rano” robocza (Automat z przekąskami).
 - Balans ekonomii: start 200 zł (+20 zł za każde dalsze miejsce), kieszonkowe 20 zł, czynsz P/10 (cała grupa x2), z budynkami 0,4P / P / 2P / 4P (ustalone symulacją botów); do sprawdzenia w testach z grupą. Pełne grupy są rzadkie (34-54% partii), więc monopol prawie się nie zdarza: rozważyć handel między graczami.
 - Zestaw kart specjalnych w Poprawce (talia 18 Kart Dziekanatu ustalona, w kodzie: CARDS w kampus-tour.ts).
-- Czy dodać statystyki między sesjami (ranking po nicku) bez wprowadzania kont.
 - Własna nazwa całej platformy.

@@ -2,7 +2,7 @@ import { fileURLToPath } from "node:url";
 import { Server } from "@colyseus/core";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import express from "express";
-import { LobbyRoom } from "./LobbyRoom.ts";
+import { LobbyRoom, stats } from "./LobbyRoom.ts";
 
 const port = Number(process.env.PORT ?? 2567);
 const webDist = fileURLToPath(new URL("../../web/dist", import.meta.url));
@@ -12,6 +12,10 @@ const server = new Server({
   express: (app) => {
     app.get("/health", (_req, res) => {
       res.send("ok");
+    });
+    app.get("/api/stats", (_req, res) => {
+      // W dev frontend stoi na innym porcie; ranking i tak widzi każdy na stronie.
+      res.set("Access-Control-Allow-Origin", "*").json(stats.ranking());
     });
     app.use(express.static(webDist));
   },

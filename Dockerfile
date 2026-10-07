@@ -5,7 +5,7 @@ WORKDIR /app
 COPY . .
 RUN pnpm install --frozen-lockfile && pnpm --filter web build
 
-# Zależności produkcyjne serwera — na docelowej architekturze (natywne moduły, np. SQLite w przyszłości).
+# Zależności produkcyjne serwera — na docelowej architekturze (na wypadek modułów natywnych).
 FROM node:24-slim AS deps
 RUN npm i -g pnpm@12.9.1
 WORKDIR /app
@@ -20,6 +20,8 @@ COPY --from=deps /app ./
 COPY packages/games/src packages/games/src
 COPY apps/server/src apps/server/src
 COPY --from=build /app/apps/web/dist apps/web/dist
+# Katalog na SQLite; nazwany wolumen przejmuje z obrazu właściciela node.
+RUN mkdir data && chown node data
 USER node
 ENV NODE_ENV=production PORT=2567
 EXPOSE 2567

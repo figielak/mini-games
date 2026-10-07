@@ -1,8 +1,8 @@
 import { ArrowRight, Plus } from "@phosphor-icons/react";
-import { cleanNick, NICK_MAX, ROOM_CODE_ALPHABET, ROOM_CODE_LENGTH } from "@mini-games/games";
-import { useState } from "react";
+import { cleanNick, GAMES, NICK_MAX, ROOM_CODE_ALPHABET, ROOM_CODE_LENGTH } from "@mini-games/games";
+import { useEffect, useState } from "react";
 import type { Room } from "@colyseus/sdk";
-import { codeFromUrl, createRoom, errorText, joinRoom, savedNick } from "../net.ts";
+import { codeFromUrl, createRoom, errorText, fetchRanking, joinRoom, type RankingRow, savedNick } from "../net.ts";
 
 const onlyCodeChars = (s: string) =>
   [...s.toUpperCase()].filter((c) => ROOM_CODE_ALPHABET.includes(c)).join("").slice(0, ROOM_CODE_LENGTH);
@@ -13,6 +13,11 @@ export function Home({ onRoom, notice }: { onRoom: (room: Room) => void; notice?
   const [nickError, setNickError] = useState("");
   const [roomError, setRoomError] = useState(notice ?? "");
   const [busy, setBusy] = useState(false);
+  const [ranking, setRanking] = useState<Record<string, RankingRow[]>>({});
+
+  useEffect(() => {
+    fetchRanking().then(setRanking);
+  }, []);
 
   async function go(action: "create" | "join") {
     const clean = cleanNick(nick);
@@ -91,6 +96,8 @@ export function Home({ onRoom, notice }: { onRoom: (room: Room) => void; notice?
         </p>
       </form>
 
+      <Ranking ranking={ranking} me={cleanNick(nick)} />
+
       <div className="mt-auto pt-6">
         <button type="button" className="btn btn-ghost w-full" disabled={busy} onClick={() => go("create")}>
           <Plus size={18} weight="bold" aria-hidden />
@@ -98,5 +105,33 @@ export function Home({ onRoom, notice }: { onRoom: (room: Room) => void; notice?
         </button>
       </div>
     </main>
+  );
+}
+
+function Ranking({ ranking, me }: { ranking: Record<string, RankingRow[]>; me: string | null }) {
+  const games = Object.entries(ranking).filter(([id]) => GAMES[id]);
+  if (games.length === 0) return null;
+  return (
+    <section className="tile mt-3 flex flex-col gap-4" aria-labelledby="ranking">
+      <h2 id="ranking" className="label">
+        Ranking
+      </h2>
+      {games.map(([id, rows]) => (
+        <div key={id}>
+          <h3 className="mb-1 font-semibold">{GAMES[id].name}</h3>
+          <ol className="flex flex-col text-sm">
+            {rows.map((r, i) => (
+              <li key={r.nick} className={`flex gap-3 py-0.5 ${r.nick === me ? "text-accent" : ""}`}>
+                <span className="w-5 font-mono text-fg-subtle">{i + 1}</span>
+                <span className="flex-1 truncate">{r.nick}</span>
+                <span className="font-mono tabular-nums" aria-label={`${r.wins} wygranych z ${r.played} partii`}>
+                  {r.wins}/{r.played}
+                </span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      ))}
+    </section>
   );
 }
