@@ -17,6 +17,11 @@ import { ALLOWANCE, BOARD, buildCost, CARDS, kampusTour as game, type Move, ROUN
 // - budowa tylko na swoim polu po staniu na nim (także zaraz po kupnie), dowolnie wiele poziomów naraz;
 //   poziomy 1-3 kosztują P/2, landmark (4) P i wymaga kompletu; czynsz 0,5P / 1,5P / 3P / 5P,
 // - sprzedaż przy długu: pole z budynkami za połowę (cena + budynki),
+// - Juwenalia: kto stanie na rogu, wybiera swoje pole; czynsz na nim ×2, przy kolejnych Juwenaliach ×3, ×4…
+//   (jedno pole naraz, nowy wybór przenosi Juwenalia),
+// - Bilet MPK: stanięcie kończy turę; w następnej zamiast rzutu można pojechać na dowolne pole,
+// - wykupienie: po zapłaceniu czynszu cudze pole można odkupić za 2× wartość (bez landmarków),
+// - monopol: 3 pełne grupy kolorów kończą grę wygraną,
 // - koniec, gdy zostanie jeden gracz albo po ROUNDS rundach (ranking wg majątku: gotówka + ceny pól).
 
 const A = "ania";
@@ -47,10 +52,15 @@ const three = () => game.setup([A, B, C], createRng(1));
 /** Stan z nadpisaną gotówką, właścicielami i pozycjami. */
 function with2(
   s: State,
-  patch: Partial<Pick<State, "cash" | "owners" | "positions" | "round" | "levels" | "deck" | "kolokwium" | "passes">>,
+  patch: Partial<
+    Pick<State, "cash" | "owners" | "positions" | "round" | "levels" | "deck" | "kolokwium" | "passes" | "juwenalia" | "festivals" | "mpk">
+  >,
 ): State {
   return {
     ...s,
+    juwenalia: patch.juwenalia !== undefined ? patch.juwenalia : s.juwenalia,
+    festivals: patch.festivals ?? s.festivals,
+    mpk: patch.mpk ?? s.mpk,
     deck: patch.deck ?? s.deck,
     kolokwium: patch.kolokwium ?? s.kolokwium,
     passes: { ...s.passes, ...patch.passes },
@@ -240,7 +250,7 @@ describe("czynsz i opłaty", () => {
     const s = roll(with2(two(), { owners: { 4: B } }), A, 1, 3);
     expect(view(s).cash[A]).toBe(START_CASH - 2); // 15 / 10, zaokrąglone
     expect(view(s).cash[B]).toBe(START_CASH + 2);
-    expect(game.waitingFor(s)).toEqual([B]);
+    expect(view(s).phase).toBe("buyout");
   });
 
   test("cała grupa w rękach właściciela: czynsz ×2", () => {
@@ -517,7 +527,7 @@ describe("Karty Dziekanatu", () => {
     expect(game.validateMove(s, B, { type: "card" })).toBe(false);
     expect(game.validateMove(s, A, { type: "roll" })).toBe(false);
     expect(game.validateMove(two(), A, { type: "card" })).toBe(false);
-    expect(game.timeoutMove!(s, A)).toEqual({ type: "card" });
+    expect(game.timeoutMove!(s, A, createRng(1))).toEqual({ type: "card" });
     const after = reveal(s);
     expect(view(after).card).toBeNull();
     expect(view(after).cash[A]).toBe(START_CASH + 30);
@@ -704,5 +714,170 @@ describe("koniec gry", () => {
     expect(game.waitingFor(s)).toEqual([]);
     expect(view(s).turn).toBeNull();
     expect(game.validateMove(s, A, { type: "roll" })).toBe(false);
+  });
+});
+
+describe("Juwenalia", () => {
+  // A z 12 rzutem 1+3 staje na Juwenaliach (16).
+  const party = (patch: Parameters<typeof with2>[1] = {}) => roll(with2(two(), { positions: { [A]: 12 }, ...patch }), A, 1, 3);
+
+  test("wybór własnego pola: czynsz na nim ×2", () => {
+    let s = party({ owners: { 17: A } });
+    expect(view(s).phase).toBe("juwenalia");
+    expect(game.waitingFor(s)).toEqual([A]);
+    expect(game.validateMove(s, B, { type: "juwenalia", tile: 17 })).toBe(false);
+    s = play(s, A, { type: "juwenalia", tile: 17 });
+    expect(view(s).juwenalia).toEqual({ tile: 17, factor: 2 });
+    expect(view(s).events.at(-1)).toEqual({ type: "juwenalia", player: A, tile: 17, amount: 2 });
+    expect(game.waitingFor(s)).toEqual([B]);
+    // B z 14 na 17: czynsz 3 zł × 2.
+    s = roll(with2(s, { positions: { [B]: 14 } }), B, 1, 2);
+    expect(view(s).cash[B]).toBe(START_CASH - 6);
+    expect(view(s).cash[A]).toBe(START_CASH + 6);
+  });
+
+  test("kolejne Juwenalia: ×3 i przeniesienie na nowe pole", () => {
+    let s = party({ owners: { 17: A, 31: A }, juwenalia: { tile: 17, factor: 2 }, festivals: 1 });
+    s = play(s, A, { type: "juwenalia", tile: 31 });
+    expect(view(s).juwenalia).toEqual({ tile: 31, factor: 3 });
+    // Stare pole wraca do zwykłego czynszu.
+    s = roll(with2(s, { positions: { [B]: 14 } }), B, 1, 2);
+    expect(view(s).cash[B]).toBe(START_CASH - 3);
+  });
+
+  test("tylko własne pole", () => {
+    const s = party({ owners: { 17: A, 18: B } });
+    expect(game.validateMove(s, A, { type: "juwenalia", tile: 18 })).toBe(false);
+    expect(game.validateMove(s, A, { type: "juwenalia", tile: 19 })).toBe(false);
+    expect(game.validateMove(s, A, { type: "juwenalia", tile: 16 })).toBe(false);
+    expect(game.validateMove(two(), A, { type: "juwenalia", tile: 17 })).toBe(false);
+  });
+
+  test("bez własnych pól Juwenalia nic nie robią", () => {
+    const s = party();
+    expect(view(s).juwenalia).toBeNull();
+    expect(game.waitingFor(s)).toEqual([B]);
+  });
+
+  test("sprzedaż pola z Juwenaliami je kasuje", () => {
+    // A ma 1 zł, czynsz za Rynek u B 5 zł; A sprzedaje 17 z Juwenaliami.
+    let s = with2(two(), { cash: { [A]: 1 }, owners: { 17: A, 31: B }, positions: { [A]: 26 }, juwenalia: { tile: 17, factor: 2 } });
+    s = roll(s, A, 2, 3);
+    s = play(s, A, { type: "sell", tile: 17 });
+    expect(view(s).juwenalia).toBeNull();
+  });
+
+  test("limit czasu: Juwenalia na najdroższym własnym polu", () => {
+    expect(game.timeoutMove!(party({ owners: { 1: A, 31: A, 17: A } }), A, createRng(1))).toEqual({ type: "juwenalia", tile: 31 });
+  });
+});
+
+describe("Bilet MPK", () => {
+  // A z 24 rzutem 1+2 staje na MPK (27).
+  const ticket = (a = 1, b = 2) => roll(with2(two(), { positions: { [A]: 24 } }), A, a, b);
+
+  test("stanięcie na MPK daje bilet i kończy turę, także po dublecie", () => {
+    const s = roll(with2(two(), { positions: { [A]: 25 } }), A, 1, 1);
+    expect(view(s).positions[A]).toBe(27);
+    expect(view(s).mpk).toEqual([A]);
+    expect(view(s).events.at(-1)).toEqual({ type: "mpk", player: A });
+    expect(game.waitingFor(s)).toEqual([B]);
+  });
+
+  test("następna tura: jazda na dowolne pole przez Początek z kieszonkowym i rozliczeniem pola", () => {
+    let s = roll(ticket(), B, 5, 6);
+    s = with2(s, { owners: { 3: B } });
+    s = play(s, A, { type: "travel", tile: 3 });
+    expect(view(s).positions[A]).toBe(3);
+    expect(view(s).mpk).toEqual([]);
+    expect(view(s).events).toContainEqual({ type: "travel", player: A, tile: 3 });
+    // +20 kieszonkowego, -2 czynszu za Bibliotekę.
+    expect(view(s).cash[A]).toBe(START_CASH + ALLOWANCE - 2);
+  });
+
+  test("zwykły rzut zamiast jazdy zużywa bilet", () => {
+    let s = roll(ticket(), B, 5, 6);
+    s = roll(s, A, 5, 6);
+    expect(view(s).mpk).toEqual([]);
+  });
+
+  test("jazda tylko z biletem, w fazie rzutu i nie na to samo pole", () => {
+    expect(game.validateMove(two(), A, { type: "travel", tile: 3 })).toBe(false);
+    const s = roll(ticket(), B, 5, 6);
+    expect(game.validateMove(s, A, { type: "travel", tile: 27 })).toBe(false);
+    expect(game.validateMove(s, B, { type: "travel", tile: 3 })).toBe(false);
+    expect(game.validateMove(s, A, { type: "travel", tile: 3 })).toBe(true);
+  });
+});
+
+describe("wykupienie", () => {
+  // A z 0 rzutem 1+3 staje na Hali PRz (4, cena 15 zł) należącej do B.
+  const onTheirs = (patch: Parameters<typeof with2>[1] = {}) => roll(with2(two(), { owners: { 4: B }, ...patch }), A, 1, 3);
+
+  test("po czynszu można wykupić pole za 2× wartość, pieniądze dostaje właściciel", () => {
+    let s = onTheirs({ levels: { 4: 1 } }); // wartość 15 + 8, czynsz 8 zł
+    expect(view(s).phase).toBe("buyout");
+    expect(game.waitingFor(s)).toEqual([A]);
+    expect(game.validateMove(s, B, { type: "buyout" })).toBe(false);
+    s = play(s, A, { type: "buyout" });
+    expect(view(s).owners[4]).toBe(A);
+    expect(view(s).levels[4]).toBe(1);
+    expect(view(s).cash[A]).toBe(START_CASH - 8 - 46);
+    expect(view(s).cash[B]).toBe(START_CASH + 8 + 46);
+    expect(view(s).events.at(-1)).toEqual({ type: "buyout", player: A, tile: 4, amount: 46, to: B });
+    // Po wykupie można budować jak na własnym polu.
+    expect(view(s).phase).toBe("build");
+  });
+
+  test("pominięcie wykupu kończy turę", () => {
+    const s = play(onTheirs(), A, { type: "skip" });
+    expect(view(s).owners[4]).toBe(B);
+    expect(game.waitingFor(s)).toEqual([B]);
+  });
+
+  test("landmarku nie da się wykupić", () => {
+    const s = onTheirs({ owners: { 3: B, 4: B, 6: B }, levels: { 4: 4 } });
+    expect(game.waitingFor(s)).toEqual([B]);
+  });
+
+  test("bez pieniędzy na wykup nie ma oferty", () => {
+    const s = onTheirs({ cash: { [A]: 31 } }); // po czynszu 29 zł < 30 zł
+    expect(game.waitingFor(s)).toEqual([B]);
+  });
+
+  test("wykup ostatniego pola grupy daje komplet", () => {
+    let s = onTheirs({ owners: { 3: A, 4: B, 6: A } });
+    s = play(s, A, { type: "buyout" });
+    expect(view(s).events.at(-1)).toEqual({ type: "set", player: A, tile: 4 });
+  });
+
+  test("limit czasu pomija wykup", () => {
+    expect(game.timeoutMove!(onTheirs(), A, createRng(1))).toEqual({ type: "skip" });
+  });
+});
+
+describe("monopol", () => {
+  // A ma już grupy Noc w centrum (30, 31) i Rano (1, 2) oraz dwa pola z trzeciej (3, 4); dokupuje Rektorat (6).
+  const owners = { 30: A, 31: A, 1: A, 2: A, 3: A, 4: A };
+
+  test("trzecia pełna grupa kończy grę wygraną", () => {
+    let s = roll(with2(two(), { owners, positions: { [A]: 1 } }), A, 2, 3);
+    s = play(s, A, { type: "buy" });
+    expect(view(s).monopoly).toBe(A);
+    expect(view(s).events.at(-1)).toEqual({ type: "monopoly", player: A });
+    expect(game.isOver(s)).toEqual({ winner: A, ranking: [A, B] });
+    expect(game.waitingFor(s)).toEqual([]);
+  });
+
+  test("wygrana także przez wykup, nawet gdy przeciwnik jest bogatszy", () => {
+    let s = roll(with2(two(), { owners: { ...owners, 6: B }, positions: { [A]: 1 }, cash: { [B]: 1000 } }), A, 2, 3);
+    s = play(s, A, { type: "buyout" });
+    expect(game.isOver(s)).toEqual({ winner: A, ranking: [A, B] });
+  });
+
+  test("Ksero i Stołówka się nie liczą", () => {
+    let s = roll(with2(two(), { owners: { 30: A, 31: A, 1: A, 2: A, 29: A } }), A, 3, 4);
+    s = play(s, A, { type: "buy" });
+    expect(game.isOver(s)).toBeNull();
   });
 });
