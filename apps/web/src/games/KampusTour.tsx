@@ -26,6 +26,7 @@ import {
 import {
   KAMPUS_ALLOWANCE as ALLOWANCE,
   KAMPUS_BOARD as BOARD,
+  KAMPUS_CARDS as CARDS,
   KAMPUS_ROUNDS as ROUNDS,
   KAMPUS_UTILITY_RATES as UTILITY_RATES,
   type KampusEvent,
@@ -104,9 +105,8 @@ const CORNERS: Record<string, { icon: Icon; color: string; sub: string; soon?: b
   kolokwium: {
     icon: Exam,
     color: "#ff6369",
-    sub: "tracisz turę",
-    soon: true,
-    info: "Wkrótce: tracisz turę albo zdajesz, rzucając dublet. Na razie bez efektu.",
+    sub: "tura lub dublet",
+    info: "Trafiasz tu przez trzeci dublet z rzędu albo kartę Spóźnienie. W swojej turze rzucasz: dublet = zdajesz i od razu idziesz dalej, bez dubletu czekasz jedną turę. Karta Zaliczenie wyprowadza bez rzutu. Samo stanięcie tutaj nic nie robi.",
   },
   juwenalia: {
     icon: Confetti,
@@ -267,6 +267,11 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
   const settledEvents = useRef(view.events);
   if (settled) settledEvents.current = view.events;
   const recent = settledEvents.current.slice(-2);
+  // Świeżo wylosowana Karta Dziekanatu: pokazana w środku, a pod nią to, co stało się po niej.
+  const cardAt = recent.findLastIndex((e) => e.type === "card");
+  const drawn = cardAt >= 0 ? recent[cardAt].card : undefined;
+  const drawnBy = cardAt >= 0 ? recent[cardAt].player : undefined;
+  const afterCard = cardAt >= 0 ? recent.slice(cardAt + 1) : [];
   // Świeżo zebrany komplet: jego pola chwilę pulsują w kolorze gracza.
   const lastEvent = settledEvents.current.at(-1);
   const fresh = lastEvent?.type === "set" ? setOf(lastEvent.tile!) : [];
@@ -309,6 +314,14 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
         }`;
       case "build":
         return `${who} buduje ${BOARD[e.tile!].name}: ${levelName(e.level!)} za ${e.amount} zł`;
+      case "card":
+        return `${who} ciągnie kartę: ${CARDS[e.card!].title}`;
+      case "kolokwium":
+        return `${who} trafia na Kolokwium`;
+      case "pass":
+        return e.card === undefined ? `${who} zdaje Kolokwium dubletem` : `${who} zdaje dzięki Zaliczeniu`;
+      case "fail":
+        return `${who} oblewa i czeka turę`;
       case "skip":
         return `${who} pomija ${BOARD[e.tile!].name}`;
       case "sell":
@@ -467,7 +480,7 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
       text = `Płacisz ${tile.amount} zł opłaty do banku.`;
     } else if (tile.kind === "karty") {
       accent = CARDS_COLOR;
-      text = "Wkrótce: losujesz kartę ze stypendium, warunkiem, poprawką i innymi niespodziankami. Na razie bez efektu.";
+      text = `Ciągniesz kartę z talii Dziekanatu: stypendia, opłaty, wycieczki po Rzeszowie i Kolokwium. W talii: ${view.deckSize} kart.`;
     } else {
       accent = CORNERS[tile.kind].color;
       text = CORNERS[tile.kind].info;
@@ -543,6 +556,8 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
               </span>
               <span className="font-mono text-sm text-fg">{out ? "bankrut" : `${view.cash[id]} zł`}</span>
               {!out && <span>{fields(Object.values(view.owners).filter((o) => o === id).length)}</span>}
+              {view.kolokwium.includes(id) && <span className="font-medium text-[#ff6369]">na Kolokwium</span>}
+              {(view.passes[id] ?? 0) > 0 && <span className="text-fg">Zaliczenie ×{view.passes[id]}</span>}
               {ranking.includes(id) && <span className="font-mono">{ranking.indexOf(id) + 1}. miejsce</span>}
             </div>
           );
@@ -638,7 +653,23 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
                     Łączenie ponownie…
                   </p>
                 )}
-                {recent.length > 0 && (
+                {drawn !== undefined ? (
+                  <div className="flex max-w-sm items-stretch overflow-hidden rounded-inset border border-line bg-surface text-left">
+                    <span className="grid w-9 shrink-0 place-items-center" style={{ backgroundColor: CARDS_COLOR }} aria-hidden>
+                      <Cards size={18} weight="fill" className="text-bg" />
+                    </span>
+                    <span className="px-3 py-1.5">
+                      <span className="block text-[10px] tracking-wide text-fg-muted uppercase">Karta Dziekanatu · {nick(drawnBy!)}</span>
+                      <span className="block text-sm font-semibold">{CARDS[drawn].title}</span>
+                      <span className="block text-xs text-fg-muted">{CARDS[drawn].text}</span>
+                      {afterCard.map((e, i) => (
+                        <span key={i} className="block text-xs text-fg">
+                          {describe(e)}
+                        </span>
+                      ))}
+                    </span>
+                  </div>
+                ) : recent.length > 0 && (
                   <ul className="text-center text-sm font-medium">
                     {recent.map((e, i) => (
                       <li
@@ -654,10 +685,14 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
 
                 <div className="flex items-center gap-3">
                   {/* Przy budowie kostki ustępują miejsca przyciskom poziomów. */}
-                  {view.dice && !(settled && canMove && view.phase === "build") && <Dice values={view.dice} rolling={rolling} />}
+                  {view.dice && !over && !(settled && canMove && view.phase === "build") && <Dice values={view.dice} rolling={rolling} />}
                   {settled && canMove && view.phase === "roll" && (
                     <button type="button" className="btn btn-primary" onClick={() => onMove({ type: "roll" })}>
-                      Rzuć kośćmi
+                      {!view.kolokwium.includes(me)
+                        ? "Rzuć kośćmi"
+                        : (view.passes[me] ?? 0) > 0
+                          ? "Rzuć (użyjesz Zaliczenia)"
+                          : "Rzuć (potrzebny dublet)"}
                     </button>
                   )}
                   {settled && canMove && view.phase === "buy" && (

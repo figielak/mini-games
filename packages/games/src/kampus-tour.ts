@@ -58,16 +58,68 @@ const PROPERTIES: Record<number, Tile> = Object.fromEntries(
 /** Pola zgodnie z ruchem wskazówek zegara od lewego górnego rogu planszy 12×6. */
 export const BOARD: Tile[] = Array.from({ length: SIZE }, (_, i) => SPECIAL[i] ?? PROPERTIES[i]);
 
+/** Pole Kolokwium (róg „więzienia”). */
+export const KOLOKWIUM = 11;
+
+/** Efekt Karty Dziekanatu. */
+export type CardEffect =
+  | { kind: "cash"; amount: number }
+  | { kind: "fromEach"; amount: number }
+  | { kind: "toEach"; amount: number }
+  | { kind: "repairs"; perLevel: number; perLandmark: number }
+  | { kind: "kolokwium" }
+  | { kind: "pass" }
+  | { kind: "back"; steps: number }
+  | { kind: "goto"; tile: number }
+  | { kind: "nearestUtility" };
+
+/** Talia Kart Dziekanatu (numer karty = indeks); tytuł i opis pokazuje UI. */
+export const CARDS: { title: string; text: string; effect: CardEffect }[] = [
+  { title: "Stypendium rektora", text: "Za średnią 5,0. Dostajesz 30 zł.", effect: { kind: "cash", amount: 30 } },
+  { title: "Stypendium socjalne", text: "Wniosek przeszedł. Dostajesz 20 zł.", effect: { kind: "cash", amount: 20 } },
+  { title: "Zwrot za akademik", text: "Nadpłata za pokój wraca. Dostajesz 15 zł.", effect: { kind: "cash", amount: 15 } },
+  { title: "Nagroda w konkursie", text: "Projekt koła naukowego wygrywa. Dostajesz 25 zł.", effect: { kind: "cash", amount: 25 } },
+  { title: "Korepetycje", text: "Uczysz innych do kolokwium. Każdy płaci ci 5 zł.", effect: { kind: "fromEach", amount: 5 } },
+  { title: "Warunek", text: "Nie poszło. Płacisz 30 zł za warunek.", effect: { kind: "cash", amount: -30 } },
+  { title: "Kara w bibliotece", text: "Przetrzymana książka. Płacisz 10 zł.", effect: { kind: "cash", amount: -10 } },
+  { title: "Mandat", text: "Jazda MPK bez biletu. Płacisz 20 zł.", effect: { kind: "cash", amount: -20 } },
+  { title: "Składka na imprezę", text: "Zrzutka na domówkę. Płacisz każdemu po 5 zł.", effect: { kind: "toEach", amount: 5 } },
+  {
+    title: "Remont w akademiku",
+    text: "Płacisz 5 zł za każdy poziom budynków i 20 zł za każdy landmark.",
+    effect: { kind: "repairs", perLevel: 5, perLandmark: 20 },
+  },
+  { title: "Spóźnienie na zajęcia", text: "Idziesz prosto na Kolokwium, bez kieszonkowego.", effect: { kind: "kolokwium" } },
+  {
+    title: "Zaliczenie w pierwszym terminie",
+    text: "Zachowaj kartę: wychodzisz z Kolokwium bez rzutu na dublet.",
+    effect: { kind: "pass" },
+  },
+  { title: "Zgubiona legitymacja", text: "Wracasz po nią: cofasz się o 3 pola.", effect: { kind: "back", steps: 3 } },
+  { title: "Pobudka na 8:00", text: `Idziesz na Początek i dostajesz ${ALLOWANCE} zł kieszonkowego.`, effect: { kind: "goto", tile: 0 } },
+  { title: "Wieczorne wyjście na Rynek", text: "Idziesz na Rynek.", effect: { kind: "goto", tile: 31 } },
+  { title: "Juwenalia!", text: "Idziesz na Juwenalia. Mijając Początek, dostajesz kieszonkowe.", effect: { kind: "goto", tile: 16 } },
+  {
+    title: "Nocny autobus MPK",
+    text: "Jedziesz na najbliższe Ksero albo Stołówkę. Właścicielowi płacisz podwójny czynsz.",
+    effect: { kind: "nearestUtility" },
+  },
+  { title: "Przerwa w kawiarni", text: "Idziesz na Automat z kawą. Mijając Początek, dostajesz kieszonkowe.", effect: { kind: "goto", tile: 1 } },
+];
+const PASS_CARD = CARDS.findIndex((c) => c.effect.kind === "pass");
+
 export type Move = { type: "roll" } | { type: "buy" } | { type: "skip" } | { type: "sell"; tile: number } | { type: "build"; level: number };
 
 /** Co się wydarzyło w ostatnim ruchu; UI zamienia to na tekst. */
 export type Event = {
-  type: "allowance" | "buy" | "set" | "skip" | "build" | "rent" | "tax" | "sell" | "bankrupt";
+  type: "allowance" | "buy" | "set" | "skip" | "build" | "rent" | "tax" | "sell" | "bankrupt" | "card" | "kolokwium" | "pass" | "fail";
   player: PlayerId;
   amount?: number;
   tile?: number;
   /** Poziom po budowie (4 = landmark). */
   level?: number;
+  /** Numer Karty Dziekanatu (wylosowanej albo użytej). */
+  card?: number;
   to?: PlayerId | null;
 };
 
@@ -88,13 +140,20 @@ export interface State {
   /** Dublety z rzędu w tej turze. */
   doubles: number;
   round: number;
-  /** Niespłacony czynsz lub opłata (faza sprzedaży); to: null = bank. */
-  debt: { amount: number; to: PlayerId | null } | null;
+  /** Niespłacony czynsz lub opłata (faza sprzedaży); kwota dzieli się po równo między wierzycieli, pusta lista = bank. */
+  debt: { amount: number; to: PlayerId[] } | null;
+  /** Talia Kart Dziekanatu: dobiera się z początku, karta wraca na koniec. */
+  deck: number[];
+  /** Kto siedzi na Kolokwium. */
+  kolokwium: PlayerId[];
+  /** Zachowane karty „Zaliczenie w pierwszym terminie”. */
+  passes: Record<PlayerId, number>;
   /** Ostatnie zdarzenia (najwyżej LOG), żeby gracz, który odwrócił wzrok, wiedział, co się stało. */
   events: Event[];
 }
 
-export type View = Omit<State, "turn" | "doubles"> & { turn: PlayerId | null };
+/** Widok bez kolejności talii (to byłaby wiedza o przyszłych kartach). */
+export type View = Omit<State, "turn" | "doubles" | "deck"> & { turn: PlayerId | null; deckSize: number };
 
 const moveSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("roll") }),
@@ -169,9 +228,12 @@ function endTurn(s: State): State {
 /** Koniec rozstrzygania pola: dublet daje kolejny rzut, chyba że to trzeci z rzędu. */
 const finish = (s: State): State => (s.doubles > 0 && s.doubles < 3 ? { ...s, phase: "roll" } : endTurn(s));
 
-function goBankrupt(s: State, player: PlayerId, to: PlayerId | null): State {
+const alive = (s: State) => s.players.filter((p) => !s.bankrupt.includes(p));
+
+function goBankrupt(s: State, player: PlayerId, to: PlayerId[]): State {
   const cash = { ...s.cash, [player]: 0 };
-  if (to) cash[to] += s.cash[player];
+  // ponytail: reszta z dzielenia przepada w banku
+  for (const q of to) cash[q] += Math.floor(s.cash[player] / to.length);
   const owners = Object.fromEntries(Object.entries(s.owners).filter(([, p]) => p !== player));
   const levels = Object.fromEntries(Object.entries(s.levels).filter(([tile]) => owners[Number(tile)]));
   const next: State = {
@@ -181,16 +243,17 @@ function goBankrupt(s: State, player: PlayerId, to: PlayerId | null): State {
     levels,
     debt: null,
     bankrupt: [...s.bankrupt, player],
+    kolokwium: s.kolokwium.filter((p) => p !== player),
     events: [...s.events, { type: "bankrupt" as const, player }].slice(-LOG),
   };
   return next.players.length - next.bankrupt.length <= 1 ? { ...next, phase: "over" } : endTurn(next);
 }
 
-/** Płatność z sprzedażą pól albo bankructwem, gdy gotówki brakuje. */
-function pay(s: State, player: PlayerId, amount: number, to: PlayerId | null): State {
+/** Płatność (po równo dla wierzycieli, pusta lista = bank) ze sprzedażą pól albo bankructwem, gdy gotówki brakuje. */
+function pay(s: State, player: PlayerId, amount: number, to: PlayerId[]): State {
   if (s.cash[player] >= amount) {
     const cash = { ...s.cash, [player]: s.cash[player] - amount };
-    if (to) cash[to] += amount;
+    for (const q of to) cash[q] += amount / to.length;
     return finish({ ...s, cash, debt: null });
   }
   const assets = owned(s, player).reduce((sum, i) => sum + saleValue(s, i), 0);
@@ -206,17 +269,85 @@ function offerBuild(s: State, player: PlayerId): State {
   return canBuild ? { ...s, phase: "build" } : finish(s);
 }
 
-function land(s: State, player: PlayerId): State {
+/** Ruch do przodu o steps pól; przejście przez Początek daje kieszonkowe. */
+function advance(s: State, player: PlayerId, steps: number): State {
+  const to = s.positions[player] + steps;
+  const passed = Math.floor(to / SIZE);
+  const moved = {
+    ...s,
+    positions: { ...s.positions, [player]: to % SIZE },
+    laps: { ...s.laps, [player]: s.laps[player] + passed },
+    cash: { ...s.cash, [player]: s.cash[player] + passed * ALLOWANCE },
+  };
+  return passed ? log(moved, { type: "allowance", player, amount: passed * ALLOWANCE }) : moved;
+}
+const moveTo = (s: State, player: PlayerId, tile: number) => advance(s, player, (tile - s.positions[player] + SIZE) % SIZE || SIZE);
+
+/** Na Kolokwium: pionek na pole 11 bez kieszonkowego, tura się kończy. */
+function toKolokwium(s: State, player: PlayerId): State {
+  return endTurn(
+    log({ ...s, positions: { ...s.positions, [player]: KOLOKWIUM }, kolokwium: [...s.kolokwium, player] }, { type: "kolokwium", player }),
+  );
+}
+
+/** Karta Dziekanatu: dobranie z wierzchu, powrót na spód (Zaliczenie zostaje u gracza), efekt. */
+function drawCard(s: State, player: PlayerId): State {
+  const [id, ...rest] = s.deck;
+  const effect = CARDS[id].effect;
+  const next = log({ ...s, deck: effect.kind === "pass" ? rest : [...rest, id] }, { type: "card", player, tile: s.positions[player], card: id });
+  const others = alive(next).filter((q) => q !== player);
+  switch (effect.kind) {
+    case "cash":
+      return effect.amount >= 0
+        ? finish({ ...next, cash: { ...next.cash, [player]: next.cash[player] + effect.amount } })
+        : pay(next, player, -effect.amount, []);
+    case "fromEach": {
+      // Korepetycje nie wpędzają innych w długi: każdy oddaje tyle, ile ma.
+      const cash = { ...next.cash };
+      for (const q of others) {
+        const paid = Math.min(effect.amount, cash[q]);
+        cash[q] -= paid;
+        cash[player] += paid;
+      }
+      return finish({ ...next, cash });
+    }
+    case "toEach":
+      return pay(next, player, effect.amount * others.length, others);
+    case "repairs": {
+      const amount = owned(next, player).reduce((sum, i) => {
+        const level = levelOf(next, i);
+        return sum + (level === LANDMARK ? effect.perLandmark : level * effect.perLevel);
+      }, 0);
+      return amount ? pay(next, player, amount, []) : finish(next);
+    }
+    case "kolokwium":
+      return toKolokwium(next, player);
+    case "pass":
+      return finish({ ...next, passes: { ...next.passes, [player]: (next.passes[player] ?? 0) + 1 } });
+    case "back":
+      return land({ ...next, positions: { ...next.positions, [player]: (next.positions[player] - effect.steps + SIZE) % SIZE } }, player);
+    case "goto":
+      return land(moveTo(next, player, effect.tile), player);
+    case "nearestUtility": {
+      const pos = next.positions[player];
+      return land(moveTo(next, player, UTILITIES.find((u) => u > pos) ?? UTILITIES[0]), player, 2);
+    }
+  }
+}
+
+/** Rozliczenie pola, na którym stanął gracz; rentFactor mnoży czynsz (Nocny autobus). */
+function land(s: State, player: PlayerId, rentFactor = 1): State {
   const pos = s.positions[player];
   const tile = BOARD[pos];
-  if (tile.kind === "tax") return pay(log(s, { type: "tax", player, amount: tile.amount }), player, tile.amount, null);
+  if (tile.kind === "tax") return pay(log(s, { type: "tax", player, amount: tile.amount }), player, tile.amount, []);
+  if (tile.kind === "karty") return drawCard(s, player);
   if (tile.kind !== "property" && tile.kind !== "utility") return finish(s);
 
   const owner = s.owners[pos];
   if (!owner) return s.cash[player] >= tile.price ? { ...s, phase: "buy" } : finish(s);
   if (owner === player) return offerBuild(s, player);
-  const amount = rent(s, pos);
-  return pay(log(s, { type: "rent", player, amount, tile: pos, to: owner }), player, amount, owner);
+  const amount = rent(s, pos) * rentFactor;
+  return pay(log(s, { type: "rent", player, amount, tile: pos, to: owner }), player, amount, [owner]);
 }
 
 export const kampusTour: GameDefinition<State, Move> = {
@@ -227,22 +358,32 @@ export const kampusTour: GameDefinition<State, Move> = {
   turnSeconds: 60,
   moveSchema,
 
-  setup: (players) => ({
-    players,
-    positions: Object.fromEntries(players.map((p) => [p, 0])),
-    laps: Object.fromEntries(players.map((p) => [p, 0])),
-    cash: Object.fromEntries(players.map((p) => [p, START_CASH])),
-    owners: {},
-    levels: {},
-    bankrupt: [],
-    turn: 0,
-    phase: "roll",
-    dice: null,
-    doubles: 0,
-    round: 1,
-    debt: null,
-    events: [],
-  }),
+  setup(players, rng) {
+    const deck = CARDS.map((_, i) => i);
+    for (let i = deck.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [deck[i], deck[j]] = [deck[j], deck[i]];
+    }
+    return {
+      players,
+      positions: Object.fromEntries(players.map((p) => [p, 0])),
+      laps: Object.fromEntries(players.map((p) => [p, 0])),
+      cash: Object.fromEntries(players.map((p) => [p, START_CASH])),
+      owners: {},
+      levels: {},
+      bankrupt: [],
+      turn: 0,
+      phase: "roll",
+      dice: null,
+      doubles: 0,
+      round: 1,
+      debt: null,
+      events: [],
+      deck,
+      kolokwium: [],
+      passes: {},
+    };
+  },
 
   validateMove(s, player, move) {
     if (s.phase === "over" || current(s) !== player) return false;
@@ -305,21 +446,28 @@ export const kampusTour: GameDefinition<State, Move> = {
     }
 
     const dice: [number, number] = [Math.floor(rng() * 6) + 1, Math.floor(rng() * 6) + 1];
-    const to = s.positions[player] + dice[0] + dice[1];
-    const passed = Math.floor(to / SIZE);
-    const events = passed ? [...s.events, { type: "allowance" as const, player, amount: passed * ALLOWANCE }].slice(-LOG) : s.events;
-    return land(
-      {
-        ...s,
-        dice,
-        doubles: dice[0] === dice[1] ? s.doubles + 1 : 0,
-        positions: { ...s.positions, [player]: to % SIZE },
-        laps: { ...s.laps, [player]: s.laps[player] + passed },
-        cash: { ...s.cash, [player]: s.cash[player] + passed * ALLOWANCE },
-        events,
-      },
-      player,
-    );
+    const double = dice[0] === dice[1];
+    let next: State = { ...s, dice, doubles: double ? s.doubles + 1 : 0 };
+
+    if (s.kolokwium.includes(player)) {
+      next = { ...next, kolokwium: s.kolokwium.filter((p) => p !== player) };
+      if ((s.passes[player] ?? 0) > 0) {
+        // Zaliczenie: wyjście bez rzutu na dublet, karta wraca do talii, dalej zwykły rzut.
+        next = log(
+          { ...next, passes: { ...next.passes, [player]: s.passes[player] - 1 }, deck: [...next.deck, PASS_CARD] },
+          { type: "pass", player, card: PASS_CARD },
+        );
+      } else if (double) {
+        // Zdany dubletem: ruch o oczka, ale bez dodatkowego rzutu.
+        next = log({ ...next, doubles: 0 }, { type: "pass", player });
+      } else {
+        return endTurn(log(next, { type: "fail", player }));
+      }
+    } else if (next.doubles === 3) {
+      return toKolokwium(next, player);
+    }
+
+    return land(advance(next, player, dice[0] + dice[1]), player);
   },
 
   playerView: (s): View => ({
@@ -336,6 +484,9 @@ export const kampusTour: GameDefinition<State, Move> = {
     round: Math.min(s.round, ROUNDS),
     debt: s.debt,
     events: s.events,
+    deckSize: s.deck.length,
+    kolokwium: s.kolokwium,
+    passes: s.passes,
   }),
 
   isOver(s) {

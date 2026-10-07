@@ -10,6 +10,7 @@ export { TRACK as CHINCZYK_TRACK, type View as ChinczykView } from "./chinczyk.t
 export {
   ALLOWANCE as KAMPUS_ALLOWANCE,
   BOARD as KAMPUS_BOARD,
+  CARDS as KAMPUS_CARDS,
   baseRent as kampusBaseRent,
   buildCost as kampusBuildCost,
   LANDMARK as KAMPUS_LANDMARK,
