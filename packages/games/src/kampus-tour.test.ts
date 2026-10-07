@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { createRng, type Rng } from "./core.ts";
-import { ALLOWANCE, BOARD, buildCost, kampusTour as game, type Move, ROUNDS, SIZE, START_CASH, type State, type View } from "./kampus-tour.ts";
+import { ALLOWANCE, BOARD, buildCost, CARDS, kampusTour as game, type Move, ROUNDS, SIZE, START_CASH, type State, type View } from "./kampus-tour.ts";
 
 // Testy napisane przed implementacją. Ustalają zasady Kampus Tour:
 // - 2-4 graczy, plansza 32 pól, wszyscy startują na polu 0 (Początek) z 200 zł,
@@ -10,7 +10,10 @@ import { ALLOWANCE, BOARD, buildCost, kampusTour as game, type Move, ROUNDS, SIZ
 // - Ksero i Stołówka (jak wodociągi): czynsz = suma oczek × 2 zł, a gdy właściciel ma oba × 5 zł,
 // - pole 28 (Opłata za akademik) kosztuje 15 zł,
 // - brak gotówki: sprzedaż pól bankowi za połowę ceny, a gdy to nie wystarczy, bankructwo,
-// - dublet daje kolejny rzut; trzeci dublet z rzędu: ruch, ale koniec tury,
+// - dublet daje kolejny rzut; trzeci dublet z rzędu wysyła na Kolokwium (bez ruchu),
+// - Kolokwium: najwyżej 1 tura; w swojej turze dublet = wyjście i ruch (bez dodatkowego rzutu),
+//   bez dubletu tura przerwy; karta Zaliczenie wyprowadza automatycznie,
+// - Karty Dziekanatu: talia 18 kart, dobrana karta wraca na spód (Zaliczenie zostaje u gracza do użycia),
 // - budowa tylko na swoim polu po staniu na nim (także zaraz po kupnie), dowolnie wiele poziomów naraz;
 //   poziomy 1-3 kosztują P/2, landmark (4) P i wymaga kompletu; czynsz 0,5P / 1,5P / 3P / 5P,
 // - sprzedaż przy długu: pole z budynkami za połowę (cena + budynki),
@@ -42,9 +45,15 @@ const two = () => game.setup([A, B], createRng(1));
 const three = () => game.setup([A, B, C], createRng(1));
 
 /** Stan z nadpisaną gotówką, właścicielami i pozycjami. */
-function with2(s: State, patch: Partial<Pick<State, "cash" | "owners" | "positions" | "round" | "levels">>): State {
+function with2(
+  s: State,
+  patch: Partial<Pick<State, "cash" | "owners" | "positions" | "round" | "levels" | "deck" | "kolokwium" | "passes">>,
+): State {
   return {
     ...s,
+    deck: patch.deck ?? s.deck,
+    kolokwium: patch.kolokwium ?? s.kolokwium,
+    passes: { ...s.passes, ...patch.passes },
     levels: { ...s.levels, ...patch.levels },
     cash: { ...s.cash, ...patch.cash },
     owners: { ...s.owners, ...patch.owners },
@@ -52,6 +61,16 @@ function with2(s: State, patch: Partial<Pick<State, "cash" | "owners" | "positio
     round: patch.round ?? s.round,
   };
 }
+
+/** Numer karty po tytule. */
+function card(title: string): number {
+  const i = CARDS.findIndex((c) => c.title === title);
+  if (i < 0) throw new Error(`nie ma karty „${title}”`);
+  return i;
+}
+
+/** Talia z zadaną kartą na wierzchu. */
+const top = (s: State, title: string): State => ({ ...s, deck: [card(title), ...s.deck.filter((c) => c !== card(title))] });
 
 const price = (tile: number) => {
   const t = BOARD[tile];
@@ -134,15 +153,15 @@ describe("rzut i ruch", () => {
   });
 
   test("ruch o sumę oczek, wynik widać w widoku, tura przechodzi dalej", () => {
-    const s = roll(two(), A, 2, 3); // pole 5: Karty Dziekanatu, bez efektu
-    expect(view(s).positions[A]).toBe(5);
-    expect(view(s).dice).toEqual([2, 3]);
+    const s = roll(two(), A, 5, 6); // pole 11: Kolokwium w odwiedzinach, bez efektu
+    expect(view(s).positions[A]).toBe(11);
+    expect(view(s).dice).toEqual([5, 6]);
     expect(game.waitingFor(s)).toEqual([B]);
   });
 
   test("przejście przez start: okrążenie i 20 zł kieszonkowego", () => {
-    const s = roll(with2(two(), { positions: { [A]: 27 } }), A, 6, 4);
-    expect(view(s).positions[A]).toBe(5);
+    const s = roll(with2(two(), { positions: { [A]: 27 } }), A, 2, 3);
+    expect(view(s).positions[A]).toBe(0);
     expect(view(s).laps[A]).toBe(1);
     expect(view(s).cash[A]).toBe(START_CASH + ALLOWANCE);
     expect(ALLOWANCE).toBe(20);
@@ -156,13 +175,15 @@ describe("rzut i ruch", () => {
     expect(view(s).phase).toBe("roll");
   });
 
-  test("trzeci dublet z rzędu: ruch, ale koniec tury", () => {
+  test("trzeci dublet z rzędu: prosto na Kolokwium, bez ruchu, koniec tury", () => {
     // Za 5 zł nic się nie kupi, więc nie ma fazy kupna.
     let s = with2(two(), { cash: { [A]: 5 } });
     s = roll(s, A, 1, 1);
     s = roll(s, A, 2, 2);
     s = roll(s, A, 3, 3);
-    expect(view(s).positions[A]).toBe(12);
+    expect(view(s).positions[A]).toBe(11);
+    expect(view(s).kolokwium).toEqual([A]);
+    expect(view(s).events.at(-1)).toEqual({ type: "kolokwium", player: A });
     expect(game.waitingFor(s)).toEqual([B]);
     // Licznik dubletów zeruje się dla kolejnego gracza.
     s = roll(with2(s, { cash: { [B]: 5 } }), B, 1, 1);
@@ -170,9 +191,9 @@ describe("rzut i ruch", () => {
   });
 
   test("po ostatnim graczu zaczyna się kolejna runda", () => {
-    let s = roll(two(), A, 2, 3);
+    let s = roll(two(), A, 5, 6);
     expect(view(s).round).toBe(1);
-    s = roll(s, B, 2, 3);
+    s = roll(s, B, 5, 6);
     expect(view(s).round).toBe(2);
     expect(game.waitingFor(s)).toEqual([A]);
   });
@@ -272,7 +293,7 @@ describe("długi i bankructwo", () => {
     let s = with2(two(), { cash: { [A]: 3 }, owners: { 1: A, 29: A, 3: B, 4: B, 6: B } });
     s = roll(s, A, 1, 3); // czynsz 4 zł, A ma 3 zł
     expect(view(s).phase).toBe("sell");
-    expect(view(s).debt).toEqual({ amount: 4, to: B });
+    expect(view(s).debt).toEqual({ amount: 4, to: [B] });
     expect(game.waitingFor(s)).toEqual([A]);
     expect(game.validateMove(s, A, { type: "sell", tile: 4 }), "cudzego pola nie sprzeda").toBe(false);
     expect(game.validateMove(s, A, { type: "roll" })).toBe(false);
@@ -303,8 +324,8 @@ describe("długi i bankructwo", () => {
     expect(view(s).owners[1]).toBeUndefined();
     expect(game.isOver(s)).toBeNull();
     expect(game.waitingFor(s)).toEqual([B]);
-    s = roll(s, B, 2, 3);
-    s = roll(s, C, 2, 3);
+    s = roll(s, B, 5, 6);
+    s = roll(s, C, 5, 6);
     expect(game.waitingFor(s)).toEqual([B]);
     expect(view(s).round).toBe(2);
   });
@@ -315,17 +336,17 @@ describe("historia zdarzeń", () => {
     let s = roll(two(), A, 1, 2); // A na 3
     s = play(s, A, { type: "buy" });
     s = play(s, A, { type: "skip" }); // bez budowy: pominięcie budowy nie jest zdarzeniem
-    s = roll(s, B, 2, 3); // B na Karty Dziekanatu: brak nowego zdarzenia
+    s = roll(s, B, 5, 6); // B na Kolokwium w odwiedzinach: brak nowego zdarzenia
     expect(view(s).events).toEqual([{ type: "buy", player: A, amount: 15, tile: 3 }]);
     s = roll(s, A, 1, 3); // A na 7 (Ksero)
     s = play(s, A, { type: "skip" });
     expect(view(s).events.at(-1)).toEqual({ type: "skip", player: A, tile: 7 });
 
     for (let i = 0; i < 4; i++) s = { ...s, events: [...s.events, { type: "allowance", player: B, amount: 20 }] };
-    s = roll(s, B, 6, 1); // B z 5 na 12: Hala Podpromie, faza kupna
+    s = roll(s, B, 1, 2); // B z 11 na 14: Stadion Stali, faza kupna
     s = play(s, B, { type: "buy" });
     expect(view(s).events).toHaveLength(4);
-    expect(view(s).events.at(-1)).toEqual({ type: "buy", player: B, amount: 25, tile: 12 });
+    expect(view(s).events.at(-1)).toEqual({ type: "buy", player: B, amount: 25, tile: 14 });
   });
 });
 
@@ -462,14 +483,180 @@ describe("budowanie", () => {
 
   test("majątek w rankingu liczy budynki", () => {
     let s = with2(two(), { round: ROUNDS, cash: { [A]: 100, [B]: 120 }, owners: { 17: A }, levels: { 17: 3 } });
-    s = roll(s, A, 2, 3);
-    s = roll(s, B, 2, 3);
+    s = roll(s, A, 5, 6);
+    s = roll(s, B, 5, 6);
     // A: 100 + 30 + 45 = 175 > B: 120.
     expect(game.isOver(s)).toEqual({ winner: A, ranking: [A, B] });
   });
 
   test("limit czasu w fazie budowy pomija budowę", () => {
     expect(game.timeoutMove!(onOwn(), A, createRng(1))).toEqual({ type: "skip" });
+  });
+});
+
+describe("Karty Dziekanatu", () => {
+  const draw = (s: State, title: string) => roll(top(s, title), A, 2, 3); // A z 0 na pole kart 5
+
+  test("talia: 18 kart, potasowana deterministycznie, kolejność ukryta w widoku", () => {
+    expect(CARDS).toHaveLength(18);
+    const s = two();
+    expect([...s.deck].sort((x, y) => x - y)).toEqual(CARDS.map((_, i) => i));
+    expect(game.setup([A, B], createRng(1)).deck).toEqual(s.deck);
+    expect(game.setup([A, B], createRng(2)).deck).not.toEqual(s.deck);
+    expect(view(s).deckSize).toBe(18);
+    expect((view(s) as unknown as { deck?: unknown }).deck).toBeUndefined();
+  });
+
+  test("dobrana karta jest zdarzeniem i wraca na spód talii", () => {
+    const s = draw(two(), "Stypendium rektora");
+    expect(view(s).events.at(-1)).toEqual({ type: "card", player: A, tile: 5, card: card("Stypendium rektora") });
+    expect(s.deck.at(-1)).toBe(card("Stypendium rektora"));
+    expect(s.deck).toHaveLength(18);
+    expect(game.waitingFor(s)).toEqual([B]);
+  });
+
+  test.each([
+    ["Stypendium rektora", 30],
+    ["Stypendium socjalne", 20],
+    ["Zwrot za akademik", 15],
+    ["Nagroda w konkursie", 25],
+    ["Warunek", -30],
+    ["Kara w bibliotece", -10],
+    ["Mandat", -20],
+  ])("%s: %i zł", (title, amount) => {
+    expect(view(draw(two(), title)).cash[A]).toBe(START_CASH + amount);
+  });
+
+  test("opłata z karty bez gotówki: sprzedaż pól, potem spłata do banku", () => {
+    let s = draw(with2(two(), { cash: { [A]: 20 }, owners: { 17: A } }), "Warunek");
+    expect(view(s).phase).toBe("sell");
+    expect(view(s).debt).toEqual({ amount: 30, to: [] });
+    s = play(s, A, { type: "sell", tile: 17 });
+    expect(view(s).cash[A]).toBe(20 + 15 - 30);
+    expect(view(s).cash[B]).toBe(START_CASH);
+  });
+
+  test("Korepetycje: każdy płaci 5 zł, a kto ma mniej, oddaje tyle, ile ma", () => {
+    const s = draw(with2(three(), { cash: { [C]: 3 } }), "Korepetycje");
+    expect(view(s).cash).toEqual({ [A]: START_CASH + 8, [B]: START_CASH - 5, [C]: 0 });
+  });
+
+  test("Składka na imprezę: płacisz każdemu po 5 zł", () => {
+    const s = draw(three(), "Składka na imprezę");
+    expect(view(s).cash).toEqual({ [A]: START_CASH - 10, [B]: START_CASH + 5, [C]: START_CASH + 5 });
+  });
+
+  test("Składka po sprzedaży pola: pieniądze trafiają do wszystkich wierzycieli", () => {
+    let s = draw(with2(three(), { cash: { [A]: 6 }, owners: { 1: A } }), "Składka na imprezę");
+    expect(view(s).debt).toEqual({ amount: 10, to: [B, C] });
+    s = play(s, A, { type: "sell", tile: 1 });
+    expect(view(s).cash).toEqual({ [A]: 1, [B]: START_CASH + 5, [C]: START_CASH + 5 });
+  });
+
+  test("Remont w akademiku: 5 zł za poziom, 20 zł za landmark", () => {
+    const s = draw(with2(two(), { owners: { 1: A, 3: A, 17: A }, levels: { 1: 2, 17: 4 } }), "Remont w akademiku");
+    expect(view(s).cash[A]).toBe(START_CASH - 30);
+  });
+
+  test("Spóźnienie na zajęcia: prosto na Kolokwium, bez kieszonkowego, nawet po dublecie koniec tury", () => {
+    const s = roll(top(with2(two(), { positions: { [A]: 3 } }), "Spóźnienie na zajęcia"), A, 1, 1);
+    expect(view(s).positions[A]).toBe(11);
+    expect(view(s).kolokwium).toEqual([A]);
+    expect(view(s).cash[A]).toBe(START_CASH);
+    expect(game.waitingFor(s)).toEqual([B]);
+  });
+
+  test("Zaliczenie w pierwszym terminie: karta zostaje u gracza, poza talią", () => {
+    const s = draw(two(), "Zaliczenie w pierwszym terminie");
+    expect(view(s).passes[A]).toBe(1);
+    expect(s.deck).toHaveLength(17);
+  });
+
+  test("Zgubiona legitymacja: cofasz się o 3 i rozliczasz pole", () => {
+    const s = draw(with2(two(), { owners: { 2: B } }), "Zgubiona legitymacja");
+    expect(view(s).positions[A]).toBe(2);
+    expect(view(s).cash[A]).toBe(START_CASH - 1);
+  });
+
+  test("Pobudka na 8:00: na Początek z kieszonkowym", () => {
+    const s = draw(two(), "Pobudka na 8:00");
+    expect(view(s).positions[A]).toBe(0);
+    expect(view(s).laps[A]).toBe(1);
+    expect(view(s).cash[A]).toBe(START_CASH + ALLOWANCE);
+  });
+
+  test("Wieczorne wyjście na Rynek: czynsz u właściciela, bez właściciela kupno", () => {
+    expect(view(draw(with2(two(), { owners: { 31: B } }), "Wieczorne wyjście na Rynek")).cash[A]).toBe(START_CASH - 5);
+    const free = draw(two(), "Wieczorne wyjście na Rynek");
+    expect(view(free).positions[A]).toBe(31);
+    expect(view(free).phase).toBe("buy");
+  });
+
+  test("Juwenalia!: przejście przez Początek daje kieszonkowe", () => {
+    const s = roll(top(with2(two(), { positions: { [A]: 16 } }), "Juwenalia!"), A, 2, 3); // 21 → 16
+    expect(view(s).positions[A]).toBe(16);
+    expect(view(s).cash[A]).toBe(START_CASH + ALLOWANCE);
+  });
+
+  test("Przerwa w kawiarni: Automat z kawą przez Początek", () => {
+    const s = draw(two(), "Przerwa w kawiarni");
+    expect(view(s).positions[A]).toBe(1);
+    expect(view(s).cash[A]).toBe(START_CASH + ALLOWANCE);
+    expect(view(s).phase).toBe("buy");
+  });
+
+  test("Nocny autobus MPK: najbliższe Ksero/Stołówka, u właściciela podwójny czynsz", () => {
+    // Z 5 na Ksero (7): oczka 5 × 2 zł × 2.
+    const s = draw(with2(two(), { owners: { 7: B } }), "Nocny autobus MPK");
+    expect(view(s).positions[A]).toBe(7);
+    expect(view(s).cash[A]).toBe(START_CASH - 20);
+    // Z 13 najbliższa jest Stołówka (29).
+    const far = roll(top(with2(two(), { positions: { [A]: 8 } }), "Nocny autobus MPK"), A, 2, 3);
+    expect(view(far).positions[A]).toBe(29);
+    expect(view(far).phase).toBe("buy");
+  });
+});
+
+describe("Kolokwium", () => {
+  const jailed = (patch: Parameters<typeof with2>[1] = {}) => with2(two(), { positions: { [A]: 11 }, kolokwium: [A], ...patch });
+
+  test("zwykłe stanięcie na Kolokwium nic nie robi", () => {
+    const s = roll(two(), A, 5, 6);
+    expect(view(s).kolokwium).toEqual([]);
+    expect(game.waitingFor(s)).toEqual([B]);
+  });
+
+  test("dublet: zdajesz i od razu idziesz, bez dodatkowego rzutu", () => {
+    let s = roll(jailed(), A, 2, 2);
+    expect(view(s).kolokwium).toEqual([]);
+    expect(view(s).positions[A]).toBe(15);
+    expect(view(s).events).toContainEqual({ type: "pass", player: A });
+    s = play(s, A, { type: "skip" }); // Zalew: pominięcie zakupu
+    expect(game.waitingFor(s)).toEqual([B]);
+  });
+
+  test("bez dubletu: tura przerwy, w następnej gra normalnie", () => {
+    let s = roll(jailed(), A, 1, 2);
+    expect(view(s).positions[A]).toBe(11);
+    expect(view(s).kolokwium).toEqual([]);
+    expect(view(s).events.at(-1)).toEqual({ type: "fail", player: A });
+    expect(game.waitingFor(s)).toEqual([B]);
+    s = roll(s, B, 5, 6);
+    s = roll(s, A, 1, 2);
+    expect(view(s).positions[A]).toBe(14);
+  });
+
+  test("karta Zaliczenie wyprowadza automatycznie i wraca do talii", () => {
+    const start = jailed({ passes: { [A]: 1 }, deck: two().deck.filter((c) => c !== card("Zaliczenie w pierwszym terminie")) });
+    const s = roll(start, A, 1, 2);
+    expect(view(s).positions[A]).toBe(14);
+    expect(view(s).passes[A]).toBe(0);
+    expect(view(s).events).toContainEqual({ type: "pass", player: A, card: card("Zaliczenie w pierwszym terminie") });
+    expect(s.deck).toHaveLength(18);
+  });
+
+  test("limit czasu na Kolokwium: zwykły rzut", () => {
+    expect(game.timeoutMove!(jailed(), A, createRng(1))).toEqual({ type: "roll" });
   });
 });
 
@@ -493,10 +680,10 @@ describe("koniec gry", () => {
       cash: { [A]: 50, [B]: 30, [C]: 60 },
       owners: { 30: B },
     });
-    s = roll(s, A, 2, 3); // każdy na Karty Dziekanatu, bez efektu
-    s = roll(s, B, 2, 3);
+    s = roll(s, A, 5, 6); // każdy na Kolokwium w odwiedzinach, bez efektu
+    s = roll(s, B, 5, 6);
     expect(game.isOver(s)).toBeNull();
-    s = roll(s, C, 2, 3);
+    s = roll(s, C, 5, 6);
     expect(game.isOver(s)).toEqual({ winner: B, ranking: [B, C, A] });
     expect(game.waitingFor(s)).toEqual([]);
     expect(view(s).turn).toBeNull();
