@@ -36,9 +36,9 @@ export function Game({ view, me, dropped, send }: Props) {
         players={view.players}
         dropped={dropped}
         canMove={myTurn}
-        ranking={game.result?.ranking ?? []}
+        result={game.result}
         onMove={(move) => send("move", move)}
-        timer={view.phase === "playing" && <Countdown game={game} />}
+        timer={view.phase === "playing" && <Countdown game={game} total={def.turnSeconds} />}
         actions={view.phase === "over" && <OverActions host={view.hostId === me} send={send} />}
       />
     );
@@ -161,7 +161,7 @@ function OverActions({ host, send }: { host: boolean; send: Send }) {
  * Sekundy do końca tury. Liczone od chwili odebrania wiadomości, nie od zegara serwera.
  * Termin zależy od obiektu wiadomości, nie od liczby: każda nowa tura przychodzi z tym samym msLeft (60000).
  */
-function Countdown({ game }: { game: NonNullable<RoomView["game"]> }) {
+function Countdown({ game, total }: { game: NonNullable<RoomView["game"]>; total?: number }) {
   const deadline = useMemo(() => (game.msLeft === null ? null : Date.now() + game.msLeft), [game]);
   const [now, setNow] = useState(Date.now);
 
@@ -172,6 +172,21 @@ function Countdown({ game }: { game: NonNullable<RoomView["game"]> }) {
 
   if (deadline === null) return null;
   const seconds = Math.max(0, Math.ceil((deadline - now) / 1000));
+  // Z podanym limitem tury: kurczący się pasek zamiast samej liczby.
+  if (total) {
+    const left = Math.max(0, deadline - now) / (total * 1000);
+    return (
+      <div className="flex items-center gap-2">
+        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-line" role="progressbar" aria-label="Czas tury" aria-valuenow={seconds}>
+          <div
+            className={`h-full rounded-full transition-[width] duration-300 ease-linear ${seconds <= 10 ? "bg-accent" : "bg-fg-muted"}`}
+            style={{ width: `${Math.min(1, left) * 100}%` }}
+          />
+        </div>
+        <span className={`w-8 text-right font-mono text-xs ${seconds <= 10 ? "text-accent" : "text-fg-muted"}`}>{seconds}s</span>
+      </div>
+    );
+  }
   return (
     <span className={`flex items-center gap-1 font-mono text-sm ${seconds <= 10 ? "text-accent" : "text-fg-muted"}`}>
       <Timer size={16} aria-hidden />

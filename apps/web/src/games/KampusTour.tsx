@@ -30,6 +30,7 @@ import {
   type KampusMove,
   type KampusTourView,
   kampusBaseRent as baseRent,
+  type GameResult,
   type LobbyPlayer,
 } from "@mini-games/games";
 import { type ReactNode, useState } from "react";
@@ -40,8 +41,8 @@ interface Props {
   players: LobbyPlayer[];
   dropped: boolean;
   canMove: boolean;
-  /** Kolejność końcowa z wyniku gry; pusta w trakcie partii. */
-  ranking: string[];
+  /** Wynik partii (także walkower bez rankingu); null w trakcie gry. */
+  result: GameResult | null;
   onMove: (move: KampusMove) => void;
   timer: ReactNode;
   actions: ReactNode;
@@ -101,6 +102,12 @@ const price = (tile: number) => {
   return t.kind === "property" || t.kind === "utility" ? t.price : t.kind === "tax" ? t.amount : 0;
 };
 const saleValue = (tile: number) => Math.floor(price(tile) / 2);
+/** „1 pole”, „3 pola”, „5 pól”. */
+function fields(n: number) {
+  if (n === 1) return "1 pole";
+  const few = n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14);
+  return `${n} ${few ? "pola" : "pól"}`;
+}
 
 /** Pole planszy 12×6 → [kolumna, wiersz], od lewego górnego rogu zgodnie z ruchem wskazówek zegara. */
 function cell(i: number): [number, number] {
@@ -110,19 +117,22 @@ function cell(i: number): [number, number] {
   return [0, 32 - i];
 }
 
-export function KampusTour({ view, me, players, dropped, canMove, ranking, onMove, timer, actions }: Props) {
+export function KampusTour({ view, me, players, dropped, canMove, result, onMove, timer, actions }: Props) {
   const [selected, setSelected] = useState<number | null>(null);
   const player = (id: string) => players.find((p) => p.id === id);
   const color = (id: string) => player(id)?.color ?? "#8b8b92";
   const nick = (id: string) => player(id)?.nick ?? "Gracz";
   const seat = (id: string) => view.players.indexOf(id);
-  const over = view.phase === "over";
+  const over = result !== null;
+  const ranking = result?.ranking ?? [];
   const selling = canMove && view.phase === "sell";
 
   const status = over
-    ? ranking[0] === me
+    ? result.winner === me
       ? "Wygrywasz!"
-      : `Wygrywa ${nick(ranking[0])}`
+      : result.winner
+        ? `Wygrywa ${nick(result.winner)}`
+        : "Koniec gry"
     : canMove
       ? "Twoja tura"
       : `Ruch: ${nick(view.turn!)}`;
@@ -147,63 +157,70 @@ export function KampusTour({ view, me, players, dropped, canMove, ranking, onMov
 
   const here = view.turn ? view.positions[view.turn] : 0;
 
-  const pawnIcons = (tile: number, size: string | number) =>
-    view.players
-      .filter((p) => view.positions[p] === tile && !view.bankrupt.includes(p))
-      .map((p) => {
-        const Pawn = SEAT_ICONS[seat(p)];
-        return (
-          <Pawn key={p} size={size} weight="fill" className="drop-shadow-[0_0_2px_var(--color-bg)]" style={{ color: color(p) }} aria-label={nick(p)} />
-        );
-      });
+  /** Żeton gracza: ikona w ciemnym kółku z jasną obwódką, widoczny na każdym kolorze pola. */
+  const token = (p: string, size: number) => {
+    const Pawn = SEAT_ICONS[seat(p)];
+    return (
+      <span
+        key={p}
+        className="-ml-1.5 grid shrink-0 place-items-center rounded-full border-[1.5px] border-white bg-bg shadow-[0_1px_3px_rgb(0_0_0/0.7)] first:ml-0"
+        style={{ width: size, height: size }}
+      >
+        <Pawn size={size * 0.62} weight="fill" style={{ color: color(p) }} aria-label={nick(p)} />
+      </span>
+    );
+  };
+  /** Pionki na polu: rząd lekko zachodzących na siebie żetonów. */
+  const tokens = (tile: number, size: number) => (
+    <span className="flex shrink-0 items-center justify-center" style={{ height: size }}>
+      {view.players.filter((p) => view.positions[p] === tile && !view.bankrupt.includes(p)).map((p) => token(p, size))}
+    </span>
+  );
 
   /** Zawartość pola na planszy, zależnie od rodzaju. */
   function tileFace(i: number) {
     const tile = BOARD[i];
-    const pawns = pawnIcons(i, view.players.filter((p) => view.positions[p] === i).length > 1 ? "45%" : "60%");
     const sellable = selling && view.owners[i] === me;
-    const priceTag = (
-      <span className="font-mono text-[10px] font-semibold text-fg">{sellable ? `+${saleValue(i)}` : price(i)} zł</span>
-    );
 
     if (tile.kind in CORNERS) {
       const corner = CORNERS[tile.kind];
       return (
         <>
           <corner.icon size={22} weight="fill" style={{ color: corner.color }} aria-hidden />
-          <span className="px-1 text-center text-[10px] leading-tight font-semibold text-fg">{tile.name}</span>
-          {/* W rogu pionki stoją rzędem pod podpisem, żeby go nie zasłaniać. */}
-          <span className="flex h-4 items-center gap-0.5">{pawnIcons(i, 16)}</span>
+          <span className="px-1 text-center text-[11px] leading-tight font-semibold text-fg">{tile.name}</span>
+          {tokens(i, 18)}
         </>
       );
     }
 
+    // Kolorowy nagłówek: grupa dla nieruchomości, ikona dla pól specjalnych.
     const header =
-      tile.kind === "property" ? GROUP_COLORS[tile.group] : tile.kind === "utility" ? UTILITY_COLOR : null;
-    const TileIcon = tile.kind === "karty" ? Cards : tile.kind === "tax" ? Bed : null;
-    const UtilityIcon = tile.kind === "utility" ? UTILITY_ICONS[tile.name] : null;
+      tile.kind === "property" ? GROUP_COLORS[tile.group] : tile.kind === "karty" ? CARDS_COLOR : UTILITY_COLOR;
+    const HeaderIcon = tile.kind === "utility" ? UTILITY_ICONS[tile.name] : tile.kind === "karty" ? Cards : tile.kind === "tax" ? Bed : null;
+    const label = tile.kind === "karty" ? "Dziekanat" : (SHORT[i] ?? tile.name);
+    const side = cell(i)[0] === 0 || cell(i)[0] === 11;
+    const priceTag = (
+      <span className="font-mono text-[12px] leading-none font-semibold text-fg">
+        {tile.kind === "karty" ? "\u00a0" : `${sellable ? `+${saleValue(i)}` : price(i)} zł`}
+      </span>
+    );
     return (
       <>
-        {header && (
-          <span className="grid h-1/4 w-full shrink-0 place-items-center text-bg" style={{ backgroundColor: header }} aria-hidden>
-            {UtilityIcon && <UtilityIcon size={10} weight="bold" />}
-          </span>
-        )}
-        <span className="flex min-h-0 flex-1 flex-col items-center justify-center px-0.5">
-          {TileIcon && (
-            <TileIcon
-              size={tile.kind === "karty" ? 18 : 14}
-              weight={tile.kind === "karty" ? "fill" : "regular"}
-              style={{ color: tile.kind === "karty" ? CARDS_COLOR : undefined }}
-              className="text-fg"
-              aria-hidden
-            />
-          )}
-          <span className="text-center text-[9px] leading-tight text-fg">{tile.kind === "karty" ? "Dziekanat" : (SHORT[i] ?? tile.name)}</span>
+        <span className="grid h-[18%] w-full shrink-0 place-items-center text-bg" style={{ backgroundColor: header }} aria-hidden>
+          {HeaderIcon && <HeaderIcon size={10} weight="fill" />}
         </span>
-        {tile.kind !== "karty" && <span className="pb-0.5">{priceTag}</span>}
-        {pawns.length > 0 && (
-          <span className={`absolute inset-x-0 top-1/4 bottom-0 grid place-items-center ${pawns.length > 1 ? "grid-cols-2" : ""}`}>{pawns}</span>
+        <span className="flex min-h-0 flex-1 items-center justify-center px-0.5 text-center text-[10px] leading-[1.1] text-fg">{label}</span>
+        {/* Pionki nie zasłaniają nazwy: na górze i dole planszy stoją nad ceną, na bokach (niskie pola) obok niej. */}
+        {side ? (
+          <span className="mb-0.5 flex items-center gap-1">
+            {priceTag}
+            {tokens(i, 16)}
+          </span>
+        ) : (
+          <>
+            <span className="mb-0.5">{tokens(i, 18)}</span>
+            <span className="mb-0.5">{priceTag}</span>
+          </>
         )}
       </>
     );
@@ -282,25 +299,28 @@ export function KampusTour({ view, me, players, dropped, canMove, ranking, onMov
 
   return (
     <main className="landscape p-[max(0.5rem,env(safe-area-inset-top))_max(0.5rem,env(safe-area-inset-right))_max(0.5rem,env(safe-area-inset-bottom))_max(0.5rem,env(safe-area-inset-left))]">
-      <div className="relative flex h-full items-center justify-center px-24">
+      <div className="relative flex h-full items-center justify-center px-21">
         {view.players.map((id, i) => {
           const Pawn = SEAT_ICONS[i];
-          const active = view.turn === id;
+          const active = !over && view.turn === id;
           const out = view.bankrupt.includes(id);
           return (
             <div
               key={id}
-              className={`absolute flex w-22 flex-col items-center gap-0.5 rounded-inset border p-1.5 text-center text-xs ${SEAT_CORNERS[i]} ${
-                active ? "border-line-hover bg-surface" : "border-transparent text-fg-muted"
+              className={`absolute flex w-20 flex-col items-center gap-0.5 rounded-inset border-2 p-1.5 text-center text-xs ${SEAT_CORNERS[i]} ${
+                active ? "" : "border-transparent text-fg-muted"
               } ${out ? "opacity-40" : ""}`}
+              // Gracz na turze: obwódka, tło i poświata w jego kolorze.
+              style={active ? { borderColor: color(id), backgroundColor: mix(color(id), 16), boxShadow: `0 0 14px ${mix(color(id), 55)}` } : undefined}
             >
               <Pawn size={26} weight="fill" style={{ color: color(id) }} aria-hidden />
               <span className={`w-full truncate ${out ? "line-through" : ""}`}>
                 {nick(id)}
                 {id === me && " (ty)"}
               </span>
-              <span className="font-mono text-fg">{out ? "bankrut" : `${view.cash[id]} zł`}</span>
-              {over && <span className="font-mono">{ranking.indexOf(id) + 1}. miejsce</span>}
+              <span className="font-mono text-sm text-fg">{out ? "bankrut" : `${view.cash[id]} zł`}</span>
+              {!out && <span>{fields(Object.values(view.owners).filter((o) => o === id).length)}</span>}
+              {ranking.includes(id) && <span className="font-mono">{ranking.indexOf(id) + 1}. miejsce</span>}
             </div>
           );
         })}
@@ -337,7 +357,13 @@ export function KampusTour({ view, me, players, dropped, canMove, ranking, onMov
                   className={`relative flex flex-col items-center justify-center overflow-hidden rounded-sm bg-[color-mix(in_srgb,var(--color-fg)_12%,var(--color-bg))] ${
                     sellable ? "outline-2 outline-accent" : selected === i ? "outline-2 outline-fg" : ""
                   }`}
-                  style={{ gridColumn: x + 1, gridRow: y + 1, backgroundColor: background }}
+                  style={{
+                    gridColumn: x + 1,
+                    gridRow: y + 1,
+                    backgroundColor: background,
+                    // Właściciel: odcień tła i obwódka w jego kolorze.
+                    boxShadow: owner ? `inset 0 0 0 2px ${color(owner)}` : undefined,
+                  }}
                   onClick={() => setSelected(selected === i ? null : i)}
                 >
                   {tileFace(i)}
@@ -349,10 +375,8 @@ export function KampusTour({ view, me, players, dropped, canMove, ranking, onMov
               <p className="label">
                 Kampus Tour · runda {view.round}/{ROUNDS}
               </p>
-              <div className="flex items-center gap-3">
-                <h1 className="text-lg font-semibold">{status}</h1>
-                {timer}
-              </div>
+              {timer && <div className="w-full max-w-sm">{timer}</div>}
+              <h1 className="text-lg font-semibold">{status}</h1>
               {dropped && (
                 <p role="status" className="flex items-center gap-2 text-sm text-accent">
                   <WifiSlash size={16} aria-hidden />
@@ -360,7 +384,7 @@ export function KampusTour({ view, me, players, dropped, canMove, ranking, onMov
                 </p>
               )}
               {view.events.length > 0 && (
-                <ul className="text-center text-xs text-fg-muted">
+                <ul className="text-center text-sm font-medium text-fg">
                   {view.events.map((e, i) => (
                     <li key={i}>{describe(e)}</li>
                   ))}
@@ -372,7 +396,7 @@ export function KampusTour({ view, me, players, dropped, canMove, ranking, onMov
                   <span className="flex gap-1" aria-label={`Wyrzucono ${view.dice[0]} i ${view.dice[1]}`}>
                     {view.dice.map((d, i) => {
                       const Die = DICE[d - 1];
-                      return <Die key={i} size={32} weight="fill" aria-hidden />;
+                      return <Die key={i} size={56} weight="fill" aria-hidden />;
                     })}
                   </span>
                 )}
@@ -391,10 +415,10 @@ export function KampusTour({ view, me, players, dropped, canMove, ranking, onMov
                     </button>
                   </>
                 )}
-                {!canMove && view.phase === "buy" && <p className="text-sm text-fg-muted">{nick(view.turn!)} decyduje o zakupie</p>}
+                {!over && !canMove && view.phase === "buy" && <p className="text-sm text-fg-muted">{nick(view.turn!)} decyduje o zakupie</p>}
               </div>
 
-              {view.phase === "sell" && view.debt && (
+              {!over && view.phase === "sell" && view.debt && (
                 <p className="text-center text-sm">
                   {selling
                     ? `Brakuje ${view.debt.amount - view.cash[me]} zł. Stuknij swoje pole i sprzedaj je za pół ceny.`
