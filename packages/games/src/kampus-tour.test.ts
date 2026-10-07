@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { createRng, type Rng } from "./core.ts";
-import { ALLOWANCE, BOARD, kampusTour as game, type Move, ROUNDS, SIZE, START_CASH, type State, type View } from "./kampus-tour.ts";
+import { ALLOWANCE, BOARD, buildCost, kampusTour as game, type Move, ROUNDS, SIZE, START_CASH, type State, type View } from "./kampus-tour.ts";
 
 // Testy napisane przed implementacją. Ustalają zasady Kampus Tour:
 // - 2-4 graczy, plansza 32 pól, wszyscy startują na polu 0 (Początek) z 200 zł,
@@ -11,6 +11,9 @@ import { ALLOWANCE, BOARD, kampusTour as game, type Move, ROUNDS, SIZE, START_CA
 // - pole 28 (Opłata za akademik) kosztuje 15 zł,
 // - brak gotówki: sprzedaż pól bankowi za połowę ceny, a gdy to nie wystarczy, bankructwo,
 // - dublet daje kolejny rzut; trzeci dublet z rzędu: ruch, ale koniec tury,
+// - budowa tylko na swoim polu po staniu na nim (także zaraz po kupnie), dowolnie wiele poziomów naraz;
+//   poziomy 1-3 kosztują P/2, landmark (4) P i wymaga kompletu; czynsz 0,5P / 1,5P / 3P / 5P,
+// - sprzedaż przy długu: pole z budynkami za połowę (cena + budynki),
 // - koniec, gdy zostanie jeden gracz albo po ROUNDS rundach (ranking wg majątku: gotówka + ceny pól).
 
 const A = "ania";
@@ -39,9 +42,10 @@ const two = () => game.setup([A, B], createRng(1));
 const three = () => game.setup([A, B, C], createRng(1));
 
 /** Stan z nadpisaną gotówką, właścicielami i pozycjami. */
-function with2(s: State, patch: Partial<Pick<State, "cash" | "owners" | "positions" | "round">>): State {
+function with2(s: State, patch: Partial<Pick<State, "cash" | "owners" | "positions" | "round" | "levels">>): State {
   return {
     ...s,
+    levels: { ...s.levels, ...patch.levels },
     cash: { ...s.cash, ...patch.cash },
     owners: { ...s.owners, ...patch.owners },
     positions: { ...s.positions, ...patch.positions },
@@ -184,6 +188,9 @@ describe("kupno", () => {
     s = play(s, A, { type: "buy" });
     expect(view(s).owners[3]).toBe(A);
     expect(view(s).cash[A]).toBe(START_CASH - price(3));
+    // Po kupnie od razu można budować; pominięcie oddaje turę.
+    expect(view(s).phase).toBe("build");
+    s = play(s, A, { type: "skip" });
     expect(game.waitingFor(s)).toEqual([B]);
   });
 
@@ -221,10 +228,10 @@ describe("czynsz i opłaty", () => {
     expect(view(s).cash[B]).toBe(START_CASH + 4);
   });
 
-  test("własne pole: bez czynszu i bez kupna", () => {
+  test("własne pole: bez czynszu i bez kupna, za to budowa", () => {
     const s = roll(with2(two(), { owners: { 4: A } }), A, 1, 3);
     expect(view(s).cash[A]).toBe(START_CASH);
-    expect(game.waitingFor(s)).toEqual([B]);
+    expect(view(s).phase).toBe("build");
   });
 
   test("grupa z 2 pól: oba w rękach właściciela to czynsz ×2", () => {
@@ -307,6 +314,7 @@ describe("historia zdarzeń", () => {
   test("ostatnie zdarzenia zostają po kolejnych ruchach, najwyżej 4", () => {
     let s = roll(two(), A, 1, 2); // A na 3
     s = play(s, A, { type: "buy" });
+    s = play(s, A, { type: "skip" }); // bez budowy: pominięcie budowy nie jest zdarzeniem
     s = roll(s, B, 2, 3); // B na Karty Dziekanatu: brak nowego zdarzenia
     expect(view(s).events).toEqual([{ type: "buy", player: A, amount: 15, tile: 3 }]);
     s = roll(s, A, 1, 3); // A na 7 (Ksero)
@@ -342,6 +350,126 @@ describe("komplet grupy", () => {
     s = roll(s, A, 2, 3);
     s = play(s, A, { type: "buy" });
     expect(view(s).events.at(-1)?.type).toBe("buy");
+  });
+});
+
+describe("budowanie", () => {
+  // Pole 17 (Ulica 3 Maja, grupa 17-18-19) kosztuje 30 zł: poziom 15 zł, landmark 30 zł.
+  const onOwn = (patch: Parameters<typeof with2>[1] = {}) =>
+    roll(with2(two(), { owners: { 17: A }, positions: { [A]: 14 }, ...patch }), A, 1, 2);
+
+  test("koszt budowy: poziomy po P/2, landmark P", () => {
+    expect(buildCost(17, 0, 1)).toBe(15);
+    expect(buildCost(17, 0, 3)).toBe(45);
+    expect(buildCost(17, 3, 4)).toBe(30);
+    expect(buildCost(4, 0, 1)).toBe(8); // 15 / 2, zaokrąglone
+  });
+
+  test("kilka poziomów naraz: płaci się sumę", () => {
+    let s = onOwn();
+    expect(view(s).phase).toBe("build");
+    expect(game.waitingFor(s)).toEqual([A]);
+    s = play(s, A, { type: "build", level: 3 });
+    expect(view(s).levels[17]).toBe(3);
+    expect(view(s).cash[A]).toBe(START_CASH - 45);
+    expect(view(s).events.at(-1)).toEqual({ type: "build", player: A, tile: 17, level: 3, amount: 45 });
+    expect(game.waitingFor(s)).toEqual([B]);
+  });
+
+  test("dobudowa od obecnego poziomu; poziom nie wyższy niż obecny jest odrzucany", () => {
+    const s = onOwn({ levels: { 17: 2 } });
+    expect(game.validateMove(s, A, { type: "build", level: 2 })).toBe(false);
+    expect(game.validateMove(s, A, { type: "build", level: 1 })).toBe(false);
+    const built = play(s, A, { type: "build", level: 3 });
+    expect(view(built).cash[A]).toBe(START_CASH - 15);
+  });
+
+  test("landmark tylko z kompletem grupy", () => {
+    expect(game.validateMove(onOwn({ levels: { 17: 3 } }), A, { type: "build", level: 4 })).toBe(false);
+    // Na poziomie 3 bez kompletu nie ma czego budować: tura idzie dalej.
+    expect(game.waitingFor(onOwn({ levels: { 17: 3 } }))).toEqual([B]);
+
+    let s = onOwn({ owners: { 17: A, 18: A, 19: A }, levels: { 17: 3 } });
+    s = play(s, A, { type: "build", level: 4 });
+    expect(view(s).levels[17]).toBe(4);
+    expect(view(s).cash[A]).toBe(START_CASH - 30);
+  });
+
+  test("budowa ponad stan gotówki jest odrzucana; bez pieniędzy nie ma fazy budowy", () => {
+    const s = onOwn({ cash: { [A]: 20 } });
+    expect(game.validateMove(s, A, { type: "build", level: 1 })).toBe(true);
+    expect(game.validateMove(s, A, { type: "build", level: 2 })).toBe(false);
+    expect(game.waitingFor(onOwn({ cash: { [A]: 14 } }))).toEqual([B]);
+  });
+
+  test("po kupnie od razu można budować", () => {
+    let s = roll(with2(two(), { positions: { [A]: 14 } }), A, 1, 2);
+    s = play(s, A, { type: "buy" });
+    s = play(s, A, { type: "build", level: 1 });
+    expect(view(s).levels[17]).toBe(1);
+    expect(view(s).cash[A]).toBe(START_CASH - 30 - 15);
+  });
+
+  test("Ksero, Stołówka i Akademik bez budowy", () => {
+    expect(game.waitingFor(roll(with2(two(), { owners: { 7: A } }), A, 3, 4))).toEqual([B]);
+    expect(game.waitingFor(play(roll(two(), A, 3, 4), A, { type: "buy" }))).toEqual([B]);
+  });
+
+  test("budować można tylko w fazie budowy", () => {
+    expect(game.validateMove(two(), A, { type: "build", level: 1 })).toBe(false);
+  });
+
+  test("pominięcie budowy po dublecie daje kolejny rzut", () => {
+    let s = roll(with2(two(), { owners: { 17: A }, positions: { [A]: 15 } }), A, 1, 1);
+    expect(view(s).phase).toBe("build");
+    s = play(s, A, { type: "skip" });
+    expect(view(s).phase).toBe("roll");
+    expect(game.waitingFor(s)).toEqual([A]);
+  });
+
+  test.each([
+    [1, 15],
+    [2, 45],
+    [3, 90],
+    [4, 150],
+  ])("czynsz na poziomie %i: %i zł (komplet go nie podwaja)", (level, amount) => {
+    const s = roll(with2(two(), { owners: { 17: B, 18: B, 19: B }, levels: { 17: level }, positions: { [A]: 14 } }), A, 1, 2);
+    expect(view(s).cash[A]).toBe(START_CASH - amount);
+    expect(view(s).cash[B]).toBe(START_CASH + amount);
+  });
+
+  test("sprzedaż przy długu: pole z budynkami za połowę, poziom znika", () => {
+    // A ma 1 zł i pole 3 Maja z poziomem 2 (30 + 30 zł → sprzedaż za 30 zł); czynsz za Rynek u B to 5 zł.
+    let s = with2(two(), { cash: { [A]: 1 }, owners: { 17: A, 31: B }, levels: { 17: 2 }, positions: { [A]: 26 } });
+    s = roll(s, A, 2, 3);
+    expect(view(s).phase).toBe("sell");
+    s = play(s, A, { type: "sell", tile: 17 });
+    expect(view(s).cash[A]).toBe(1 + 30 - 5);
+    expect(view(s).levels[17] ?? 0).toBe(0);
+    expect(view(s).owners[17]).toBeUndefined();
+  });
+
+  test("bankructwo czyści budynki", () => {
+    const s = roll(
+      with2(three(), { cash: { [A]: 0 }, owners: { 1: A, 17: B }, levels: { 1: 2, 17: 4 }, positions: { [A]: 14 } }),
+      A,
+      1,
+      2,
+    );
+    expect(view(s).bankrupt).toEqual([A]);
+    expect(view(s).levels[1] ?? 0).toBe(0);
+  });
+
+  test("majątek w rankingu liczy budynki", () => {
+    let s = with2(two(), { round: ROUNDS, cash: { [A]: 100, [B]: 120 }, owners: { 17: A }, levels: { 17: 3 } });
+    s = roll(s, A, 2, 3);
+    s = roll(s, B, 2, 3);
+    // A: 100 + 30 + 45 = 175 > B: 120.
+    expect(game.isOver(s)).toEqual({ winner: A, ranking: [A, B] });
+  });
+
+  test("limit czasu w fazie budowy pomija budowę", () => {
+    expect(game.timeoutMove!(onOwn(), A, createRng(1))).toEqual({ type: "skip" });
   });
 });
 
