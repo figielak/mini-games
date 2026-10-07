@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { createRng, type Rng } from "./core.ts";
-import { ALLOWANCE, BOARD, buildCost, CARDS, kampusTour as game, type Move, ROUNDS, SIZE, SEAT_BONUS, START_CASH, type State, type View } from "./kampus-tour.ts";
+import { ALLOWANCE, BOARD, buildCost, CARDS, CHARACTERS, kampusTour as game, type Move, ROUNDS, SIZE, SEAT_BONUS, START_CASH, type State, type View } from "./kampus-tour.ts";
 
 // Testy napisane przed implementacją. Ustalają zasady Kampus Tour:
 // - 2-4 graczy, plansza 32 pól, wszyscy startują na polu 0 (Początek) z 200 zł, każde dalsze miejsce +20 zł
@@ -23,7 +23,8 @@ import { ALLOWANCE, BOARD, buildCost, CARDS, kampusTour as game, type Move, ROUN
 // - Bilet MPK: stanięcie kończy turę; w następnej zamiast rzutu można pojechać na dowolne pole,
 // - wykupienie: po zapłaceniu czynszu cudze pole można odkupić za 2× wartość (bez landmarków),
 // - monopol: 3 pełne grupy kolorów kończą grę wygraną,
-// - koniec, gdy zostanie jeden gracz albo po ROUNDS rundach (ranking wg majątku: gotówka + ceny pól).
+// - koniec, gdy zostanie jeden gracz albo po ROUNDS rundach (ranking wg majątku: gotówka + ceny pól),
+// - na starcie każdy wybiera postać (pionek), wszyscy naraz; postaci się nie powtarzają; po limicie czasu losowa wolna.
 
 const A = "ania";
 const B = "bartek";
@@ -47,8 +48,13 @@ function play(s: State, player: string, move: Move, rng: Rng = dice()): State {
 
 const roll = (s: State, player: string, a: number, b: number) => play(s, player, { type: "roll" }, dice(a, b));
 
-/** Stan po setupie, ale z równą gotówką: testy zasad liczą od START_CASH bez premii za miejsce. */
-const even = (s: State): State => ({ ...s, cash: Object.fromEntries(s.players.map((p) => [p, START_CASH])) });
+/** Stan po setupie i wyborze postaci (gracz i dostaje postać i), z równą gotówką: testy zasad liczą od START_CASH bez premii za miejsce. */
+const even = (s: State): State => ({
+  ...s,
+  phase: "roll",
+  characters: Object.fromEntries(s.players.map((p, i) => [p, i])),
+  cash: Object.fromEntries(s.players.map((p) => [p, START_CASH])),
+});
 const two = () => even(game.setup([A, B], createRng(1)));
 const three = () => even(game.setup([A, B, C], createRng(1)));
 
@@ -147,14 +153,17 @@ describe("setup", () => {
     expect(START_CASH).toBe(200);
     expect(SEAT_BONUS).toBe(20);
     expect(v.owners).toEqual({});
-    expect(game.waitingFor(s)).toEqual([A]);
+    // Najpierw wszyscy naraz wybierają postać.
+    expect(v.phase).toBe("pick");
+    expect(v.characters).toEqual({});
+    expect(game.waitingFor(s)).toEqual(players);
     expect(v.turn).toBe(A);
-    expect(v.phase).toBe("roll");
     expect(v.round).toBe(1);
     expect(v.dice).toBeNull();
   });
 
-  test("gra dla 2-4 graczy", () => {
+  test("gra dla 2-4 graczy, do wyboru 6 postaci", () => {
+    expect(CHARACTERS).toHaveLength(6);
     expect(game.minPlayers).toBe(2);
     expect(game.maxPlayers).toBe(4);
   });
@@ -891,5 +900,49 @@ describe("monopol", () => {
     let s = roll(with2(two(), { owners: { 30: A, 31: A, 1: A, 2: A, 29: A } }), A, 3, 4);
     s = play(s, A, { type: "buy" });
     expect(game.isOver(s)).toBeNull();
+  });
+});
+
+describe("wybór postaci", () => {
+  const fresh = () => game.setup([A, B, C], createRng(1));
+  const pick = (s: State, player: string, character: number) => play(s, player, { type: "pick", character });
+
+  test("każdy wybiera naraz, kolejność wyboru dowolna; czekamy tylko na tych bez postaci", () => {
+    let s = pick(fresh(), C, 2);
+    expect(game.waitingFor(s)).toEqual([A, B]);
+    s = pick(s, A, 5);
+    expect(game.waitingFor(s)).toEqual([B]);
+    expect(view(s).characters).toEqual({ [C]: 2, [A]: 5 });
+    expect(view(s).phase).toBe("pick");
+  });
+
+  test("po ostatnim wyborze gra rusza: rzuca pierwszy gracz", () => {
+    let s = pick(pick(fresh(), A, 0), B, 1);
+    s = pick(s, C, 3);
+    expect(view(s).phase).toBe("roll");
+    expect(game.waitingFor(s)).toEqual([A]);
+    expect(view(s).characters).toEqual({ [A]: 0, [B]: 1, [C]: 3 });
+  });
+
+  test("nie można wziąć zajętej postaci, wybrać drugi raz ani spoza listy", () => {
+    const s = pick(fresh(), A, 0);
+    expect(game.validateMove(s, B, { type: "pick", character: 0 })).toBe(false);
+    expect(game.validateMove(s, A, { type: "pick", character: 1 })).toBe(false);
+    expect(game.validateMove(s, B, { type: "pick", character: CHARACTERS.length })).toBe(false);
+    expect(game.validateMove(s, "obcy", { type: "pick", character: 1 })).toBe(false);
+  });
+
+  test("w trakcie wyboru nie można rzucać, a po starcie nie można zmienić postaci", () => {
+    expect(game.validateMove(fresh(), A, { type: "roll" })).toBe(false);
+    expect(game.validateMove(two(), A, { type: "pick", character: 4 })).toBe(false);
+  });
+
+  test("po limicie czasu gracz dostaje losową wolną postać", () => {
+    const s = pick(pick(fresh(), A, 0), B, 1);
+    for (const seed of [1, 2, 3, 4, 5]) {
+      const move = game.timeoutMove!(s, C, createRng(seed));
+      expect(move.type).toBe("pick");
+      expect(game.validateMove(s, C, move)).toBe(true);
+    }
   });
 });
