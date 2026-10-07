@@ -111,6 +111,7 @@ export const CARDS: { title: string; text: string; effect: CardEffect }[] = [
 const PASS_CARD = CARDS.findIndex((c) => c.effect.kind === "pass");
 
 export type Move =
+  | { type: "pick"; character: number }
   | { type: "roll" }
   | { type: "card" }
   | { type: "buy" }
@@ -164,7 +165,9 @@ export interface State {
   /** Kolejność odpadania. */
   bankrupt: PlayerId[];
   turn: number;
-  phase: "roll" | "card" | "buy" | "buyout" | "build" | "sell" | "juwenalia" | "over";
+  phase: "pick" | "roll" | "card" | "buy" | "buyout" | "build" | "sell" | "juwenalia" | "over";
+  /** Postać (pionek) gracza: indeks w CHARACTERS, wybierana na starcie. */
+  characters: Record<PlayerId, number>;
   dice: [number, number] | null;
   /** Dublety z rzędu w tej turze. */
   doubles: number;
@@ -194,7 +197,11 @@ export interface State {
 /** Widok bez kolejności talii (to byłaby wiedza o przyszłych kartach). */
 export type View = Omit<State, "turn" | "doubles" | "deck"> & { turn: PlayerId | null; deckSize: number };
 
+/** Postaci do wyboru na starcie; wygląd figurek jest w UI. */
+export const CHARACTERS = ["Z plecakiem", "Z kawą", "Na hulajnodze", "Z laptopem", "W słuchawkach", "Z książkami"];
+
 const moveSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("pick"), character: z.number().int().min(0).max(CHARACTERS.length - 1) }),
   z.object({ type: z.literal("roll") }),
   z.object({ type: z.literal("card") }),
   z.object({ type: z.literal("buy") }),
@@ -450,7 +457,8 @@ export const kampusTour: GameDefinition<State, Move> = {
       levels: {},
       bankrupt: [],
       turn: 0,
-      phase: "roll",
+      phase: "pick",
+      characters: {},
       dice: null,
       doubles: 0,
       round: 1,
@@ -468,6 +476,17 @@ export const kampusTour: GameDefinition<State, Move> = {
   },
 
   validateMove(s, player, move) {
+    // Wybór postaci: wszyscy naraz, każda postać raz.
+    if (move.type === "pick" || s.phase === "pick")
+      return (
+        move.type === "pick" &&
+        s.phase === "pick" &&
+        s.players.includes(player) &&
+        s.characters[player] === undefined &&
+        move.character >= 0 &&
+        move.character < CHARACTERS.length &&
+        !Object.values(s.characters).includes(move.character)
+      );
     if (s.phase === "over" || current(s) !== player) return false;
     if (move.type === "roll") return s.phase === "roll";
     if (move.type === "card") return s.phase === "card";
@@ -490,6 +509,11 @@ export const kampusTour: GameDefinition<State, Move> = {
   },
 
   applyMove(s, player, move, rng: Rng) {
+    if (move.type === "pick") {
+      const characters = { ...s.characters, [player]: move.character };
+      return { ...s, characters, phase: s.players.every((p) => characters[p] !== undefined) ? "roll" : "pick" };
+    }
+
     // Pominięcie zakupu jest zdarzeniem, pominięcie budowy nie.
     if (move.type === "skip") return finish(s.phase === "buy" ? log(s, { type: "skip", player, tile: s.positions[player] }) : s);
 
@@ -598,6 +622,7 @@ export const kampusTour: GameDefinition<State, Move> = {
     bankrupt: s.bankrupt,
     turn: s.phase === "over" ? null : current(s),
     phase: s.phase,
+    characters: s.characters,
     dice: s.dice,
     round: Math.min(s.round, ROUNDS),
     debt: s.debt,
@@ -622,9 +647,14 @@ export const kampusTour: GameDefinition<State, Move> = {
     return { winner: ranking[0], ranking };
   },
 
-  waitingFor: (s) => (s.phase === "over" ? [] : [current(s)]),
+  waitingFor: (s) =>
+    s.phase === "over" ? [] : s.phase === "pick" ? s.players.filter((p) => s.characters[p] === undefined) : [current(s)],
 
-  timeoutMove(s, player) {
+  timeoutMove(s, player, rng) {
+    if (s.phase === "pick") {
+      const free = CHARACTERS.map((_, i) => i).filter((i) => !Object.values(s.characters).includes(i));
+      return { type: "pick", character: free[Math.floor(rng() * free.length)] };
+    }
     if (s.phase === "buy" || s.phase === "build" || s.phase === "buyout") return { type: "skip" };
     if (s.phase === "juwenalia") {
       const best = owned(s, player).sort((a, b) => priceOf(b) - priceOf(a) || a - b)[0];

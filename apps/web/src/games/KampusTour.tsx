@@ -1,11 +1,8 @@
 import {
   Bed,
-  Bicycle,
-  BookOpen,
   Books,
   Bus,
   Cards,
-  Coffee,
   Confetti,
   Crown,
   DiceFive,
@@ -19,7 +16,6 @@ import {
   Flask,
   Warning,
   ForkKnife,
-  GraduationCap,
   Buildings,
   type Icon,
   Star,
@@ -36,6 +32,7 @@ import {
   KAMPUS_ALLOWANCE as ALLOWANCE,
   KAMPUS_BOARD as BOARD,
   KAMPUS_CARDS as CARDS,
+  KAMPUS_CHARACTERS as CHARACTERS,
   KAMPUS_GROUPS as GROUPS,
   KAMPUS_ROUNDS as ROUNDS,
   KAMPUS_UTILITY_RATES as UTILITY_RATES,
@@ -52,6 +49,7 @@ import {
   type LobbyPlayer,
 } from "@mini-games/games";
 import { type ReactNode, useEffect, useRef, useState } from "react";
+import { Figure } from "./kampus-figures.tsx";
 
 interface Props {
   view: KampusTourView;
@@ -67,8 +65,6 @@ interface Props {
 }
 
 const DICE = [DiceOne, DiceTwo, DiceThree, DiceFour, DiceFive, DiceSix];
-/** Ikona gracza zależy od miejsca przy stole; ten sam kształt jest jego pionkiem. */
-const SEAT_ICONS = [GraduationCap, BookOpen, Coffee, Bicycle];
 /** Rogi ekranu w kolejności miejsc, zgodnie z ruchem wskazówek zegara. */
 const SEAT_CORNERS = ["top-0 left-0", "top-0 right-0", "bottom-0 right-0", "bottom-0 left-0"];
 
@@ -492,19 +488,20 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
     );
   }
 
-  /** Żeton gracza: kółko w jego kolorze z ciemną ikoną i białą obwódką, widoczne na każdym polu. */
-  const token = (p: string, size: number, first: boolean) => {
-    const Pawn = SEAT_ICONS[seat(p)];
-    return (
-      <span
-        key={p}
-        className="grid shrink-0 place-items-center rounded-full border-2 border-white text-bg shadow-[0_2px_4px_rgb(0_0_0/0.8)]"
-        style={{ width: size, height: size, marginLeft: first ? 0 : -size * 0.45, backgroundColor: color(p) }}
-      >
-        <Pawn size={size * 0.6} weight="fill" aria-label={nick(p)} />
-      </span>
-    );
-  };
+  /** Postać gracza; przed wyborem (i w starych partiach) zastępczo według miejsca przy stole. */
+  const character = (p: string) => view.characters?.[p] ?? seat(p);
+  /** Żeton gracza: kółko w jego kolorze z ciemną figurką i białą obwódką, widoczne na każdym polu. */
+  const token = (p: string, size: number, first: boolean) => (
+    <span
+      key={p}
+      role="img"
+      aria-label={nick(p)}
+      className="grid shrink-0 place-items-center rounded-full border-2 border-white text-bg shadow-[0_2px_4px_rgb(0_0_0/0.8)]"
+      style={{ width: size, height: size, marginLeft: first ? 0 : -size * 0.45, backgroundColor: color(p) }}
+    >
+      <Figure character={character(p)} size={size * 0.82} cut={color(p)} />
+    </span>
+  );
   /** Pionki na polu: rząd zachodzących na siebie żetonów; przy 3-4 graczach mniejsze, żeby zmieścić się w polu. */
   const tokens = (tile: number, size: number) => {
     const here = view.players.filter((p) => shown[p] === tile && !view.bankrupt.includes(p));
@@ -702,7 +699,6 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
         style={{ width: stage.width, height: STAGE_H, zoom: stage.scale }}
       >
         {view.players.map((id, i) => {
-          const Pawn = SEAT_ICONS[i];
           const active = !over && view.turn === id;
           const out = view.bankrupt.includes(id);
           return (
@@ -714,7 +710,7 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
               // Wszystkie panele mają ten sam kształt; gracz na turze tylko obwódkę i poświatę w swoim kolorze.
               style={active ? { borderColor: color(id), boxShadow: `0 0 14px ${mix(color(id), 55)}` } : undefined}
             >
-              <Pawn size={26} weight="fill" style={{ color: color(id) }} aria-hidden />
+              <Figure character={character(id)} size={30} cut="var(--color-surface)" className="shrink-0" color={color(id)} />
               <span className={`line-clamp-2 w-full leading-tight break-words ${out ? "line-through" : ""}`}>
                 {nick(id)}
                 {id === me && " (ty)"}
@@ -954,6 +950,51 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
             </div>
           </div>
         </div>
+
+        {/* Wybór postaci na starcie: wszyscy naraz, zajęte postaci w kolorze i z nickiem właściciela. */}
+        {!over && view.phase === "pick" && (
+          <div className="absolute inset-0 z-20 grid place-items-center bg-bg/60 backdrop-blur-sm">
+            <div
+              role="dialog"
+              aria-label="Wybór postaci"
+              className="flex w-[30rem] animate-[card-in_0.35s_ease-out] flex-col gap-3 rounded-inset border border-line bg-surface p-4 shadow-[0_16px_48px_rgb(0_0_0/0.7)]"
+            >
+              <h2 className="text-center text-lg font-semibold">{canMove ? "Wybierz postać" : "Czekamy na wybór postaci"}</h2>
+              <div className="grid grid-cols-6 gap-2">
+                {CHARACTERS.map((name, k) => {
+                  const owner = view.players.find((p) => view.characters[p] === k);
+                  return (
+                    <button
+                      key={k}
+                      type="button"
+                      disabled={!canMove || !!owner}
+                      aria-label={owner ? `${name}: ${nick(owner)}` : name}
+                      className="flex flex-col items-center gap-1 rounded-inset p-1 text-center text-[11px] leading-tight enabled:hover:bg-line disabled:cursor-default"
+                      onClick={() => onMove({ type: "pick", character: k })}
+                    >
+                      <span
+                        className="grid size-14 place-items-center rounded-full border-2"
+                        style={
+                          owner
+                            ? { backgroundColor: color(owner), borderColor: "white", color: "var(--color-bg)" }
+                            : { borderColor: "var(--color-line-hover)", color: canMove ? color(me) : "var(--color-fg-muted)" }
+                        }
+                      >
+                        <Figure character={k} size={44} cut={owner ? color(owner) : "var(--color-surface)"} />
+                      </span>
+                      <span className={owner ? "font-semibold" : "text-fg-muted"}>{owner ? nick(owner) : name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {!canMove && (
+                <p className="text-center text-sm text-fg-muted">
+                  Wybierają: {view.players.filter((p) => view.characters[p] === undefined).map(nick).join(", ")}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Karta Dziekanatu: plansza się rozmywa, karta na środku, efekt dopiero po kliknięciu. */}
         {settled && !over && view.phase === "card" && view.card !== null && (
