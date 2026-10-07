@@ -444,6 +444,22 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
   /** Majątek jak w rankingu po ostatniej rundzie: gotówka + pola z budynkami. */
   const wealth = (id: string) =>
     cash[id] + Object.keys(settledOwners.current).map(Number).filter((i) => settledOwners.current[i] === id).reduce((sum, i) => sum + value(i), 0);
+  /** Ile zapłaci ten, kto stanie na cudzym polu (z kompletem, budynkami i Juwenaliami); Ksero i Stołówka: mnożnik oczek. */
+  const rentNow = (i: number): ReactNode => {
+    const t = BOARD[i];
+    const owner = view.owners[i];
+    if (t.kind === "utility") {
+      const count = BOARD.filter((b, j) => b.kind === "utility" && view.owners[j] === owner).length;
+      return (
+        <span className="inline-flex items-center gap-px font-mono">
+          <DiceFive size={12} weight="fill" aria-label="oczka" />×{UTILITY_RATES[count - 1]}
+        </span>
+      );
+    }
+    if (t.kind !== "property") return zl(price(i));
+    const rent = level(i) ? levelRent(i, level(i)) : baseRent(t.price) * (complete(i) ? 2 : 1);
+    return zl(rent * (view.juwenalia?.tile === i ? view.juwenalia.factor : 1));
+  };
   /** Poziomy, które gracz na turze może teraz zbudować na swoim polu. */
   const buildChoices = () => {
     const from = level(here);
@@ -521,7 +537,8 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
     const side = cell(i)[0] === 0 || cell(i)[0] === 11;
     const priceTag = (
       <span className="text-[12px] leading-none font-semibold text-fg">
-        {tile.kind === "karty" ? "\u00a0" : zl(sellable ? `+${saleValue(i)}` : price(i))}
+        {/* Wolne pole: cena kupna; czyjeś: czynsz za stanięcie. */}
+        {tile.kind === "karty" ? "\u00a0" : sellable ? zl(`+${saleValue(i)}`) : view.owners[i] ? rentNow(i) : zl(price(i))}
       </span>
     );
     // Pola specjalne: duża ikona zamiast paska grupy.
@@ -772,7 +789,7 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
                       style={{ color: CORNERS.juwenalia.color }}
                       aria-label={`Juwenalia: czynsz ×${view.juwenalia.factor}`}
                     >
-                      <Confetti size={11} weight="fill" aria-hidden />×{view.juwenalia.factor}
+                      <Confetti size={11} weight="fill" aria-hidden />
                     </span>
                   )}
                   {/* Właściciel (pasek i obwódka są w boxShadow); przy komplecie gwiazdka w jego kolorze. */}
