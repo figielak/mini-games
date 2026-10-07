@@ -90,11 +90,33 @@ const SHORT: Record<number, string> = {
 };
 
 /** Rogi: większe pola z własnym kolorem i opisem działania. */
-const CORNERS: Record<string, { icon: Icon; color: string; info: string }> = {
-  start: { icon: Sun, color: "#46a758", info: `Za każde przejście dostajesz ${ALLOWANCE} zł kieszonkowego.` },
-  kolokwium: { icon: Exam, color: "#e5484d", info: "Wkrótce: tracisz turę albo zdajesz, rzucając dublet. Na razie bez efektu." },
-  juwenalia: { icon: Confetti, color: "#d873b0", info: "Wkrótce: wybierasz swoje pole, które ma podwójny czynsz. Na razie bez efektu." },
-  mpk: { icon: Bus, color: "#ffc53d", info: "Wkrótce: w następnej turze przeskakujesz na dowolne pole. Na razie bez efektu." },
+/**
+ * Rogi: neutralne tło (żeby nie myliły się z polami graczy i Dziekanatu), duża kolorowa ikona,
+ * krótki podpis działania; soon = efekt jeszcze nie działa (podpis kursywą, wyjaśnienie w okienku).
+ */
+const CORNERS: Record<string, { icon: Icon; color: string; sub: string; soon?: boolean; info: string }> = {
+  start: { icon: Sun, color: "#ffb224", sub: `+${ALLOWANCE} zł`, info: `Za każde przejście dostajesz ${ALLOWANCE} zł kieszonkowego.` },
+  kolokwium: {
+    icon: Exam,
+    color: "#ff6369",
+    sub: "tracisz turę",
+    soon: true,
+    info: "Wkrótce: tracisz turę albo zdajesz, rzucając dublet. Na razie bez efektu.",
+  },
+  juwenalia: {
+    icon: Confetti,
+    color: "#e879f9",
+    sub: "×2 czynsz",
+    soon: true,
+    info: "Wkrótce: wybierasz swoje pole, które ma podwójny czynsz. Na razie bez efektu.",
+  },
+  mpk: {
+    icon: Bus,
+    color: "#3dd68c",
+    sub: "dowolne pole",
+    soon: true,
+    info: "Wkrótce: w następnej turze przeskakujesz na dowolne pole. Na razie bez efektu.",
+  },
 };
 const UTILITY_ICONS: Record<string, Icon> = { Ksero: Printer, Stołówka: ForkKnife };
 
@@ -298,11 +320,18 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
 
     if (tile.kind in CORNERS) {
       const corner = CORNERS[tile.kind];
+      // Pionki stoją obok ikony, więc przy tłoku ikona maleje.
+      const pawns = view.players.filter((p) => shown[p] === i && !view.bankrupt.includes(p)).length;
       return (
         <>
-          <corner.icon size={22} weight="fill" style={{ color: corner.color }} aria-hidden />
-          <span className="px-1 text-center text-[11px] leading-tight font-semibold text-fg">{tile.name}</span>
-          {tokens(i, 26)}
+          <span className="flex items-center gap-1">
+            <corner.icon size={pawns >= 3 ? 22 : pawns ? 28 : 36} weight="fill" style={{ color: corner.color }} aria-hidden />
+            {pawns > 0 && tokens(i, 22)}
+          </span>
+          <span className="px-1 text-center text-[11px] leading-none font-semibold text-fg">{tile.name}</span>
+          <span className={`mt-0.5 px-1 text-center text-[9px] leading-none whitespace-nowrap ${corner.soon ? "text-fg-muted italic" : "text-fg-muted"}`}>
+            {corner.sub}
+          </span>
         </>
       );
     }
@@ -456,7 +485,7 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
               const sellable = selling && owner === me;
               const background =
                 tile.kind in CORNERS
-                ? mix(CORNERS[tile.kind].color, 22)
+                ? "color-mix(in srgb, var(--color-fg) 17%, var(--color-bg))"
                 : tile.kind === "karty"
                   ? mix(CARDS_COLOR, 14)
                   : owner
