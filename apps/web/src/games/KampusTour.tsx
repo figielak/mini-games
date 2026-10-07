@@ -122,7 +122,7 @@ const CORNERS: Record<string, { icon: Icon; color: string; sub: string; info: st
   kolokwium: {
     icon: Exam,
     color: "#ff6369",
-    sub: "czekaj 1 turę lub wyrzuć dublet",
+    sub: "dublet albo 1 tura",
     info: "Trafiasz tu przez trzeci dublet z rzędu albo kartę Spóźnienie. W swojej turze rzucasz: dublet = zdajesz i od razu idziesz dalej, bez dubletu czekasz jedną turę. Karta Zaliczenie wyprowadza bez rzutu. Samo stanięcie tutaj nic nie robi.",
   },
   juwenalia: {
@@ -138,6 +138,8 @@ const CORNERS: Record<string, { icon: Icon; color: string; sub: string; info: st
     info: "Tura się kończy, a w następnej zamiast rzutu możesz pojechać na dowolne pole (mijając Początek, dostajesz kieszonkowe). Zwykły rzut zużywa bilet.",
   },
 };
+/** Rodzaj pola specjalnego w okienku (pola bez paska grupy). */
+const SPECIAL_KINDS: Record<string, string> = { utility: "Pole usługowe", tax: "Opłata", karty: "Karta Dziekanatu" };
 const UTILITY_ICONS: Record<string, Icon> = { Ksero: Printer, Stołówka: ForkKnife };
 
 /** Kwota: liczba w mono, „zł” mniejsze i tuż przy niej. */
@@ -572,7 +574,12 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
         ) : (
           SpecialIcon && <SpecialIcon size={side ? 14 : 20} weight="fill" className="mt-1 shrink-0" style={{ color: SPECIAL_COLOR }} aria-hidden />
         )}
-        <span className="flex min-h-0 flex-1 items-center justify-center px-0.5 text-center text-[10px] leading-[1.1] font-medium text-fg">{label}</span>
+        {/* Długie nazwy (Kręgielnia, Przekąski) mniejsze, żeby nie dotykały krawędzi wąskiego pola. */}
+        <span
+          className={`flex min-h-0 flex-1 items-center justify-center px-1 text-center leading-[1.1] font-medium text-fg ${label.length > 8 ? "text-[9px]" : "text-[10px]"}`}
+        >
+          {label}
+        </span>
         <span className="mb-1.5 flex">{priceTag}</span>
         {/* Pionki stoją na środku pola, nad nazwą (pełna nazwa jest w okienku po stuknięciu); duże, żeby je było widać. */}
         {view.players.some((p) => shown[p] === i && !view.bankrupt.includes(p)) && (
@@ -604,13 +611,14 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
       if (view.juwenalia?.tile === i) rows.push(["Juwenalia", `czynsz ×${view.juwenalia.factor}`]);
       text = "Budujesz po staniu na swoim polu. Landmark tylko z kompletem grupy.";
     } else if (tile.kind === "utility") {
+      text = "Pole usługowe: można je kupić, ale nie można na nim budować. Czynsz zależy od rzutu, a z oboma (Ksero i Stołówka) jest wyższy.";
       rows.push(
         ["Cena", `${tile.price} zł`],
         ["Czynsz", `oczka × ${UTILITY_RATES[0]} zł`],
         ["Ksero i Stołówka", `oczka × ${UTILITY_RATES[1]} zł`],
       );
     } else if (tile.kind === "tax") {
-      text = `Płacisz ${tile.amount} zł opłaty do banku.`;
+      text = `Opłata: tego pola nie można kupić. Kto na nim stanie, płaci ${tile.amount} zł do banku.`;
     } else if (tile.kind === "karty") {
       text = `Ciągniesz kartę z talii Dziekanatu: stypendia, opłaty, wycieczki po Rzeszowie i Kolokwium. W talii: ${view.deckSize} kart.`;
     } else {
@@ -628,6 +636,7 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
           <div>
             <h2 className="font-semibold">{tile.name}</h2>
             {tile.kind === "property" && <p className="text-xs text-fg-muted">{groupChip(tile.group)}</p>}
+            {SPECIAL_KINDS[tile.kind] && <p className="text-xs text-fg-muted">{SPECIAL_KINDS[tile.kind]}</p>}
           </div>
           <button type="button" className="-m-1 p-1 text-fg-muted" aria-label="Zamknij" onClick={() => setSelected(null)}>
             <X size={18} />
