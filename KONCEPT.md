@@ -23,7 +23,7 @@ Mechanik można się inspirować, natomiast nazwy, grafiki i logo oryginału nie
 (np. Rynek, Zamek Lubomirskich, Bulwary nad Wisłokiem, Millenium Hall). Ostateczna lista pól do ustalenia.
 
 **Rdzeń (jak w oryginale):**
-- pozioma plansza 32 pól (prostokąt 12×6, rogi: Początek dnia, Kolokwium, Juwenalia, Bilet MPK), rzut dwiema kośćmi, dublet daje dodatkowy rzut,
+- pozioma plansza 32 pól (prostokąt 12×6, rogi: Początek, Kolokwium, Juwenalia, Bilet MPK), rzut dwiema kośćmi, dublet daje dodatkowy rzut,
 - kupowanie pól i płacenie czynszu,
 - grupy kolorów (np. kierunki studiów); posiadanie całej grupy zwiększa czynsz,
 - rozbudowa pól aż do landmarku,
@@ -33,7 +33,7 @@ Mechanik można się inspirować, natomiast nazwy, grafiki i logo oryginału nie
 **Własne dodatki (propozycje):**
 | Oryginał | Kampus Tour |
 |---|---|
-| Start | **Początek dnia**: premia za przejście |
+| Start | **Początek**: premia za przejście |
 | Więzienie | **Kolokwium**: tracisz turę albo zdajesz rzutem dubletu |
 | Mistrzostwa świata | **Juwenalia**: wybrane pole ma podwójny czynsz |
 | Podróż | **Bilet MPK**: przeskok na dowolne pole w następnej turze |

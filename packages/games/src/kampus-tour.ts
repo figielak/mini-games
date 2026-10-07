@@ -4,7 +4,7 @@ import type { GameDefinition, PlayerId, Rng } from "./core.ts";
 export const SIZE = 32;
 export const ROUNDS = 20;
 export const START_CASH = 200;
-/** Kieszonkowe za przejście przez Początek dnia. */
+/** Kieszonkowe za przejście przez Początek. */
 export const ALLOWANCE = 20;
 const TAX = 15;
 
@@ -35,7 +35,7 @@ export type Tile =
 export type TileKind = Tile["kind"];
 
 const SPECIAL: Record<number, Tile> = {
-  0: { kind: "start", name: "Początek dnia" },
+  0: { kind: "start", name: "Początek" },
   5: { kind: "karty", name: "Karty Dziekanatu" },
   7: { kind: "utility", name: "Ksero", price: UTILITY_PRICE },
   11: { kind: "kolokwium", name: "Kolokwium" },
@@ -68,7 +68,7 @@ export type Event = {
 export interface State {
   players: PlayerId[];
   positions: Record<PlayerId, number>;
-  /** Pełne okrążenia (przejścia przez Początek dnia). */
+  /** Pełne okrążenia (przejścia przez Początek). */
   laps: Record<PlayerId, number>;
   cash: Record<PlayerId, number>;
   owners: Record<number, PlayerId>;

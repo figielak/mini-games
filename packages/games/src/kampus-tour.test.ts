@@ -3,7 +3,7 @@ import { createRng, type Rng } from "./core.ts";
 import { ALLOWANCE, BOARD, kampusTour as game, type Move, ROUNDS, SIZE, START_CASH, type State, type View } from "./kampus-tour.ts";
 
 // Testy napisane przed implementacją. Ustalają zasady Kampus Tour:
-// - 2-4 graczy, plansza 32 pól, wszyscy startują na polu 0 (Początek dnia) z 200 zł,
+// - 2-4 graczy, plansza 32 pól, wszyscy startują na polu 0 (Początek) z 200 zł,
 // - rzut dwiema kośćmi: Math.floor(rng() * 6) + 1 dwa razy, ruch o sumę,
 // - przejście przez pole 0 dolicza okrążenie i 20 zł kieszonkowego,
 // - wolne pole można kupić (jeśli stać) albo pominąć; na cudzym płaci się czynsz P/10, za całą grupę ×2,
