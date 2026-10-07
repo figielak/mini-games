@@ -158,6 +158,31 @@ const reducedMotion = typeof matchMedia === "function" && matchMedia("(prefers-r
  * Pozycje pionków do wyświetlenia: po rzucie pionek idzie pole po polu do pozycji z serwera.
  * Długie skoki (powrót po zerwanym połączeniu) i ograniczony ruch w systemie: bez animacji.
  */
+/**
+ * Scena gry o stałej wysokości STAGE_H (szerokość z proporcji ekranu, w granicach), skalowana do ekranu.
+ * Dzięki temu tekst, kostki i panele rosną razem z planszą (monitor) i nie ucinają się na wąskim telefonie.
+ * W pionie gra jest obrócona (.landscape), więc szerokość i wysokość ekranu się zamieniają.
+ */
+const STAGE_H = 390;
+const STAGE_MIN_W = 800;
+const STAGE_MAX_W = 1000;
+function useStage() {
+  const read = () => {
+    const portrait = innerHeight > innerWidth;
+    const vw = portrait ? innerHeight : innerWidth;
+    const vh = portrait ? innerWidth : innerHeight;
+    const width = Math.min(STAGE_MAX_W, Math.max(STAGE_MIN_W, (vw * STAGE_H) / vh));
+    return { width, scale: Math.min(vw / width, vh / STAGE_H) };
+  };
+  const [stage, setStage] = useState(read);
+  useEffect(() => {
+    const update = () => setStage(read());
+    addEventListener("resize", update);
+    return () => removeEventListener("resize", update);
+  }, []);
+  return stage;
+}
+
 function useWalk(target: Record<string, number>, paused: boolean): Record<string, number> {
   const [shown, setShown] = useState(target);
   useEffect(() => {
@@ -232,6 +257,7 @@ function cell(i: number): [number, number] {
 
 export function KampusTour({ view, me, players, dropped, canMove, result, onMove, timer, actions }: Props) {
   const [selected, setSelected] = useState<number | null>(null);
+  const stage = useStage();
   const rolling = useRolling(view.positions);
   // Pionek rusza dopiero, gdy kostki się zatrzymają.
   const shown = useWalk(view.positions, rolling);
@@ -492,8 +518,11 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
   }
 
   return (
-    <main className="landscape p-[max(0.5rem,env(safe-area-inset-top))_max(0.5rem,env(safe-area-inset-right))_max(0.5rem,env(safe-area-inset-bottom))_max(0.5rem,env(safe-area-inset-left))]">
-      <div className="relative flex h-full items-center justify-center px-21">
+    <main className="landscape grid place-items-center overflow-hidden">
+      <div
+        className="relative flex items-center justify-center p-2 px-21"
+        style={{ width: stage.width, height: STAGE_H, zoom: stage.scale }}
+      >
         {view.players.map((id, i) => {
           const Pawn = SEAT_ICONS[i];
           const active = !over && view.turn === id;
