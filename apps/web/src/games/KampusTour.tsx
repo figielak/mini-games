@@ -15,6 +15,7 @@ import {
   Exam,
   ForkKnife,
   GraduationCap,
+  Buildings,
   type Icon,
   Star,
   Printer,
@@ -31,6 +32,10 @@ import {
   type KampusMove,
   type KampusTourView,
   kampusBaseRent as baseRent,
+  kampusBuildCost as buildCost,
+  KAMPUS_LANDMARK as LANDMARK,
+  KAMPUS_LEVEL_RENT as LEVEL_RENT,
+  kampusMaxLevel as maxLevel,
   kampusSetOf as setOf,
   type GameResult,
   type LobbyPlayer,
@@ -125,7 +130,8 @@ const price = (tile: number) => {
   const t = BOARD[tile];
   return t.kind === "property" || t.kind === "utility" ? t.price : t.kind === "tax" ? t.amount : 0;
 };
-const saleValue = (tile: number) => Math.floor(price(tile) / 2);
+const levelName = (level: number) => (level === LANDMARK ? "landmark" : `poziom ${level}`);
+const levelRent = (tile: number, level: number) => Math.round(LEVEL_RENT[level - 1] * price(tile));
 /** „1 pole”, „3 pola”, „5 pól”. */
 function fields(n: number) {
   if (n === 1) return "1 pole";
@@ -273,6 +279,8 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
         return `${who} płaci ${e.amount} zł za akademik`;
       case "set":
         return `${who} ma komplet: ${setOf(e.tile!).map((t) => SHORT[t] ?? BOARD[t].name).join(" + ")}!`;
+      case "build":
+        return `${who} buduje ${BOARD[e.tile!].name}: ${levelName(e.level!)} za ${e.amount} zł`;
       case "skip":
         return `${who} pomija ${BOARD[e.tile!].name}`;
       case "sell":
@@ -284,7 +292,17 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
 
   const here = view.turn ? view.positions[view.turn] : 0;
   /** Pole, o którego kupnie właśnie się decyduje: świeci, reszta planszy przygasa. */
-  const deciding = settled && !over && view.phase === "buy" ? here : null;
+  const deciding = settled && !over && (view.phase === "buy" || view.phase === "build") ? here : null;
+  const level = (tile: number) => view.levels[tile] ?? 0;
+  /** Sprzedaż bankowi: połowa ceny pola z budynkami. */
+  const saleValue = (tile: number) => Math.floor((price(tile) + buildCost(tile, 0, level(tile))) / 2);
+  /** Poziomy, które gracz na turze może teraz zbudować na swoim polu. */
+  const buildChoices = () => {
+    const from = level(here);
+    const options: number[] = [];
+    for (let l = from + 1; l <= maxLevel(view.owners, here); l++) if (buildCost(here, from, l) <= view.cash[view.turn!]) options.push(l);
+    return options;
+  };
 
   /** Co daje kupno: czynsz i ile pól z grupy gracz już ma. */
   function buyInfo(i: number) {
@@ -361,6 +379,18 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
       <>
         <span className="grid h-[18%] w-full shrink-0 place-items-center text-bg" style={{ backgroundColor: header }} aria-hidden>
           {HeaderIcon && <HeaderIcon size={10} weight="fill" />}
+          {/* Zabudowa: kwadraciki za poziomy 1-3, budynek za landmark. */}
+          {level(i) === LANDMARK ? (
+            <Buildings size={11} weight="fill" aria-label="Landmark" />
+          ) : (
+            level(i) > 0 && (
+              <span className="flex gap-[2px]" aria-label={`Poziom ${level(i)}`}>
+                {Array.from({ length: level(i) }, (_, k) => (
+                  <span key={k} className="size-[5px] rounded-[1px] bg-bg" />
+                ))}
+              </span>
+            )
+          )}
         </span>
         <span className="flex min-h-0 flex-1 items-center justify-center px-0.5 text-center text-[10px] leading-[1.1] text-fg">{label}</span>
         {/* Pionki nie zasłaniają nazwy: na górze i dole planszy stoją nad ceną, na bokach (niskie pola) obok niej. */}
@@ -389,7 +419,16 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
 
     if (tile.kind === "property") {
       accent = GROUP_COLORS[tile.group];
-      rows.push(["Cena", `${tile.price} zł`], ["Czynsz", `${baseRent(tile.price)} zł`], ["Cała grupa", `${baseRent(tile.price) * 2} zł`]);
+      rows.push(
+        ["Cena", `${tile.price} zł`],
+        ["Czynsz", `${baseRent(tile.price)} zł (komplet ${baseRent(tile.price) * 2} zł)`],
+        ...LEVEL_RENT.map((_, k): [string, string] => [
+          k + 1 === LANDMARK ? "Landmark" : `Poziom ${k + 1}`,
+          `${levelRent(i, k + 1)} zł (budowa ${buildCost(i, k, k + 1)} zł)`,
+        ]),
+        ["Zabudowa", level(i) ? levelName(level(i)) : "brak"],
+      );
+      text = "Budujesz po staniu na swoim polu. Landmark tylko z kompletem grupy.";
     } else if (tile.kind === "utility") {
       rows.push(
         ["Cena", `${tile.price} zł`],
@@ -581,7 +620,8 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
                 )}
 
                 <div className="flex items-center gap-3">
-                  {view.dice && <Dice values={view.dice} rolling={rolling} />}
+                  {/* Przy budowie kostki ustępują miejsca przyciskom poziomów. */}
+                  {view.dice && !(settled && canMove && view.phase === "build") && <Dice values={view.dice} rolling={rolling} />}
                   {settled && canMove && view.phase === "roll" && (
                     <button type="button" className="btn btn-primary" onClick={() => onMove({ type: "roll" })}>
                       Rzuć kośćmi
@@ -598,9 +638,36 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
                     </>
                   )}
                   {settled && !over && !canMove && view.phase === "roll" && <p className="text-sm text-fg-muted">{nick(view.turn!)} rzuca kośćmi…</p>}
+                  {settled && canMove && view.phase === "build" && (
+                    <>
+                      {buildChoices().map((l) => (
+                        <button
+                          key={l}
+                          type="button"
+                          className="btn btn-primary min-h-11 flex-col gap-0 px-3 text-sm leading-tight"
+                          onClick={() => onMove({ type: "build", level: l })}
+                        >
+                          {l === LANDMARK ? "Landmark" : `Poziom ${l}`}
+                          <span className="text-[11px] font-normal">
+                            {buildCost(here, level(here), l)} zł · czynsz {levelRent(here, l)}
+                          </span>
+                        </button>
+                      ))}
+                      <button type="button" className="btn btn-ghost min-h-11 px-4" onClick={() => onMove({ type: "skip" })}>
+                        Pomiń
+                      </button>
+                    </>
+                  )}
                   {settled && !over && !canMove && view.phase === "buy" && <p className="text-sm text-fg-muted">{nick(view.turn!)} decyduje o zakupie</p>}
+                  {settled && !over && !canMove && view.phase === "build" && <p className="text-sm text-fg-muted">{nick(view.turn!)} decyduje o budowie</p>}
                 </div>
                 {settled && canMove && view.phase === "buy" && <p className="text-center text-sm text-fg-muted">{buyInfo(here)}</p>}
+                {settled && canMove && view.phase === "build" && (
+                  <p className="text-center text-sm text-fg-muted">
+                    Budujesz: {BOARD[here].name}
+                    {maxLevel(view.owners, here) < LANDMARK && " · landmark po zebraniu kompletu"}
+                  </p>
+                )}
 
                 {!over && view.phase === "sell" && view.debt && (
                   <p className="text-center text-sm">

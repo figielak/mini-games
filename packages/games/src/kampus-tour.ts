@@ -27,6 +27,10 @@ const UTILITY_PRICE = 30;
 /** Mnożnik sumy oczek przy 1 i 2 posiadanych. */
 export const UTILITY_RATES = [2, 5];
 
+/** Czynsz z budynkami: ułamek ceny P dla poziomów 1-4 (bez mnożnika za komplet). */
+export const LEVEL_RENT = [0.5, 1.5, 3, 5];
+export const LANDMARK = LEVEL_RENT.length;
+
 export type Tile =
   | { kind: "start" | "kolokwium" | "juwenalia" | "mpk" | "karty"; name: string }
   | { kind: "property"; name: string; group: number; price: number }
@@ -54,14 +58,16 @@ const PROPERTIES: Record<number, Tile> = Object.fromEntries(
 /** Pola zgodnie z ruchem wskazówek zegara od lewego górnego rogu planszy 12×6. */
 export const BOARD: Tile[] = Array.from({ length: SIZE }, (_, i) => SPECIAL[i] ?? PROPERTIES[i]);
 
-export type Move = { type: "roll" } | { type: "buy" } | { type: "skip" } | { type: "sell"; tile: number };
+export type Move = { type: "roll" } | { type: "buy" } | { type: "skip" } | { type: "sell"; tile: number } | { type: "build"; level: number };
 
 /** Co się wydarzyło w ostatnim ruchu; UI zamienia to na tekst. */
 export type Event = {
-  type: "allowance" | "buy" | "set" | "skip" | "rent" | "tax" | "sell" | "bankrupt";
+  type: "allowance" | "buy" | "set" | "skip" | "build" | "rent" | "tax" | "sell" | "bankrupt";
   player: PlayerId;
   amount?: number;
   tile?: number;
+  /** Poziom po budowie (4 = landmark). */
+  level?: number;
   to?: PlayerId | null;
 };
 
@@ -72,10 +78,12 @@ export interface State {
   laps: Record<PlayerId, number>;
   cash: Record<PlayerId, number>;
   owners: Record<number, PlayerId>;
+  /** Poziom zabudowy pola: 1-3 budynki, 4 landmark; brak wpisu = 0. */
+  levels: Record<number, number>;
   /** Kolejność odpadania. */
   bankrupt: PlayerId[];
   turn: number;
-  phase: "roll" | "buy" | "sell" | "over";
+  phase: "roll" | "buy" | "build" | "sell" | "over";
   dice: [number, number] | null;
   /** Dublety z rzędu w tej turze. */
   doubles: number;
@@ -93,6 +101,7 @@ const moveSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("buy") }),
   z.object({ type: z.literal("skip") }),
   z.object({ type: z.literal("sell"), tile: z.number().int().min(0).max(SIZE - 1) }),
+  z.object({ type: z.literal("build"), level: z.number().int().min(1).max(LANDMARK) }),
 ]);
 
 const LOG = 4;
@@ -107,14 +116,33 @@ export function setOf(tile: number): number[] {
   const t = BOARD[tile];
   return t.kind === "utility" ? UTILITIES : t.kind === "property" ? GROUPS[t.group] : [];
 }
-const saleValue = (tile: number) => Math.floor(priceOf(tile) / 2);
+const levelOf = (s: State, tile: number) => s.levels[tile] ?? 0;
+
+/** Koszt budowy z poziomu from na to: poziomy 1-3 po P/2, landmark P. */
+export function buildCost(tile: number, from: number, to: number): number {
+  const p = priceOf(tile);
+  let cost = 0;
+  for (let l = from + 1; l <= to; l++) cost += l === LANDMARK ? p : Math.round(p / 2);
+  return cost;
+}
+
+/** Najwyższy możliwy poziom: landmark tylko z kompletem grupy; Ksero, Stołówka i reszta bez budowy. */
+export function maxLevel(owners: Record<number, PlayerId>, tile: number): number {
+  if (BOARD[tile].kind !== "property") return 0;
+  return setOf(tile).every((i) => owners[i] === owners[tile]) ? LANDMARK : LANDMARK - 1;
+}
+
+/** Wartość pola z budynkami: cena + koszt budowy. */
+const valueOf = (s: State, tile: number) => priceOf(tile) + buildCost(tile, 0, levelOf(s, tile));
+/** Sprzedaż bankowi za połowę wartości pola z budynkami. */
+const saleValue = (s: State, tile: number) => Math.floor(valueOf(s, tile) / 2);
 const owned = (s: State, p: PlayerId) => Object.keys(s.owners).map(Number).filter((i) => s.owners[i] === p);
-const wealth = (s: State, p: PlayerId) => s.cash[p] + owned(s, p).reduce((sum, i) => sum + priceOf(i), 0);
+const wealth = (s: State, p: PlayerId) => s.cash[p] + owned(s, p).reduce((sum, i) => sum + valueOf(s, i), 0);
 
 /** Czynsz bez budynków: P/10 w pełnych złotych. */
 export const baseRent = (price: number) => Math.round(price / 10);
 
-/** Czynsz P/10, cała grupa podwaja go; Ksero i Stołówka: suma oczek × stawka zależna od liczby posiadanych. */
+/** Czynsz P/10, cała grupa podwaja go; z budynkami LEVEL_RENT × P; Ksero i Stołówka: suma oczek × stawka zależna od liczby posiadanych. */
 function rent(s: State, tile: number): number {
   const t = BOARD[tile];
   const owner = s.owners[tile];
@@ -123,6 +151,8 @@ function rent(s: State, tile: number): number {
     return (s.dice![0] + s.dice![1]) * UTILITY_RATES[count - 1];
   }
   if (t.kind !== "property") return 0;
+  const level = levelOf(s, tile);
+  if (level > 0) return Math.round(LEVEL_RENT[level - 1] * t.price);
   const base = baseRent(t.price);
   return GROUPS[t.group].every((i) => s.owners[i] === owner) ? base * 2 : base;
 }
@@ -143,10 +173,12 @@ function goBankrupt(s: State, player: PlayerId, to: PlayerId | null): State {
   const cash = { ...s.cash, [player]: 0 };
   if (to) cash[to] += s.cash[player];
   const owners = Object.fromEntries(Object.entries(s.owners).filter(([, p]) => p !== player));
+  const levels = Object.fromEntries(Object.entries(s.levels).filter(([tile]) => owners[Number(tile)]));
   const next: State = {
     ...s,
     cash,
     owners,
+    levels,
     debt: null,
     bankrupt: [...s.bankrupt, player],
     events: [...s.events, { type: "bankrupt" as const, player }].slice(-LOG),
@@ -161,9 +193,17 @@ function pay(s: State, player: PlayerId, amount: number, to: PlayerId | null): S
     if (to) cash[to] += amount;
     return finish({ ...s, cash, debt: null });
   }
-  const assets = owned(s, player).reduce((sum, i) => sum + saleValue(i), 0);
+  const assets = owned(s, player).reduce((sum, i) => sum + saleValue(s, i), 0);
   if (s.cash[player] + assets >= amount) return { ...s, phase: "sell", debt: { amount, to } };
   return goBankrupt(s, player, to);
+}
+
+/** Na swoim polu (także zaraz po kupnie) faza budowy, jeśli jest co budować i gracza stać na kolejny poziom. */
+function offerBuild(s: State, player: PlayerId): State {
+  const tile = s.positions[player];
+  const level = levelOf(s, tile);
+  const canBuild = level < maxLevel(s.owners, tile) && s.cash[player] >= buildCost(tile, level, level + 1);
+  return canBuild ? { ...s, phase: "build" } : finish(s);
 }
 
 function land(s: State, player: PlayerId): State {
@@ -174,7 +214,7 @@ function land(s: State, player: PlayerId): State {
 
   const owner = s.owners[pos];
   if (!owner) return s.cash[player] >= tile.price ? { ...s, phase: "buy" } : finish(s);
-  if (owner === player) return finish(s);
+  if (owner === player) return offerBuild(s, player);
   const amount = rent(s, pos);
   return pay(log(s, { type: "rent", player, amount, tile: pos, to: owner }), player, amount, owner);
 }
@@ -193,6 +233,7 @@ export const kampusTour: GameDefinition<State, Move> = {
     laps: Object.fromEntries(players.map((p) => [p, 0])),
     cash: Object.fromEntries(players.map((p) => [p, START_CASH])),
     owners: {},
+    levels: {},
     bankrupt: [],
     turn: 0,
     phase: "roll",
@@ -207,11 +248,34 @@ export const kampusTour: GameDefinition<State, Move> = {
     if (s.phase === "over" || current(s) !== player) return false;
     if (move.type === "roll") return s.phase === "roll";
     if (move.type === "sell") return s.phase === "sell" && s.owners[move.tile] === player;
+    if (move.type === "build") {
+      const tile = s.positions[player];
+      const level = levelOf(s, tile);
+      return (
+        s.phase === "build" &&
+        move.level > level &&
+        move.level <= maxLevel(s.owners, tile) &&
+        buildCost(tile, level, move.level) <= s.cash[player]
+      );
+    }
+    if (move.type === "skip") return s.phase === "buy" || s.phase === "build";
     return s.phase === "buy";
   },
 
   applyMove(s, player, move, rng: Rng) {
-    if (move.type === "skip") return finish(log(s, { type: "skip", player, tile: s.positions[player] }));
+    // Pominięcie zakupu jest zdarzeniem, pominięcie budowy nie.
+    if (move.type === "skip") return finish(s.phase === "buy" ? log(s, { type: "skip", player, tile: s.positions[player] }) : s);
+
+    if (move.type === "build") {
+      const tile = s.positions[player];
+      const amount = buildCost(tile, levelOf(s, tile), move.level);
+      return finish(
+        log(
+          { ...s, levels: { ...s.levels, [tile]: move.level }, cash: { ...s.cash, [player]: s.cash[player] - amount } },
+          { type: "build", player, tile, level: move.level, amount },
+        ),
+      );
+    }
 
     if (move.type === "buy") {
       const tile = s.positions[player];
@@ -220,16 +284,19 @@ export const kampusTour: GameDefinition<State, Move> = {
         { ...s, owners: { ...s.owners, [tile]: player }, cash: { ...s.cash, [player]: s.cash[player] - amount } },
         { type: "buy", player, amount, tile },
       );
-      return finish(setOf(tile).every((i) => bought.owners[i] === player) ? log(bought, { type: "set", player, tile }) : bought);
+      return offerBuild(setOf(tile).every((i) => bought.owners[i] === player) ? log(bought, { type: "set", player, tile }) : bought, player);
     }
 
     if (move.type === "sell") {
       const owners = { ...s.owners };
       delete owners[move.tile];
-      const amount = saleValue(move.tile);
+      const levels = { ...s.levels };
+      delete levels[move.tile];
+      const amount = saleValue(s, move.tile);
       const next: State = {
         ...s,
         owners,
+        levels,
         cash: { ...s.cash, [player]: s.cash[player] + amount },
         events: [...s.events, { type: "sell" as const, player, amount, tile: move.tile }].slice(-LOG),
       };
@@ -261,6 +328,7 @@ export const kampusTour: GameDefinition<State, Move> = {
     laps: s.laps,
     cash: s.cash,
     owners: s.owners,
+    levels: s.levels,
     bankrupt: s.bankrupt,
     turn: s.phase === "over" ? null : current(s),
     phase: s.phase,
@@ -280,7 +348,7 @@ export const kampusTour: GameDefinition<State, Move> = {
   waitingFor: (s) => (s.phase === "over" ? [] : [current(s)]),
 
   timeoutMove(s, player) {
-    if (s.phase === "buy") return { type: "skip" };
+    if (s.phase === "buy" || s.phase === "build") return { type: "skip" };
     if (s.phase === "sell") {
       const cheapest = owned(s, player).sort((a, b) => priceOf(a) - priceOf(b) || a - b)[0];
       return { type: "sell", tile: cheapest };

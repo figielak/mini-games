@@ -145,7 +145,7 @@ games/
 | 1 | Skorupa: pokoje, kody, lobby, nicki, reconnect | Platforma |
 | 2 | Pięć w rzędzie | Pierwsza gra end-to-end, rewanż |
 | 3 | Statki | Ukrywanie stanu (`playerView`) |
-| 4 | Kampus Tour: rdzeń (ruch, kupno, czynsz, budowanie, bankructwo) | Grywalna wersja główna |
+| 4 | Kampus Tour: rdzeń (ruch, kupno, czynsz, budowanie, bankructwo) | Grywalna wersja główna (gotowe) |
 | 5 | Kampus Tour: dodatki (Kolokwium, Juwenalia, karty, wykupienie, limit czasu) | Pełna wersja |
 | 6 | Poprawka | Gra karciana |
 | 7 | PWA, animacje, statystyki, szlify | Polerka |
