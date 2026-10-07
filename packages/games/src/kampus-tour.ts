@@ -108,17 +108,44 @@ export const CARDS: { title: string; text: string; effect: CardEffect }[] = [
 ];
 const PASS_CARD = CARDS.findIndex((c) => c.effect.kind === "pass");
 
-export type Move = { type: "roll" } | { type: "card" } | { type: "buy" } | { type: "skip" } | { type: "sell"; tile: number } | { type: "build"; level: number };
+export type Move =
+  | { type: "roll" }
+  | { type: "card" }
+  | { type: "buy" }
+  | { type: "skip" }
+  | { type: "buyout" }
+  | { type: "sell"; tile: number }
+  | { type: "build"; level: number }
+  | { type: "juwenalia"; tile: number }
+  | { type: "travel"; tile: number };
 
 /** Co się wydarzyło w ostatnim ruchu; UI zamienia to na tekst. */
 export type Event = {
-  type: "allowance" | "buy" | "set" | "skip" | "build" | "rent" | "tax" | "sell" | "bankrupt" | "card" | "kolokwium" | "pass" | "fail";
+  type:
+    | "allowance"
+    | "buy"
+    | "set"
+    | "skip"
+    | "build"
+    | "rent"
+    | "tax"
+    | "sell"
+    | "bankrupt"
+    | "card"
+    | "kolokwium"
+    | "pass"
+    | "fail"
+    | "juwenalia"
+    | "mpk"
+    | "travel"
+    | "buyout"
+    | "monopoly";
   player: PlayerId;
   amount?: number;
   tile?: number;
   /** Poziom po budowie (4 = landmark). */
   level?: number;
-  /** Numer Karty Dziekanatu (wylosowanej albo użytej). */
+  /** Numer Karty Dziekanatu (wylosowanej albo użytej). Przy Juwenaliach amount to mnożnik czynszu. */
   card?: number;
   to?: PlayerId | null;
 };
@@ -135,7 +162,7 @@ export interface State {
   /** Kolejność odpadania. */
   bankrupt: PlayerId[];
   turn: number;
-  phase: "roll" | "card" | "buy" | "build" | "sell" | "over";
+  phase: "roll" | "card" | "buy" | "buyout" | "build" | "sell" | "juwenalia" | "over";
   dice: [number, number] | null;
   /** Dublety z rzędu w tej turze. */
   doubles: number;
@@ -150,6 +177,14 @@ export interface State {
   kolokwium: PlayerId[];
   /** Zachowane karty „Zaliczenie w pierwszym terminie”. */
   passes: Record<PlayerId, number>;
+  /** Pole z Juwenaliami (jedno naraz) i jego mnożnik czynszu. */
+  juwenalia: { tile: number; factor: number } | null;
+  /** Ile razy były już Juwenalia: kolejne mają mnożnik o 1 większy. */
+  festivals: number;
+  /** Kto ma Bilet MPK na następną turę. */
+  mpk: PlayerId[];
+  /** Zwycięzca przez monopol (3 pełne grupy). */
+  monopoly: PlayerId | null;
   /** Ostatnie zdarzenia (najwyżej LOG), żeby gracz, który odwrócił wzrok, wiedział, co się stało. */
   events: Event[];
 }
@@ -162,6 +197,9 @@ const moveSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("card") }),
   z.object({ type: z.literal("buy") }),
   z.object({ type: z.literal("skip") }),
+  z.object({ type: z.literal("buyout") }),
+  z.object({ type: z.literal("juwenalia"), tile: z.number().int().min(0).max(SIZE - 1) }),
+  z.object({ type: z.literal("travel"), tile: z.number().int().min(0).max(SIZE - 1) }),
   z.object({ type: z.literal("sell"), tile: z.number().int().min(0).max(SIZE - 1) }),
   z.object({ type: z.literal("build"), level: z.number().int().min(1).max(LANDMARK) }),
 ]);
@@ -219,6 +257,13 @@ function rent(s: State, tile: number): number {
   return GROUPS[t.group].every((i) => s.owners[i] === owner) ? base * 2 : base;
 }
 
+/** Czynsz z mnożnikiem Juwenaliów. */
+const rentWithFestival = (s: State, tile: number) => rent(s, tile) * (s.juwenalia?.tile === tile ? s.juwenalia.factor : 1);
+
+/** Pole wraca do banku (sprzedaż, bankructwo): Juwenalia na nim przepadają. */
+const dropFestival = (s: State, owners: Record<number, PlayerId>): State =>
+  s.juwenalia && !owners[s.juwenalia.tile] ? { ...s, juwenalia: null } : s;
+
 /** Tura przechodzi na następnego gracza, który nie zbankrutował. */
 function endTurn(s: State): State {
   let turn = s.turn;
@@ -240,13 +285,14 @@ function goBankrupt(s: State, player: PlayerId, to: PlayerId[]): State {
   const owners = Object.fromEntries(Object.entries(s.owners).filter(([, p]) => p !== player));
   const levels = Object.fromEntries(Object.entries(s.levels).filter(([tile]) => owners[Number(tile)]));
   const next: State = {
-    ...s,
+    ...dropFestival(s, owners),
     cash,
     owners,
     levels,
     debt: null,
     bankrupt: [...s.bankrupt, player],
     kolokwium: s.kolokwium.filter((p) => p !== player),
+    mpk: s.mpk.filter((p) => p !== player),
     events: [...s.events, { type: "bankrupt" as const, player }].slice(-LOG),
   };
   return next.players.length - next.bankrupt.length <= 1 ? { ...next, phase: "over" } : endTurn(next);
@@ -270,6 +316,21 @@ function offerBuild(s: State, player: PlayerId): State {
   const level = levelOf(s, tile);
   const canBuild = level < maxLevel(s.owners, tile) && s.cash[player] >= buildCost(tile, level, level + 1);
   return canBuild ? { ...s, phase: "build" } : finish(s);
+}
+
+/** Po zapłaconym czynszu: wykup cudzego pola za 2× wartość, jeśli to nie landmark i gracza stać. */
+function offerBuyout(s: State, player: PlayerId): State {
+  const tile = s.positions[player];
+  return levelOf(s, tile) < LANDMARK && s.cash[player] >= buyoutPrice(s, tile) ? { ...s, phase: "buyout" } : finish(s);
+}
+const buyoutPrice = (s: State, tile: number) => 2 * valueOf(s, tile);
+
+/** Nowe pole gracza: zdarzenie kompletu, a przy 3 pełnych grupach koniec gry (monopol); inaczej budowa. */
+function gained(s: State, player: PlayerId, tile: number): State {
+  const next = setOf(tile).every((i) => s.owners[i] === player) ? log(s, { type: "set", player, tile }) : s;
+  if (GROUPS.filter((g) => g.every((i) => next.owners[i] === player)).length >= 3)
+    return log({ ...next, monopoly: player, phase: "over" }, { type: "monopoly", player });
+  return offerBuild(next, player);
 }
 
 /** Ruch do przodu o steps pól; przejście przez Początek daje kieszonkowe. */
@@ -350,13 +411,18 @@ function land(s: State, player: PlayerId, rentFactor = 1): State {
   const tile = BOARD[pos];
   if (tile.kind === "tax") return pay(log(s, { type: "tax", player, amount: tile.amount }), player, tile.amount, []);
   if (tile.kind === "karty") return drawCard(s, player);
+  if (tile.kind === "juwenalia") return owned(s, player).length ? { ...s, phase: "juwenalia" } : finish(s);
+  if (tile.kind === "mpk") return endTurn(log({ ...s, mpk: [...s.mpk, player] }, { type: "mpk", player }));
   if (tile.kind !== "property" && tile.kind !== "utility") return finish(s);
 
   const owner = s.owners[pos];
   if (!owner) return s.cash[player] >= tile.price ? { ...s, phase: "buy" } : finish(s);
   if (owner === player) return offerBuild(s, player);
-  const amount = rent(s, pos) * rentFactor;
-  return pay(log(s, { type: "rent", player, amount, tile: pos, to: owner }), player, amount, [owner]);
+  const amount = rentWithFestival(s, pos) * rentFactor;
+  const charged = log(s, { type: "rent", player, amount, tile: pos, to: owner });
+  // ponytail: po przymusowej sprzedaży pól nie ma oferty wykupu (i tak nie byłoby za co)
+  if (s.cash[player] < amount) return pay(charged, player, amount, [owner]);
+  return offerBuyout({ ...charged, cash: { ...s.cash, [player]: s.cash[player] - amount, [owner]: s.cash[owner] + amount } }, player);
 }
 
 export const kampusTour: GameDefinition<State, Move> = {
@@ -392,6 +458,10 @@ export const kampusTour: GameDefinition<State, Move> = {
       card: null,
       kolokwium: [],
       passes: {},
+      juwenalia: null,
+      festivals: 0,
+      mpk: [],
+      monopoly: null,
     };
   },
 
@@ -399,6 +469,9 @@ export const kampusTour: GameDefinition<State, Move> = {
     if (s.phase === "over" || current(s) !== player) return false;
     if (move.type === "roll") return s.phase === "roll";
     if (move.type === "card") return s.phase === "card";
+    if (move.type === "buyout") return s.phase === "buyout";
+    if (move.type === "juwenalia") return s.phase === "juwenalia" && s.owners[move.tile] === player;
+    if (move.type === "travel") return s.phase === "roll" && s.mpk.includes(player) && move.tile !== s.positions[player];
     if (move.type === "sell") return s.phase === "sell" && s.owners[move.tile] === player;
     if (move.type === "build") {
       const tile = s.positions[player];
@@ -410,7 +483,7 @@ export const kampusTour: GameDefinition<State, Move> = {
         buildCost(tile, level, move.level) <= s.cash[player]
       );
     }
-    if (move.type === "skip") return s.phase === "buy" || s.phase === "build";
+    if (move.type === "skip") return s.phase === "buy" || s.phase === "build" || s.phase === "buyout";
     return s.phase === "buy";
   },
 
@@ -419,6 +492,33 @@ export const kampusTour: GameDefinition<State, Move> = {
     if (move.type === "skip") return finish(s.phase === "buy" ? log(s, { type: "skip", player, tile: s.positions[player] }) : s);
 
     if (move.type === "card") return applyCard(s, player);
+
+    if (move.type === "juwenalia") {
+      const factor = s.festivals + 2;
+      return finish(
+        log({ ...s, festivals: s.festivals + 1, juwenalia: { tile: move.tile, factor } }, { type: "juwenalia", player, tile: move.tile, amount: factor }),
+      );
+    }
+
+    if (move.type === "travel") {
+      const left = log({ ...s, mpk: s.mpk.filter((p) => p !== player), doubles: 0 }, { type: "travel", player, tile: move.tile });
+      return land(moveTo(left, player, move.tile), player);
+    }
+
+    if (move.type === "buyout") {
+      const tile = s.positions[player];
+      const owner = s.owners[tile];
+      const amount = buyoutPrice(s, tile);
+      const bought = log(
+        {
+          ...s,
+          owners: { ...s.owners, [tile]: player },
+          cash: { ...s.cash, [player]: s.cash[player] - amount, [owner]: s.cash[owner] + amount },
+        },
+        { type: "buyout", player, tile, amount, to: owner },
+      );
+      return gained(bought, player, tile);
+    }
 
     if (move.type === "build") {
       const tile = s.positions[player];
@@ -438,7 +538,7 @@ export const kampusTour: GameDefinition<State, Move> = {
         { ...s, owners: { ...s.owners, [tile]: player }, cash: { ...s.cash, [player]: s.cash[player] - amount } },
         { type: "buy", player, amount, tile },
       );
-      return offerBuild(setOf(tile).every((i) => bought.owners[i] === player) ? log(bought, { type: "set", player, tile }) : bought, player);
+      return gained(bought, player, tile);
     }
 
     if (move.type === "sell") {
@@ -448,7 +548,7 @@ export const kampusTour: GameDefinition<State, Move> = {
       delete levels[move.tile];
       const amount = saleValue(s, move.tile);
       const next: State = {
-        ...s,
+        ...dropFestival(s, owners),
         owners,
         levels,
         cash: { ...s.cash, [player]: s.cash[player] + amount },
@@ -460,7 +560,8 @@ export const kampusTour: GameDefinition<State, Move> = {
 
     const dice: [number, number] = [Math.floor(rng() * 6) + 1, Math.floor(rng() * 6) + 1];
     const double = dice[0] === dice[1];
-    let next: State = { ...s, dice, doubles: double ? s.doubles + 1 : 0 };
+    // Zwykły rzut zużywa niewykorzystany Bilet MPK.
+    let next: State = { ...s, dice, doubles: double ? s.doubles + 1 : 0, mpk: s.mpk.filter((p) => p !== player) };
 
     if (s.kolokwium.includes(player)) {
       next = { ...next, kolokwium: s.kolokwium.filter((p) => p !== player) };
@@ -501,11 +602,18 @@ export const kampusTour: GameDefinition<State, Move> = {
     card: s.card,
     kolokwium: s.kolokwium,
     passes: s.passes,
+    juwenalia: s.juwenalia,
+    festivals: s.festivals,
+    mpk: s.mpk,
+    monopoly: s.monopoly,
   }),
 
   isOver(s) {
     if (s.phase !== "over") return null;
-    const alive = s.players.filter((p) => !s.bankrupt.includes(p)).sort((a, b) => wealth(s, b) - wealth(s, a));
+    // Monopolista wygrywa niezależnie od majątku.
+    const alive = s.players
+      .filter((p) => !s.bankrupt.includes(p))
+      .sort((a, b) => Number(b === s.monopoly) - Number(a === s.monopoly) || wealth(s, b) - wealth(s, a));
     const ranking = [...alive, ...[...s.bankrupt].reverse()];
     return { winner: ranking[0], ranking };
   },
@@ -513,7 +621,11 @@ export const kampusTour: GameDefinition<State, Move> = {
   waitingFor: (s) => (s.phase === "over" ? [] : [current(s)]),
 
   timeoutMove(s, player) {
-    if (s.phase === "buy" || s.phase === "build") return { type: "skip" };
+    if (s.phase === "buy" || s.phase === "build" || s.phase === "buyout") return { type: "skip" };
+    if (s.phase === "juwenalia") {
+      const best = owned(s, player).sort((a, b) => priceOf(b) - priceOf(a) || a - b)[0];
+      return { type: "juwenalia", tile: best };
+    }
     if (s.phase === "card") return { type: "card" };
     if (s.phase === "sell") {
       const cheapest = owned(s, player).sort((a, b) => priceOf(a) - priceOf(b) || a - b)[0];

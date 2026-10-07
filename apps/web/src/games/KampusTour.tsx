@@ -98,9 +98,9 @@ const SHORT: Record<number, string> = {
 /** Rogi: większe pola z własnym kolorem i opisem działania. */
 /**
  * Rogi: neutralne tło (żeby nie myliły się z polami graczy i Dziekanatu), duża kolorowa ikona,
- * krótki podpis działania; soon = efekt jeszcze nie działa (podpis kursywą, wyjaśnienie w okienku).
+ * krótki podpis działania (przy Juwenaliach aktualny mnożnik).
  */
-const CORNERS: Record<string, { icon: Icon; color: string; sub: string; soon?: boolean; info: string }> = {
+const CORNERS: Record<string, { icon: Icon; color: string; sub: string; info: string }> = {
   start: { icon: Sun, color: "#ffb224", sub: `+${ALLOWANCE} zł`, info: `Za każde przejście dostajesz ${ALLOWANCE} zł kieszonkowego.` },
   kolokwium: {
     icon: Exam,
@@ -112,15 +112,13 @@ const CORNERS: Record<string, { icon: Icon; color: string; sub: string; soon?: b
     icon: Confetti,
     color: "#e879f9",
     sub: "×2 czynsz",
-    soon: true,
-    info: "Wkrótce: wybierasz swoje pole, które ma podwójny czynsz. Na razie bez efektu.",
+    info: "Wybierasz jedno ze swoich pól: czynsz na nim rośnie. Pierwsze Juwenalia ×2, kolejne ×3, ×4 itd. Juwenalia są tylko na jednym polu naraz, nowe przenoszą je z poprzedniego.",
   },
   mpk: {
     icon: Bus,
     color: "#3dd68c",
     sub: "dowolne pole",
-    soon: true,
-    info: "Wkrótce: w następnej turze przeskakujesz na dowolne pole. Na razie bez efektu.",
+    info: "Tura się kończy, a w następnej zamiast rzutu możesz pojechać na dowolne pole (mijając Początek, dostajesz kieszonkowe). Zwykły rzut zużywa bilet.",
   },
 };
 const UTILITY_ICONS: Record<string, Icon> = { Ksero: Printer, Stołówka: ForkKnife };
@@ -281,12 +279,16 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
   const over = result !== null;
   const ranking = result?.ranking ?? [];
   const selling = canMove && view.phase === "sell";
+  /** Wybór pola na Juwenalia albo cel jazdy MPK: przycisk w okienku pola. */
+  const festive = canMove && settled && view.phase === "juwenalia";
+  const traveling = canMove && settled && view.phase === "roll" && view.mpk.includes(me);
+  const nextFactor = view.festivals + 2;
 
   const status = over
     ? result.winner === me
-      ? "Wygrywasz!"
+      ? `Wygrywasz${view.monopoly ? " przez monopol" : ""}!`
       : result.winner
-        ? `Wygrywa ${nick(result.winner)}`
+        ? `Wygrywa ${nick(result.winner)}${view.monopoly ? " (monopol)" : ""}`
         : "Koniec gry"
     : canMove
       ? "Twoja tura"
@@ -323,15 +325,26 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
         return `${who} sprzedaje ${BOARD[e.tile!].name} za ${e.amount} zł`;
       case "bankrupt":
         return `${who} bankrutuje`;
+      case "juwenalia":
+        return `${who} ogłasza Juwenalia: ${BOARD[e.tile!].name}, czynsz ×${e.amount}`;
+      case "mpk":
+        return `${who} ma Bilet MPK na następną turę`;
+      case "travel":
+        return `${who} jedzie MPK: ${BOARD[e.tile!].name}`;
+      case "buyout":
+        return `${who} wykupuje ${BOARD[e.tile!].name} od ${nick(e.to!)} za ${e.amount} zł`;
+      case "monopoly":
+        return `${who} ma 3 pełne grupy: monopol!`;
     }
   };
 
   const here = view.turn ? view.positions[view.turn] : 0;
   /** Pole, o którego kupnie właśnie się decyduje: świeci, reszta planszy przygasa. */
-  const deciding = settled && !over && (view.phase === "buy" || view.phase === "build") ? here : null;
+  const deciding = settled && !over && (view.phase === "buy" || view.phase === "build" || view.phase === "buyout") ? here : null;
   const level = (tile: number) => view.levels[tile] ?? 0;
   /** Sprzedaż bankowi: połowa ceny pola z budynkami. */
-  const saleValue = (tile: number) => Math.floor((price(tile) + buildCost(tile, 0, level(tile))) / 2);
+  const value = (tile: number) => price(tile) + buildCost(tile, 0, level(tile));
+  const saleValue = (tile: number) => Math.floor(value(tile) / 2);
   /** Poziomy, które gracz na turze może teraz zbudować na swoim polu. */
   const buildChoices = () => {
     const from = level(here);
@@ -393,8 +406,8 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
             {pawns > 0 && tokens(i, 22)}
           </span>
           <span className="px-1 text-center text-[11px] leading-none font-semibold text-fg">{tile.name}</span>
-          <span className={`mt-0.5 px-1 text-center text-[10px] leading-none font-medium whitespace-nowrap ${corner.soon ? "text-fg/75 italic" : "text-fg/90"}`}>
-            {corner.sub}
+          <span className="mt-0.5 px-1 text-center text-[10px] leading-none font-medium whitespace-nowrap text-fg/90">
+            {tile.kind === "juwenalia" ? `×${nextFactor} czynsz` : corner.sub}
           </span>
         </>
       );
@@ -464,6 +477,7 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
         ]),
         ["Zabudowa", level(i) ? levelName(level(i)) : "brak"],
       );
+      if (view.juwenalia?.tile === i) rows.push(["Juwenalia", `czynsz ×${view.juwenalia.factor}`]);
       text = "Budujesz po staniu na swoim polu. Landmark tylko z kompletem grupy.";
     } else if (tile.kind === "utility") {
       rows.push(
@@ -521,6 +535,30 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
             Sprzedaj za {saleValue(i)} zł
           </button>
         )}
+        {festive && owner === me && (
+          <button
+            type="button"
+            className="btn btn-primary self-start"
+            onClick={() => {
+              onMove({ type: "juwenalia", tile: i });
+              setSelected(null);
+            }}
+          >
+            Juwenalia tutaj (×{nextFactor})
+          </button>
+        )}
+        {traveling && i !== view.positions[me] && (
+          <button
+            type="button"
+            className="btn btn-primary self-start"
+            onClick={() => {
+              onMove({ type: "travel", tile: i });
+              setSelected(null);
+            }}
+          >
+            Jedź tutaj MPK
+          </button>
+        )}
       </div>
     );
   }
@@ -553,6 +591,7 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
               {!out && <span>{fields(Object.values(view.owners).filter((o) => o === id).length)}</span>}
               {view.kolokwium.includes(id) && <span className="font-medium text-[#ff6369]">na Kolokwium</span>}
               {(view.passes[id] ?? 0) > 0 && <span className="text-fg">Zaliczenie ×{view.passes[id]}</span>}
+              {view.mpk.includes(id) && <span className="font-medium text-[#3dd68c]">Bilet MPK</span>}
               {ranking.includes(id) && <span className="font-mono">{ranking.indexOf(id) + 1}. miejsce</span>}
             </div>
           );
@@ -576,7 +615,7 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
             {BOARD.map((tile, i) => {
               const [x, y] = cell(i);
               const owner = view.owners[i];
-              const sellable = selling && owner === me;
+              const sellable = (selling || festive) && owner === me;
               const background =
                 tile.kind in CORNERS
                 ? "color-mix(in srgb, var(--color-fg) 17%, var(--color-bg))"
@@ -607,6 +646,15 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
                   onClick={() => setSelected(selected === i ? null : i)}
                 >
                   {tileFace(i)}
+                  {view.juwenalia?.tile === i && (
+                    <span
+                      className="absolute top-0 left-0 flex items-center rounded-br-sm bg-bg/80 px-0.5 font-mono text-[10px] leading-none font-semibold"
+                      style={{ color: CORNERS.juwenalia.color }}
+                      aria-label={`Juwenalia: czynsz ×${view.juwenalia.factor}`}
+                    >
+                      <Confetti size={11} weight="fill" aria-hidden />×{view.juwenalia.factor}
+                    </span>
+                  )}
                   {/* Właściciel: stała kropka w jego kolorze w rogu pola (i lekki odcień tła); przy komplecie gwiazdka. */}
                   {owner &&
                     (complete(i) ? (
@@ -705,10 +753,34 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
                       </button>
                     </>
                   )}
+                  {settled && canMove && view.phase === "buyout" && (
+                    <>
+                      <button type="button" className="btn btn-primary" onClick={() => onMove({ type: "buyout" })}>
+                        Wykup {SHORT[here] ?? BOARD[here].name} za {2 * value(here)} zł
+                      </button>
+                      <button type="button" className="btn btn-ghost" onClick={() => onMove({ type: "skip" })}>
+                        Pomiń
+                      </button>
+                    </>
+                  )}
                   {settled && !over && !canMove && view.phase === "buy" && <p className="text-sm text-fg-muted">{nick(view.turn!)} decyduje o zakupie</p>}
+                  {settled && !over && !canMove && view.phase === "buyout" && <p className="text-sm text-fg-muted">{nick(view.turn!)} decyduje o wykupie</p>}
+                  {settled && !over && view.phase === "juwenalia" && (
+                    <p className="text-center text-sm">
+                      {canMove
+                        ? `Juwenalia! Stuknij swoje pole: czynsz ×${nextFactor}`
+                        : `${nick(view.turn!)} wybiera pole na Juwenalia (×${nextFactor})`}
+                    </p>
+                  )}
                   {settled && !over && !canMove && view.phase === "build" && <p className="text-sm text-fg-muted">{nick(view.turn!)} decyduje o budowie</p>}
                 </div>
                 {settled && canMove && view.phase === "buy" && <p className="text-center text-sm text-fg-muted">{buyInfo(here)}</p>}
+                {settled && canMove && view.phase === "buyout" && (
+                  <p className="text-center text-sm text-fg-muted">
+                    2× wartość pola · pieniądze dostaje {nick(view.owners[here])}
+                  </p>
+                )}
+                {traveling && <p className="text-center text-sm text-fg-muted">Masz Bilet MPK: stuknij dowolne pole i jedź albo rzuć kośćmi</p>}
                 {settled && canMove && view.phase === "build" && (
                   <p className="text-center text-sm text-fg-muted">
                     Budujesz: {BOARD[here].name}

@@ -27,7 +27,7 @@ Mechanik można się inspirować, natomiast nazwy, grafiki i logo oryginału nie
 - kupowanie pól i płacenie czynszu,
 - grupy kolorów (np. kierunki studiów); posiadanie całej grupy zwiększa czynsz,
 - rozbudowa pól aż do landmarku,
-- **wykupienie pola** od innego gracza za wielokrotność ceny (landmarku nie da się wykupić),
+- **wykupienie pola** od innego gracza za 2× wartość (cena + budynki) po zapłaceniu czynszu (landmarku nie da się wykupić),
 - zwycięstwo przez bankructwo przeciwników albo przez monopol (np. 3 pełne grupy kolorów).
 
 **Własne dodatki (propozycje):**
@@ -35,7 +35,7 @@ Mechanik można się inspirować, natomiast nazwy, grafiki i logo oryginału nie
 |---|---|
 | Start | **Początek**: premia za przejście |
 | Więzienie | **Kolokwium**: tracisz turę albo zdajesz rzutem dubletu |
-| Mistrzostwa świata | **Juwenalia**: wybrane pole ma podwójny czynsz |
+| Mistrzostwa świata | **Juwenalia**: wybrane własne pole ma czynsz ×2, kolejne Juwenalia ×3, ×4… (jedno pole naraz) |
 | Podróż | **Bilet MPK**: przeskok na dowolne pole w następnej turze |
 | Karty szansy | **Karty Dziekanatu**: stypendium, warunek, poprawka itp. |
 
@@ -146,7 +146,7 @@ games/
 | 2 | Pięć w rzędzie | Pierwsza gra end-to-end, rewanż |
 | 3 | Statki | Ukrywanie stanu (`playerView`) |
 | 4 | Kampus Tour: rdzeń (ruch, kupno, czynsz, budowanie, bankructwo) | Grywalna wersja główna (gotowe) |
-| 5 | Kampus Tour: dodatki (Kolokwium, Juwenalia, karty, wykupienie, limit czasu) | Pełna wersja |
+| 5 | Kampus Tour: dodatki (Kolokwium, Juwenalia, karty, wykupienie, Bilet MPK, monopol) | Pełna wersja (gotowe) |
 | 6 | Poprawka | Gra karciana |
 | 7 | PWA, animacje, statystyki, szlify | Polerka |
 
