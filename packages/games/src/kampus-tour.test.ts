@@ -1,9 +1,10 @@
 import { describe, expect, test } from "vitest";
 import { createRng, type Rng } from "./core.ts";
-import { ALLOWANCE, BOARD, buildCost, CARDS, kampusTour as game, type Move, ROUNDS, SIZE, START_CASH, type State, type View } from "./kampus-tour.ts";
+import { ALLOWANCE, BOARD, buildCost, CARDS, kampusTour as game, type Move, ROUNDS, SIZE, SEAT_BONUS, START_CASH, type State, type View } from "./kampus-tour.ts";
 
 // Testy napisane przed implementacją. Ustalają zasady Kampus Tour:
-// - 2-4 graczy, plansza 32 pól, wszyscy startują na polu 0 (Początek) z 200 zł,
+// - 2-4 graczy, plansza 32 pól, wszyscy startują na polu 0 (Początek) z 200 zł, każde dalsze miejsce +20 zł
+//   (wyrównanie przewagi pierwszego ruchu),
 // - rzut dwiema kośćmi: Math.floor(rng() * 6) + 1 dwa razy, ruch o sumę,
 // - przejście przez pole 0 dolicza okrążenie i 20 zł kieszonkowego,
 // - wolne pole można kupić (jeśli stać) albo pominąć; na cudzym płaci się czynsz P/10, za całą grupę ×2,
@@ -15,7 +16,7 @@ import { ALLOWANCE, BOARD, buildCost, CARDS, kampusTour as game, type Move, ROUN
 //   bez dubletu tura przerwy; karta Zaliczenie wyprowadza automatycznie,
 // - Karty Dziekanatu: talia 18 kart, dobrana karta wraca na spód (Zaliczenie zostaje u gracza do użycia),
 // - budowa tylko na swoim polu po staniu na nim (także zaraz po kupnie), dowolnie wiele poziomów naraz;
-//   poziomy 1-3 kosztują P/2, landmark (4) P i wymaga kompletu; czynsz 0,5P / 1,5P / 3P / 5P,
+//   poziomy 1-3 kosztują P/2, landmark (4) P i wymaga kompletu; czynsz 0,4P / P / 2P / 4P,
 // - sprzedaż przy długu: pole z budynkami za połowę (cena + budynki),
 // - Juwenalia: kto stanie na rogu, wybiera swoje pole; czynsz na nim ×2, przy kolejnych Juwenaliach ×3, ×4…
 //   (jedno pole naraz, nowy wybór przenosi Juwenalia),
@@ -46,8 +47,10 @@ function play(s: State, player: string, move: Move, rng: Rng = dice()): State {
 
 const roll = (s: State, player: string, a: number, b: number) => play(s, player, { type: "roll" }, dice(a, b));
 
-const two = () => game.setup([A, B], createRng(1));
-const three = () => game.setup([A, B, C], createRng(1));
+/** Stan po setupie, ale z równą gotówką: testy zasad liczą od START_CASH bez premii za miejsce. */
+const even = (s: State): State => ({ ...s, cash: Object.fromEntries(s.players.map((p) => [p, START_CASH])) });
+const two = () => even(game.setup([A, B], createRng(1)));
+const three = () => even(game.setup([A, B, C], createRng(1)));
 
 /** Stan z nadpisaną gotówką, właścicielami i pozycjami. */
 function with2(
@@ -132,16 +135,17 @@ describe("plansza", () => {
 });
 
 describe("setup", () => {
-  test.each([2, 3, 4])("%i graczy: wszyscy na starcie z 200 zł, rzuca pierwszy", (n) => {
+  test.each([2, 3, 4])("%i graczy: wszyscy na starcie, 200 zł + 20 zł za każde dalsze miejsce, rzuca pierwszy", (n) => {
     const players = [A, B, C, "darek"].slice(0, n);
     const s = game.setup(players, createRng(1));
     const v = view(s);
-    for (const p of players) {
+    players.forEach((p, i) => {
       expect(v.positions[p]).toBe(0);
       expect(v.laps[p]).toBe(0);
-      expect(v.cash[p]).toBe(START_CASH);
-    }
+      expect(v.cash[p]).toBe(START_CASH + SEAT_BONUS * i);
+    });
     expect(START_CASH).toBe(200);
+    expect(SEAT_BONUS).toBe(20);
     expect(v.owners).toEqual({});
     expect(game.waitingFor(s)).toEqual([A]);
     expect(v.turn).toBe(A);
@@ -459,10 +463,10 @@ describe("budowanie", () => {
   });
 
   test.each([
-    [1, 15],
-    [2, 45],
-    [3, 90],
-    [4, 150],
+    [1, 12],
+    [2, 30],
+    [3, 60],
+    [4, 120],
   ])("czynsz na poziomie %i: %i zł (komplet go nie podwaja)", (level, amount) => {
     const s = roll(with2(two(), { owners: { 17: B, 18: B, 19: B }, levels: { 17: level }, positions: { [A]: 14 } }), A, 1, 2);
     expect(view(s).cash[A]).toBe(START_CASH - amount);
@@ -823,15 +827,15 @@ describe("wykupienie", () => {
   const onTheirs = (patch: Parameters<typeof with2>[1] = {}) => roll(with2(two(), { owners: { 4: B }, ...patch }), A, 1, 3);
 
   test("po czynszu można wykupić pole za 2× wartość, pieniądze dostaje właściciel", () => {
-    let s = onTheirs({ levels: { 4: 1 } }); // wartość 15 + 8, czynsz 8 zł
+    let s = onTheirs({ levels: { 4: 1 } }); // wartość 15 + 8, czynsz 6 zł
     expect(view(s).phase).toBe("buyout");
     expect(game.waitingFor(s)).toEqual([A]);
     expect(game.validateMove(s, B, { type: "buyout" })).toBe(false);
     s = play(s, A, { type: "buyout" });
     expect(view(s).owners[4]).toBe(A);
     expect(view(s).levels[4]).toBe(1);
-    expect(view(s).cash[A]).toBe(START_CASH - 8 - 46);
-    expect(view(s).cash[B]).toBe(START_CASH + 8 + 46);
+    expect(view(s).cash[A]).toBe(START_CASH - 6 - 46);
+    expect(view(s).cash[B]).toBe(START_CASH + 6 + 46);
     expect(view(s).events.at(-1)).toEqual({ type: "buyout", player: A, tile: 4, amount: 46, to: B });
     // Po wykupie można budować jak na własnym polu.
     expect(view(s).phase).toBe("build");
