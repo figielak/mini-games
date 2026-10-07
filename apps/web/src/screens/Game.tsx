@@ -179,16 +179,16 @@ function Countdown({ game, total }: { game: NonNullable<RoomView["game"]>; total
       <div className="flex items-center gap-2">
         <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-line" role="progressbar" aria-label="Czas tury" aria-valuenow={seconds}>
           <div
-            className={`h-full rounded-full transition-[width] duration-300 ease-linear ${seconds <= 10 ? "bg-accent" : "bg-fg-muted"}`}
+            className={`h-full rounded-full transition-[width] duration-300 ease-linear ${seconds <= 10 ? "bg-warning" : "bg-fg-muted"}`}
             style={{ width: `${Math.min(1, left) * 100}%` }}
           />
         </div>
-        <span className={`w-8 text-right font-mono text-xs ${seconds <= 10 ? "text-accent" : "text-fg-muted"}`}>{seconds}s</span>
+        <span className={`w-8 text-right font-mono text-xs ${seconds <= 10 ? "text-warning" : "text-fg-muted"}`}>{seconds}s</span>
       </div>
     );
   }
   return (
-    <span className={`flex items-center gap-1 font-mono text-sm ${seconds <= 10 ? "text-accent" : "text-fg-muted"}`}>
+    <span className={`flex items-center gap-1 font-mono text-sm ${seconds <= 10 ? "text-warning" : "text-fg-muted"}`}>
       <Timer size={16} aria-hidden />
       {seconds}s
     </span>

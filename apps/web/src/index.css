@@ -28,6 +28,8 @@
   --color-accent-soft: rgb(255 36 69 / 0.12);
   /* Biały na akcencie ma tylko 3.8:1, grafit 5.1:1. */
   --color-accent-fg: #0e0e10;
+  /* Ostrzeżenie (koniec czasu tury): bursztyn, żeby nie mylić z akcentem przycisków. */
+  --color-warning: #ffb224;
 
   --font-sans: "Satoshi", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Geist Mono Variable", ui-monospace, monospace;

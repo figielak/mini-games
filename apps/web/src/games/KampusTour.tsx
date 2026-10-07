@@ -2,10 +2,12 @@ import {
   Bed,
   Bicycle,
   BookOpen,
+  Books,
   Bus,
   Cards,
   Coffee,
   Confetti,
+  Crown,
   DiceFive,
   DiceFour,
   DiceOne,
@@ -13,6 +15,8 @@ import {
   DiceThree,
   DiceTwo,
   Exam,
+  FilmSlate,
+  Flask,
   Warning,
   ForkKnife,
   GraduationCap,
@@ -20,7 +24,11 @@ import {
   type Icon,
   Star,
   Printer,
+  ShoppingBag,
+  SoccerBall,
   Sun,
+  SunHorizon,
+  Tree,
   WifiSlash,
   X,
 } from "@phosphor-icons/react";
@@ -64,11 +72,18 @@ const SEAT_ICONS = [GraduationCap, BookOpen, Coffee, Bicycle];
 /** Rogi ekranu w kolejności miejsc, zgodnie z ruchem wskazówek zegara. */
 const SEAT_CORNERS = ["top-0 left-0", "top-0 right-0", "bottom-0 right-0", "bottom-0 left-0"];
 
-/** Nagłówki grup, celowo inne niż kolory graczy (tło pola w kolorze gracza oznacza właściciela). */
-const GROUP_COLORS = ["#a0785a", "#7cc4e6", "#d873b0", "#f0913c", "#e5484d", "#e8d44d", "#4caf7d", "#5b6fd6"];
+/**
+ * Paski grup: nasycone, sąsiednie grupy w wyraźnie różnych barwach, bez czerwieni (akcent, przycisk Kup).
+ * Mogą się powtarzać z kolorami graczy, bo właściciela pokazuje dolny pasek pola, nie górny.
+ * Ikona grupy odróżnia je bez rozpoznawania barw.
+ */
+const GROUP_COLORS = ["#ff8a3d", "#38bdf8", "#d946ef", "#a3e635", "#6366f1", "#facc15", "#14b8a6", "#d4d4d8"];
 const GROUP_NAMES = ["Rano", "Kampus", "Zajęcia", "Po zajęciach", "Na mieście", "Wieczór", "Spacer", "Noc w centrum"];
-const UTILITY_COLOR = "#8b8b92";
-const CARDS_COLOR = "#ff2445";
+const GROUP_ICONS: Icon[] = [SunHorizon, Books, Flask, SoccerBall, ShoppingBag, FilmSlate, Tree, Crown];
+/** Pola specjalne (Dziekanat, Ksero, Stołówka, Akademik): neutralne, w ukośne paski zamiast koloru. */
+const SPECIAL_COLOR = "var(--color-fg)";
+const SPECIAL_BACKGROUND =
+  "repeating-linear-gradient(135deg, color-mix(in srgb, var(--color-fg) 12%, var(--color-bg)) 0 6px, color-mix(in srgb, var(--color-fg) 7%, var(--color-bg)) 6px 12px)";
 
 /** Krótkie podpisy na planszy; pełna nazwa jest w okienku po stuknięciu. */
 const SHORT: Record<number, string> = {
@@ -107,7 +122,7 @@ const CORNERS: Record<string, { icon: Icon; color: string; sub: string; info: st
   kolokwium: {
     icon: Exam,
     color: "#ff6369",
-    sub: "tura lub dublet",
+    sub: "czekaj 1 turę lub wyrzuć dublet",
     info: "Trafiasz tu przez trzeci dublet z rzędu albo kartę Spóźnienie. W swojej turze rzucasz: dublet = zdajesz i od razu idziesz dalej, bez dubletu czekasz jedną turę. Karta Zaliczenie wyprowadza bez rzutu. Samo stanięcie tutaj nic nie robi.",
   },
   juwenalia: {
@@ -124,6 +139,38 @@ const CORNERS: Record<string, { icon: Icon; color: string; sub: string; info: st
   },
 };
 const UTILITY_ICONS: Record<string, Icon> = { Ksero: Printer, Stołówka: ForkKnife };
+
+/** Kwota: liczba w mono, „zł” mniejsze i tuż przy niej. */
+const zl = (n: number | string) => (
+  <span className="font-mono whitespace-nowrap">
+    {n}
+    <span className="ml-px text-[0.75em]">zł</span>
+  </span>
+);
+
+/** Grupa: kwadracik w jej kolorze z ikoną i nazwa. */
+const groupChip = (group: number) => {
+  const GroupIcon = GROUP_ICONS[group];
+  return (
+    <span className="inline-flex items-center gap-1 align-middle">
+      <span className="grid size-4 place-items-center rounded-[3px] text-bg" style={{ backgroundColor: GROUP_COLORS[group] }}>
+        <GroupIcon size={11} weight="fill" aria-hidden />
+      </span>
+      {GROUP_NAMES[group]}
+    </span>
+  );
+};
+
+/** Status gracza w panelu: zaokrąglony znaczek z ikoną. */
+const badge = (BadgeIcon: Icon, text: string, color: string) => (
+  <span
+    className="flex items-center gap-1 rounded-full px-1.5 py-px text-[10px] leading-tight font-medium whitespace-nowrap text-fg"
+    style={{ backgroundColor: `color-mix(in srgb, ${color} 22%, var(--color-surface))`, boxShadow: `inset 0 0 0 1px ${color}` }}
+  >
+    <BadgeIcon size={11} weight="fill" style={{ color }} aria-hidden />
+    {text}
+  </span>
+);
 
 const mix = (color: string, percent: number) => `color-mix(in srgb, ${color} ${percent}%, var(--color-bg))`;
 const price = (tile: number) => {
@@ -310,7 +357,7 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
   const cash = settledCash.current;
   const floats = useFloats(view.players, cash);
   const warning = useMonopolyWarning(view.players, settledOwners.current, view.monopoly);
-  const recent = settledEvents.current.slice(-2);
+  const recent = settledEvents.current.slice(-3);
   // Świeżo zebrany komplet: jego pola chwilę pulsują w kolorze gracza.
   const lastEvent = settledEvents.current.at(-1);
   const fresh = lastEvent?.type === "set" ? setOf(lastEvent.tile!) : [];
@@ -329,6 +376,9 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
   const festive = canMove && settled && view.phase === "juwenalia";
   const traveling = canMove && settled && view.phase === "roll" && view.mpk.includes(me);
   const nextFactor = view.festivals + 2;
+  /** Czy pole można teraz wybrać; null, gdy nic się nie wybiera (wtedy nic nie przygasa). */
+  const pickable = (i: number): boolean | null =>
+    selling || festive ? view.owners[i] === me : traveling ? i !== view.positions[me] : null;
 
   const status = over
     ? result.winner === me
@@ -338,7 +388,7 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
         : "Koniec gry"
     : canMove
       ? "Twoja tura"
-      : `Ruch: ${nick(view.turn!)}`;
+      : `Tura: ${nick(view.turn!)}`;
 
   const describe = (e: KampusEvent) => {
     const who = nick(e.player);
@@ -385,7 +435,7 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
   };
 
   const here = view.turn ? view.positions[view.turn] : 0;
-  /** Pole, o którego kupnie właśnie się decyduje: świeci, reszta planszy przygasa. */
+  /** Pole, o którego kupnie właśnie się decyduje: unosi się i świeci kolorem gracza (reszta planszy zostaje czytelna). */
   const deciding = settled && !over && (view.phase === "buy" || view.phase === "build" || view.phase === "buyout") ? here : null;
   const level = (tile: number) => view.levels[tile] ?? 0;
   /** Sprzedaż bankowi: połowa ceny pola z budynkami. */
@@ -408,23 +458,28 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
     const owns = (match: (j: number) => boolean) => BOARD.filter((_, j) => match(j) && view.owners[j] === view.turn).length;
     if (t.kind === "utility") {
       const utilities = BOARD.map((b, j) => (b.kind === "utility" ? j : -1)).filter((j) => j >= 0);
-      return `Czynsz: oczka × ${UTILITY_RATES[0]} zł (z oboma × ${UTILITY_RATES[1]}) · masz ${owns((j) => utilities.includes(j))}/${utilities.length}`;
+      return `Czynsz: oczka × ${UTILITY_RATES[0]} zł · z obiema: oczka × ${UTILITY_RATES[1]} zł · masz ${owns((j) => utilities.includes(j))}/${utilities.length}`;
     }
     if (t.kind !== "property") return null;
     const group = BOARD.map((b, j) => (b.kind === "property" && b.group === t.group ? j : -1)).filter((j) => j >= 0);
-    return `Czynsz: ${baseRent(t.price)} zł (cała grupa ${baseRent(t.price) * 2} zł) · ${GROUP_NAMES[t.group]}: masz ${owns((j) => group.includes(j))}/${group.length}`;
+    return (
+      <>
+        {groupChip(t.group)} · Czynsz: {baseRent(t.price)} zł · za całą grupę: {baseRent(t.price) * 2} zł · masz {owns((j) => group.includes(j))}/
+        {group.length} pól z grupy
+      </>
+    );
   }
 
-  /** Żeton gracza: ikona w ciemnym kółku z jasną obwódką, widoczny na każdym kolorze pola. */
+  /** Żeton gracza: kółko w jego kolorze z ciemną ikoną i białą obwódką, widoczne na każdym polu. */
   const token = (p: string, size: number, first: boolean) => {
     const Pawn = SEAT_ICONS[seat(p)];
     return (
       <span
         key={p}
-        className="grid shrink-0 place-items-center rounded-full border-2 border-white bg-bg shadow-[0_1px_3px_rgb(0_0_0/0.7)]"
-        style={{ width: size, height: size, marginLeft: first ? 0 : -size * 0.45 }}
+        className="grid shrink-0 place-items-center rounded-full border-2 border-white text-bg shadow-[0_2px_4px_rgb(0_0_0/0.8)]"
+        style={{ width: size, height: size, marginLeft: first ? 0 : -size * 0.45, backgroundColor: color(p) }}
       >
-        <Pawn size={size * 0.62} weight="fill" style={{ color: color(p) }} aria-label={nick(p)} />
+        <Pawn size={size * 0.6} weight="fill" aria-label={nick(p)} />
       </span>
     );
   };
@@ -452,56 +507,55 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
         <>
           <span className="flex items-center gap-1">
             <corner.icon size={pawns >= 3 ? 22 : pawns ? 28 : 36} weight="fill" style={{ color: corner.color }} aria-hidden />
-            {pawns > 0 && tokens(i, 22)}
+            {pawns > 0 && tokens(i, 26)}
           </span>
           <span className="px-1 text-center text-[11px] leading-none font-semibold text-fg">{tile.name}</span>
-          <span className="mt-0.5 px-1 text-center text-[10px] leading-none font-medium whitespace-nowrap text-fg/90">
+          <span className="mt-0.5 px-0.5 text-center text-[9px] leading-[1.15] font-medium text-fg">
             {tile.kind === "juwenalia" ? `×${nextFactor} czynsz` : corner.sub}
           </span>
         </>
       );
     }
 
-    // Kolorowy nagłówek: grupa dla nieruchomości, ikona dla pól specjalnych.
-    const header =
-      tile.kind === "property" ? GROUP_COLORS[tile.group] : tile.kind === "karty" ? CARDS_COLOR : UTILITY_COLOR;
-    const HeaderIcon = tile.kind === "utility" ? UTILITY_ICONS[tile.name] : tile.kind === "karty" ? Cards : tile.kind === "tax" ? Bed : null;
     const label = tile.kind === "karty" ? "Dziekanat" : (SHORT[i] ?? tile.name);
     const side = cell(i)[0] === 0 || cell(i)[0] === 11;
     const priceTag = (
-      <span className="font-mono text-[12px] leading-none font-semibold text-fg">
-        {tile.kind === "karty" ? "\u00a0" : `${sellable ? `+${saleValue(i)}` : price(i)} zł`}
+      <span className="text-[12px] leading-none font-semibold text-fg">
+        {tile.kind === "karty" ? "\u00a0" : zl(sellable ? `+${saleValue(i)}` : price(i))}
       </span>
     );
+    // Pola specjalne: duża ikona zamiast paska grupy.
+    const SpecialIcon = tile.kind === "utility" ? UTILITY_ICONS[tile.name] : tile.kind === "karty" ? Cards : tile.kind === "tax" ? Bed : null;
+    const GroupIcon = tile.kind === "property" ? GROUP_ICONS[tile.group] : null;
     return (
       <>
-        <span className="grid h-[18%] w-full shrink-0 place-items-center text-bg" style={{ backgroundColor: header }} aria-hidden>
-          {HeaderIcon && <HeaderIcon size={10} weight="fill" />}
-          {/* Zabudowa: kwadraciki za poziomy 1-3, budynek za landmark. */}
-          {level(i) === LANDMARK ? (
-            <Buildings size={11} weight="fill" aria-label="Landmark" />
-          ) : (
-            level(i) > 0 && (
-              <span className="flex gap-[2px]" aria-label={`Poziom ${level(i)}`}>
-                {Array.from({ length: level(i) }, (_, k) => (
-                  <span key={k} className="size-[5px] rounded-[1px] bg-bg" />
-                ))}
-              </span>
-            )
-          )}
-        </span>
-        <span className="flex min-h-0 flex-1 items-center justify-center px-0.5 text-center text-[10px] leading-[1.1] text-fg">{label}</span>
-        {/* Pionki nie zasłaniają nazwy: na górze i dole planszy stoją nad ceną, na bokach (niskie pola) obok niej. */}
-        {side ? (
-          <span className="mb-0.5 flex items-center gap-1">
-            {priceTag}
-            {tokens(i, 22)}
+        {tile.kind === "property" ? (
+          <span
+            className="flex h-[26%] w-full shrink-0 items-center justify-between rounded-t-sm px-1 text-bg"
+            style={{ backgroundColor: GROUP_COLORS[tile.group] }}
+          >
+            {GroupIcon && <GroupIcon size={11} weight="fill" aria-label={GROUP_NAMES[tile.group]} />}
+            {/* Zabudowa: kwadraciki za poziomy 1-3, budynek za landmark. */}
+            {level(i) === LANDMARK ? (
+              <Buildings size={11} weight="fill" aria-label="Landmark" />
+            ) : (
+              level(i) > 0 && (
+                <span className="flex gap-[2px]" aria-label={`Poziom ${level(i)}`}>
+                  {Array.from({ length: level(i) }, (_, k) => (
+                    <span key={k} className="size-[5px] rounded-[1px] bg-bg" />
+                  ))}
+                </span>
+              )
+            )}
           </span>
         ) : (
-          <>
-            <span className="mb-0.5 flex">{tokens(i, 26)}</span>
-            <span className="mb-1 flex">{priceTag}</span>
-          </>
+          SpecialIcon && <SpecialIcon size={side ? 14 : 20} weight="fill" className="mt-1 shrink-0" style={{ color: SPECIAL_COLOR }} aria-hidden />
+        )}
+        <span className="flex min-h-0 flex-1 items-center justify-center px-0.5 text-center text-[10px] leading-[1.1] font-medium text-fg">{label}</span>
+        <span className="mb-1.5 flex">{priceTag}</span>
+        {/* Pionki stoją na środku pola, nad nazwą (pełna nazwa jest w okienku po stuknięciu); duże, żeby je było widać. */}
+        {view.players.some((p) => shown[p] === i && !view.bankrupt.includes(p)) && (
+          <span className="pointer-events-none absolute inset-0 z-10 grid place-items-center">{tokens(i, side ? 28 : 32)}</span>
         )}
       </>
     );
@@ -513,7 +567,7 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
     const owner = view.owners[i];
     const rows: [string, string][] = [];
     let text: string | null = null;
-    let accent = UTILITY_COLOR;
+    let accent = SPECIAL_COLOR;
 
     if (tile.kind === "property") {
       accent = GROUP_COLORS[tile.group];
@@ -537,7 +591,6 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
     } else if (tile.kind === "tax") {
       text = `Płacisz ${tile.amount} zł opłaty do banku.`;
     } else if (tile.kind === "karty") {
-      accent = CARDS_COLOR;
       text = `Ciągniesz kartę z talii Dziekanatu: stypendia, opłaty, wycieczki po Rzeszowie i Kolokwium. W talii: ${view.deckSize} kart.`;
     } else {
       accent = CORNERS[tile.kind].color;
@@ -553,7 +606,7 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
         <div className="flex items-start justify-between gap-2">
           <div>
             <h2 className="font-semibold">{tile.name}</h2>
-            {tile.kind === "property" && <p className="text-xs text-fg-muted">{GROUP_NAMES[tile.group]}</p>}
+            {tile.kind === "property" && <p className="text-xs text-fg-muted">{groupChip(tile.group)}</p>}
           </div>
           <button type="button" className="-m-1 p-1 text-fg-muted" aria-label="Zamknij" onClick={() => setSelected(null)}>
             <X size={18} />
@@ -625,27 +678,27 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
           return (
             <div
               key={id}
-              className={`absolute flex w-20 flex-col items-center gap-0.5 rounded-inset border-2 p-1.5 text-center text-xs ${SEAT_CORNERS[i]} ${
-                active ? "" : "border-transparent text-fg-muted"
+              className={`absolute flex w-20 flex-col items-center gap-0.5 rounded-inset border-2 bg-surface p-1.5 text-center text-xs ${SEAT_CORNERS[i]} ${
+                active ? "" : "border-line"
               } ${out ? "opacity-40" : ""}`}
-              // Gracz na turze: obwódka, tło i poświata w jego kolorze.
-              style={active ? { borderColor: color(id), backgroundColor: mix(color(id), 16), boxShadow: `0 0 14px ${mix(color(id), 55)}` } : undefined}
+              // Wszystkie panele mają ten sam kształt; gracz na turze tylko obwódkę i poświatę w swoim kolorze.
+              style={active ? { borderColor: color(id), boxShadow: `0 0 14px ${mix(color(id), 55)}` } : undefined}
             >
               <Pawn size={26} weight="fill" style={{ color: color(id) }} aria-hidden />
-              <span className={`w-full truncate ${out ? "line-through" : ""}`}>
+              <span className={`line-clamp-2 w-full leading-tight break-words ${out ? "line-through" : ""}`}>
                 {nick(id)}
                 {id === me && " (ty)"}
               </span>
-              <span className="font-mono text-sm text-fg">{out ? "bankrut" : `${cash[id]} zł`}</span>
-              {!out && (
-                <span title="Majątek: gotówka + pola z budynkami">
-                  majątek <span className="font-mono text-fg">{wealth(id)}</span>
+              <span className="text-sm">{out ? "bankrut" : zl(cash[id])}</span>
+              {!out && wealth(id) !== cash[id] && (
+                <span className="text-fg-muted" title="Majątek: gotówka + pola z budynkami">
+                  majątek <span className="text-fg">{zl(wealth(id))}</span>
                 </span>
               )}
-              {!out && <span>{fields(Object.values(view.owners).filter((o) => o === id).length)}</span>}
-              {view.kolokwium.includes(id) && <span className="font-medium text-[#ff6369]">na Kolokwium</span>}
-              {(view.passes[id] ?? 0) > 0 && <span className="text-fg">Zaliczenie ×{view.passes[id]}</span>}
-              {view.mpk.includes(id) && <span className="font-medium text-[#3dd68c]">Bilet MPK</span>}
+              {!out && <span className="text-fg-muted">{fields(Object.values(view.owners).filter((o) => o === id).length)}</span>}
+              {view.kolokwium.includes(id) && badge(Exam, "Kolokwium", CORNERS.kolokwium.color)}
+              {(view.passes[id] ?? 0) > 0 && badge(Cards, `Zaliczenie ×${view.passes[id]}`, SPECIAL_COLOR)}
+              {view.mpk.includes(id) && badge(Bus, "Bilet MPK", CORNERS.mpk.color)}
               {ranking.includes(id) && <span className="font-mono">{ranking.indexOf(id) + 1}. miejsce</span>}
               {floats
                 .filter((f) => f.player === id)
@@ -656,8 +709,7 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
                     style={{ color: f.amount > 0 ? "#3dd68c" : "#ff6369" }}
                     aria-hidden
                   >
-                    {f.amount > 0 ? "+" : "−"}
-                    {Math.abs(f.amount)} zł
+                    {zl(`${f.amount > 0 ? "+" : "−"}${Math.abs(f.amount)}`)}
                   </span>
                 ))}
             </div>
@@ -685,30 +737,31 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
               const sellable = (selling || festive) && owner === me;
               const background =
                 tile.kind in CORNERS
-                ? "color-mix(in srgb, var(--color-fg) 17%, var(--color-bg))"
-                : tile.kind === "karty"
-                  ? mix(CARDS_COLOR, 14)
-                  : owner
-                    ? mix(color(owner), complete(i) ? 45 : 25)
-                    : undefined;
+                  ? "color-mix(in srgb, var(--color-fg) 17%, var(--color-bg))"
+                  : tile.kind === "property"
+                    ? undefined
+                    : SPECIAL_BACKGROUND;
+              // Właściciel: dolny pasek i cienka obwódka w jego kolorze (przy komplecie grubszy pasek).
+              const ownerEdge = owner ? `inset 0 ${complete(i) ? -7 : -5}px 0 ${color(owner)}, inset 0 0 0 3px ${color(owner)}` : null;
+              const edges = [TILE_EDGE, ownerEdge, deciding === i && `0 0 16px ${color(view.turn!)}`].filter(Boolean).join(", ");
               return (
                 <button
                   key={i}
                   type="button"
                   aria-label={tile.name}
                   aria-pressed={selected === i}
-                  className={`relative flex flex-col items-center justify-center overflow-hidden rounded-sm bg-[color-mix(in_srgb,var(--color-fg)_12%,var(--color-bg))] transition-opacity ${
-                    sellable ? "z-10 outline-2 outline-accent" : deciding === i ? "z-10 outline-2" : selected === i ? "outline-2 outline-fg" : ""
-                  } ${deciding !== null && deciding !== i ? "opacity-35" : ""} ${fresh.includes(i) ? "animate-[set-glow_0.9s_ease-in-out_4]" : ""}`}
+                  className={`relative flex min-h-0 min-w-0 flex-col items-center justify-center rounded-sm bg-[color-mix(in_srgb,var(--color-fg)_12%,var(--color-bg))] transition-[opacity,translate] ${
+                    sellable ? "z-10 outline-2 outline-accent" : deciding === i ? "z-10 -translate-y-0.5 outline-2" : selected === i ? "outline-2 outline-fg" : ""
+                  } ${pickable(i) === false ? "opacity-40" : ""} ${fresh.includes(i) ? "animate-[set-glow_0.9s_ease-in-out_4]" : ""}`}
                   style={{
                     gridColumn: x + 1,
                     gridRow: y + 1,
                     backgroundColor: background,
                     ["--glow" as string]: owner ? color(owner) : undefined,
                     // Grubość pola (krawędź od spodu); poświata tylko dla pola, na którym dzieje się akcja.
-                    // Pole decyzji świeci kolorem gracza, który decyduje (czerwień kojarzy się z Dziekanatem i długiem).
+                    // Pole decyzji świeci kolorem gracza, który decyduje (czerwień to akcent i dług).
                     outlineColor: deciding === i ? color(view.turn!) : undefined,
-                    boxShadow: deciding === i ? `${TILE_EDGE}, 0 0 16px ${color(view.turn!)}` : TILE_EDGE,
+                    boxShadow: edges,
                   }}
                   onClick={() => setSelected(selected === i ? null : i)}
                 >
@@ -722,22 +775,18 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
                       <Confetti size={11} weight="fill" aria-hidden />×{view.juwenalia.factor}
                     </span>
                   )}
-                  {/* Właściciel: stała kropka w jego kolorze w rogu pola (i lekki odcień tła); przy komplecie gwiazdka. */}
+                  {/* Właściciel (pasek i obwódka są w boxShadow); przy komplecie gwiazdka w jego kolorze. */}
                   {owner &&
                     (complete(i) ? (
                       <Star
                         size={16}
                         weight="fill"
-                        className="absolute top-0 right-0 drop-shadow-[0_0_1.5px_var(--color-bg)]"
+                        className="absolute -top-1.5 -right-1.5 drop-shadow-[0_0_1.5px_var(--color-bg)]"
                         style={{ color: color(owner) }}
                         aria-label={`Komplet: ${nick(owner)}`}
                       />
                     ) : (
-                      <span
-                        className="absolute top-0.5 right-0.5 size-3 rounded-full border-2 border-bg"
-                        style={{ backgroundColor: color(owner) }}
-                        aria-label={`Właściciel: ${nick(owner)}`}
-                      />
+                      <span className="sr-only">Właściciel: {nick(owner)}</span>
                     ))}
                 </button>
               );
@@ -756,25 +805,16 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
                   </span>
                   {timer && <div className="flex-1">{timer}</div>}
                 </div>
-                <h1 className="text-lg font-semibold">{status}</h1>
+                {/* Kto jest na turze: duży nagłówek w jego kolorze. */}
+                <h1 className="flex items-center gap-2 text-xl font-semibold" style={over ? undefined : { color: color(view.turn!) }}>
+                  {!over && token(view.turn!, 28, true)}
+                  {status}
+                </h1>
                 {dropped && (
                   <p role="status" className="flex items-center gap-2 text-sm text-accent">
                     <WifiSlash size={16} aria-hidden />
                     Łączenie ponownie…
                   </p>
-                )}
-                {recent.length > 0 && (
-                  <ul className="text-center text-sm font-medium">
-                    {recent.map((e, i) => (
-                      <li
-                        key={i}
-                        className={e.type === "set" ? "font-semibold" : i === recent.length - 1 ? "text-fg" : "text-fg-muted"}
-                        style={e.type === "set" ? { color: color(e.player) } : undefined}
-                      >
-                        {describe(e)}
-                      </li>
-                    ))}
-                  </ul>
                 )}
 
                 <div className="flex items-center gap-3">
@@ -841,15 +881,15 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
                   )}
                   {settled && !over && !canMove && view.phase === "build" && <p className="text-sm text-fg-muted">{nick(view.turn!)} decyduje o budowie</p>}
                 </div>
-                {settled && canMove && view.phase === "buy" && <p className="text-center text-sm text-fg-muted">{buyInfo(here)}</p>}
+                {settled && canMove && view.phase === "buy" && <p className="text-center text-sm font-medium">{buyInfo(here)}</p>}
                 {settled && canMove && view.phase === "buyout" && (
-                  <p className="text-center text-sm text-fg-muted">
+                  <p className="text-center text-sm font-medium">
                     2× wartość pola · pieniądze dostaje {nick(view.owners[here])}
                   </p>
                 )}
-                {traveling && <p className="text-center text-sm text-fg-muted">Masz Bilet MPK: stuknij dowolne pole i jedź albo rzuć kośćmi</p>}
+                {traveling && <p className="text-center text-sm font-medium">Masz Bilet MPK: stuknij dowolne pole i jedź albo rzuć kośćmi</p>}
                 {settled && canMove && view.phase === "build" && (
-                  <p className="text-center text-sm text-fg-muted">
+                  <p className="text-center text-sm font-medium">
                     Budujesz: {BOARD[here].name}
                     {maxLevel(view.owners, here) < LANDMARK && " · landmark po zebraniu kompletu"}
                   </p>
@@ -861,6 +901,21 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
                       ? `Brakuje ${view.debt.amount - view.cash[me]} zł. Stuknij swoje pole i sprzedaj je za pół ceny.`
                       : `${nick(view.turn!)} sprzedaje pola, żeby spłacić ${view.debt.amount} zł`}
                   </p>
+                )}
+                {/* Log: najnowszy wpis na dole, starsze coraz bledsze. */}
+                {recent.length > 0 && (
+                  <ul className="flex flex-col items-center text-xs">
+                    {recent.map((e, i) => (
+                      <li
+                        key={i}
+                        className={`flex items-center gap-1.5 ${e.type === "set" ? "font-semibold" : ""}`}
+                        style={{ opacity: [0.4, 0.65, 1][i + 3 - recent.length], color: e.type === "set" ? color(e.player) : undefined }}
+                      >
+                        <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: color(e.player) }} aria-hidden />
+                        {describe(e)}
+                      </li>
+                    ))}
+                  </ul>
                 )}
                 {actions && <div className="flex w-full max-w-xs gap-2">{actions}</div>}
               </div>
@@ -878,7 +933,7 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
               aria-label="Karta Dziekanatu"
               className="flex w-72 animate-[card-in_0.35s_ease-out] flex-col overflow-hidden rounded-inset border border-line bg-surface shadow-[0_16px_48px_rgb(0_0_0/0.7)]"
             >
-              <div className="flex items-center gap-2 px-4 py-2.5 text-bg" style={{ backgroundColor: CARDS_COLOR }}>
+              <div className="flex items-center gap-2 px-4 py-2.5 text-bg" style={{ backgroundColor: SPECIAL_COLOR }}>
                 <Cards size={22} weight="fill" aria-hidden />
                 <span className="text-xs font-semibold tracking-wide uppercase">Karta Dziekanatu · {nick(view.turn!)}</span>
               </div>
@@ -921,8 +976,8 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
                   {GROUPS.map((g, k) => ({ k, mine: g.filter((i) => view.owners[i] === warning.player).length, total: g.length }))
                     .filter(({ mine, total }) => mine > 0 && mine < total)
                     .map(({ k, mine, total }) => (
-                      <li key={k} className="rounded-full border px-2 py-0.5" style={{ borderColor: GROUP_COLORS[k] }}>
-                        {GROUP_NAMES[k]} {mine}/{total}
+                      <li key={k} className="rounded-full border px-1.5 py-0.5" style={{ borderColor: GROUP_COLORS[k] }}>
+                        {groupChip(k)} {mine}/{total}
                       </li>
                     ))}
                 </ul>
