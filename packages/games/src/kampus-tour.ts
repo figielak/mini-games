@@ -501,7 +501,9 @@ export const kampusTour: GameDefinition<State, Move> = {
     }
 
     if (move.type === "travel") {
-      const left = log({ ...s, mpk: s.mpk.filter((p) => p !== player), doubles: 0 }, { type: "travel", player, tile: move.tile });
+      // Rzut tylko do czynszu za Ksero i Stołówkę (oczka × stawka); ruch nie zależy od oczek.
+      const dice: [number, number] = [Math.floor(rng() * 6) + 1, Math.floor(rng() * 6) + 1];
+      const left = log({ ...s, dice, mpk: s.mpk.filter((p) => p !== player), doubles: 0 }, { type: "travel", player, tile: move.tile });
       return land(moveTo(left, player, move.tile), player);
     }
 

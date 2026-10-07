@@ -787,12 +787,20 @@ describe("Bilet MPK", () => {
   test("następna tura: jazda na dowolne pole przez Początek z kieszonkowym i rozliczeniem pola", () => {
     let s = roll(ticket(), B, 5, 6);
     s = with2(s, { owners: { 3: B } });
-    s = play(s, A, { type: "travel", tile: 3 });
+    s = play(s, A, { type: "travel", tile: 3 }, dice(1, 2));
     expect(view(s).positions[A]).toBe(3);
     expect(view(s).mpk).toEqual([]);
     expect(view(s).events).toContainEqual({ type: "travel", player: A, tile: 3 });
     // +20 kieszonkowego, -2 czynszu za Bibliotekę.
     expect(view(s).cash[A]).toBe(START_CASH + ALLOWANCE - 2);
+  });
+
+  test("jazda na Ksero: czynsz z nowego rzutu, nie ze starych oczek", () => {
+    let s = roll(ticket(), B, 5, 6); // ostatnie oczka: 5 + 6 (rzut B)
+    s = with2(s, { owners: { 7: B } });
+    s = play(s, A, { type: "travel", tile: 7 }, dice(1, 2));
+    expect(view(s).dice).toEqual([1, 2]);
+    expect(view(s).cash[A]).toBe(START_CASH + ALLOWANCE - 6); // 3 oczka × 2 zł
   });
 
   test("zwykły rzut zamiast jazdy zużywa bilet", () => {
