@@ -4,6 +4,7 @@ import { type GameDefinition, type PlayerId, rankResults } from "./core.ts";
 /** Współrzędne 0-1 względem kwadratowego płótna, więc rysunki wszystkich są w jednej skali. */
 export type Point = [number, number];
 
+export const ATTEMPTS = 10;
 export const MIN_POINTS = 20;
 export const MAX_POINTS = 1000;
 /** Mniejsze koło łatwiej narysować płynnie, więc nie liczy się. */
@@ -15,7 +16,7 @@ const GAP_FREE = 0.03;
 /** Jak ostro kara rośnie z błędem promienia; do strojenia na rysunkach z telefonu. */
 const STRICTNESS = 5;
 
-/** Pusty rysunek = poddanie (0 pkt). */
+/** Pusty rysunek kończy pozostałe próby (zostaje najlepsza, bez żadnej 0 pkt). */
 export type Move = { type: "result"; points: Point[] };
 
 export interface Result {
@@ -29,7 +30,10 @@ export interface State {
   players: PlayerId[];
   /** Nic nie losuje, tylko odróżnia partie (rewanż montuje grę na kliencie od nowa). */
   nonce: number;
-  results: Record<PlayerId, Result>;
+  /** Oddane próby; niedokończone koło klient odrzuca sam, więc się nie liczy. */
+  attempts: Record<PlayerId, number>;
+  /** Najlepsza próba każdego gracza. */
+  best: Record<PlayerId, Result>;
 }
 
 export type View = State;
@@ -98,26 +102,31 @@ export const kolo: GameDefinition<State, Move> = {
   name: "Narysuj koło",
   minPlayers: 1,
   maxPlayers: 6,
-  turnSeconds: 60,
+  turnSeconds: 120,
   moveSchema: z.object({ type: z.literal("result"), points: z.array(z.tuple([z.number(), z.number()])).max(MAX_POINTS) }),
 
-  setup: (players, rng) => ({ players, nonce: Math.floor(rng() * 2 ** 32), results: {} }),
+  setup: (players, rng) => ({ players, nonce: Math.floor(rng() * 2 ** 32), attempts: {}, best: {} }),
 
   validateMove: (state, player, { points }) =>
     state.players.includes(player) &&
-    !(player in state.results) &&
+    (state.attempts[player] ?? 0) < ATTEMPTS &&
     (points.length === 0 || (points.length >= MIN_POINTS && points.length <= MAX_POINTS && points.every(([x, y]) => inCanvas(x) && inCanvas(y)))),
 
   applyMove: (state, player, { points }) => {
+    const prev = state.best[player];
+    if (points.length === 0) {
+      return { ...state, attempts: { ...state.attempts, [player]: ATTEMPTS }, best: { ...state.best, [player]: prev ?? { score: 0, points: [] } } };
+    }
     const { score, points: cut } = judge(points);
-    return { ...state, results: { ...state.results, [player]: { score, points: cut } } };
+    const best = prev && prev.score >= score ? prev : { score, points: cut };
+    return { ...state, attempts: { ...state.attempts, [player]: (state.attempts[player] ?? 0) + 1 }, best: { ...state.best, [player]: best } };
   },
 
   playerView: (state): View => state,
 
-  isOver: (state) => rankResults(state.players, state.results, (a, b) => b.score - a.score),
+  isOver: (state) => (kolo.waitingFor(state).length ? null : rankResults(state.players, state.best, (a, b) => b.score - a.score)),
 
-  waitingFor: (state) => state.players.filter((p) => !(p in state.results)),
+  waitingFor: (state) => state.players.filter((p) => (state.attempts[p] ?? 0) < ATTEMPTS),
 
   timeoutMove: () => ({ type: "result", points: [] }),
 };
