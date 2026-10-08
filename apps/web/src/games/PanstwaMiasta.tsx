@@ -16,44 +16,43 @@ interface Props {
 }
 
 const DRAFT_MS = 500;
-const PHASE_LABEL = { write: "Pisz", vote: "Głosowanie", summary: "Wyniki rundy", over: "Koniec" } as const;
 
 export function PanstwaMiasta({ view, me, players, waitingFor, ranking, timer, onMove }: Props) {
   const player = (id: string) => players.find((p) => p.id === id);
   const letter = view.letters[view.round];
   const playing = view.players.includes(me);
+  const finished = view.players.filter((id) => !waitingFor.includes(id));
 
   return (
     <div className="flex flex-col gap-3">
       {timer && (
-        <header className="flex flex-col gap-3">
-          <div className="flex items-baseline justify-between">
-            <h1 className="text-xl font-semibold">
+        <header className="flex items-center gap-4">
+          <span
+            className="flex size-24 shrink-0 items-center justify-center rounded-[20px] border border-line-hover bg-surface text-7xl font-semibold"
+            aria-label={`Litera ${letter}`}
+          >
+            {letter}
+          </span>
+          <div className="flex min-w-0 flex-1 flex-col gap-3">
+            <h1 className="text-2xl font-semibold">
               Runda {view.round + 1}/{view.letters.length}
             </h1>
-            <span className="text-sm text-fg-muted">{PHASE_LABEL[view.phase]}</span>
-          </div>
-          {timer}
-          <div className="flex items-center gap-4">
-            <span
-              className="flex size-20 shrink-0 items-center justify-center rounded-[20px] border border-line-hover bg-surface text-6xl font-semibold"
-              aria-label={`Litera ${letter}`}
-            >
-              {letter}
-            </span>
-            <ul className="flex flex-wrap gap-x-3 gap-y-1 text-sm">
-              {view.players.map((id) => (
-                <li key={id} className={`flex items-center gap-1.5 ${waitingFor.includes(id) ? "text-fg-muted" : ""}`}>
-                  <span className="size-2 rounded-full" style={{ backgroundColor: player(id)?.color }} aria-hidden />
-                  {player(id)?.nick ?? "Gracz"}
-                  {id === me && <span className="text-fg-muted">(ty)</span>}
-                  {!waitingFor.includes(id) && <Check size={14} weight="bold" className="text-success" aria-label="gotowe" />}
-                </li>
-              ))}
-              {!playing && <li className="text-fg-muted">Oglądasz</li>}
-            </ul>
+            {timer}
           </div>
         </header>
+      )}
+
+      {/* Jedna cienka linia: kto już skończył bieżący krok (pisanie, głos, „Dalej”). */}
+      {timer && (finished.length > 0 || !playing) && (
+        <p role="status" className="flex items-center gap-1.5 text-sm">
+          {finished.length > 0 && (
+            <>
+              <Check size={16} weight="bold" className="shrink-0 text-success" aria-hidden />
+              <span className="truncate">Gotowe: {finished.map((id) => (id === me ? "ty" : (player(id)?.nick ?? "Gracz"))).join(", ")}</span>
+            </>
+          )}
+          {!playing && <span className="ml-auto text-fg-muted">Oglądasz</span>}
+        </p>
       )}
 
       {view.phase === "write" &&
@@ -145,20 +144,20 @@ function Writing({ view, me, stopBy, onMove }: { view: PanstwaMiastaView; me: st
   const filled = answers.filter((a) => a.trim()).length;
   return (
     <form className="flex flex-col gap-3" onSubmit={submit}>
-      <div className="tile flex flex-col gap-4 p-4">
+      <div className="tile flex flex-col gap-5 p-4">
         {stopBy && <StopBanner nick={stopBy} />}
         {PM_CATEGORIES.map((category, i) => {
           const typed = answers[i].trim() !== "";
           const ok = typed && pmFits(letter, answers[i]);
           return (
-            <div key={category} className="flex flex-col gap-1.5">
-              <label htmlFor={`pm-${i}`} className="text-[13px] font-medium text-fg">
+            <div key={category} className="flex flex-col gap-2">
+              <label htmlFor={`pm-${i}`} className="text-[13px] leading-none font-medium text-fg">
                 {category}
               </label>
               <div className="relative">
                 <input
                   id={`pm-${i}`}
-                  className="field pr-10"
+                  className="field pr-10 placeholder:text-fg-subtle"
                   value={answers[i]}
                   placeholder={`${letter}…`}
                   maxLength={PM_ANSWER_MAX}

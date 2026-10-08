@@ -161,7 +161,7 @@ export function Game({ view, me, dropped, send }: Props) {
           players={view.players}
           waitingFor={game.waitingFor}
           ranking={game.result?.ranking}
-          timer={ownHeader && <Countdown game={game} total={def.turn?.(game.view).seconds} />}
+          timer={ownHeader && <Countdown game={game} total={def.turn?.(game.view).seconds} tense />}
           onMove={(move) => send("move", move)}
         />
       )}
@@ -210,7 +210,8 @@ function OverActions({ host, send }: { host: boolean; send: Send }) {
  * Sekundy do końca tury. Liczone od chwili odebrania wiadomości, nie od zegara serwera.
  * Termin zależy od obiektu wiadomości, nie od liczby: każda nowa tura przychodzi z tym samym msLeft (60000).
  */
-function Countdown({ game, total }: { game: NonNullable<RoomView["game"]>; total?: number }) {
+/** `tense`: pasek w kolorze akcentu (gra na czas, np. Państwa-miasta), a nie spokojny szary. */
+function Countdown({ game, total, tense }: { game: NonNullable<RoomView["game"]>; total?: number; tense?: boolean }) {
   const deadline = useMemo(() => (game.msLeft === null ? null : Date.now() + game.msLeft), [game]);
   const [now, setNow] = useState(Date.now);
 
@@ -228,7 +229,7 @@ function Countdown({ game, total }: { game: NonNullable<RoomView["game"]>; total
       <div className="flex items-center gap-2">
         <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-line" role="progressbar" aria-label="Czas tury" aria-valuenow={seconds}>
           <div
-            className={`h-full rounded-full transition-[width] duration-300 ease-linear ${seconds <= 10 ? "animate-pulse bg-warning" : "bg-fg-muted"}`}
+            className={`h-full rounded-full transition-[width] duration-300 ease-linear ${seconds <= 10 ? "animate-pulse bg-warning" : tense ? "bg-accent" : "bg-fg-muted"}`}
             style={{ width: `${Math.min(1, left) * 100}%` }}
           />
         </div>
