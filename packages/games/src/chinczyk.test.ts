@@ -262,6 +262,58 @@ describe("koniec gry i ranking", () => {
   });
 });
 
+describe("ostatnie zdarzenie (do animacji i komunikatów)", () => {
+  test("na starcie brak zdarzenia", () => {
+    expect(view(two()).last).toBeNull();
+  });
+
+  test("rzut z ruchem wykonanym samodzielnie: kto, ile, który pionek, skąd i dokąd", () => {
+    const s = roll(put(two(), { [A]: [5, -1, -1, -1] }, A), A, 3);
+    expect(view(s).last).toEqual({ roll: 1, player: A, dice: 3, move: { pawn: 0, from: 5, to: 8, captured: [] } });
+  });
+
+  test("przy wyborze pionka ruch dopisuje się po wyborze, numer rzutu bez zmian", () => {
+    let s = roll(put(two(), { [A]: [5, 15, -1, -1] }, A), A, 3);
+    expect(view(s).last).toEqual({ roll: 1, player: A, dice: 3 });
+    s = move(s, A, 1);
+    expect(view(s).last).toEqual({ roll: 1, player: A, dice: 3, move: { pawn: 1, from: 15, to: 18, captured: [] } });
+  });
+
+  test("wyjście z domku startowego zaczyna się od -1", () => {
+    const s = roll(two(), A, 6);
+    expect(view(s).last?.move).toEqual({ pawn: 0, from: -1, to: 0, captured: [] });
+  });
+
+  test("zbicie wskazuje zbitego gracza", () => {
+    const s = roll(put(two(), { [A]: [5, -1, -1, -1], [B]: [28, -1, -1, -1] }, A), A, 3);
+    expect(view(s).last?.move?.captured).toEqual([B]);
+  });
+
+  test("numer rzutu rośnie z każdym rzutem, także bez ruchu", () => {
+    let s = roll(two(), A, 2);
+    expect(view(s).last).toEqual({ roll: 1, player: A, dice: 2, note: "none" });
+    s = roll(s, A, 2);
+    expect(view(s).last?.roll).toBe(2);
+  });
+
+  test("trzecia szóstka z rzędu jest oznaczona", () => {
+    let s = put(two(), { [A]: [5, 15, -1, -1] }, A);
+    s = move(roll(s, A, 6), A, 0);
+    s = move(roll(s, A, 6), A, 0);
+    s = roll(s, A, 6);
+    expect(view(s).last).toEqual({ roll: 3, player: A, dice: 6, note: "sixes" });
+  });
+
+  test("widok pokazuje pozostałe próby", () => {
+    let s = two();
+    expect(view(s).tries).toBe(3);
+    s = roll(s, A, 2);
+    expect(view(s).tries).toBe(2);
+    s = roll(roll(s, A, 2), A, 2);
+    expect(view(s).tries).toBe(3); // tura B
+  });
+});
+
 describe("tura i limit czasu", () => {
   test("po limicie w fazie rzutu serwer rzuca", () => {
     const s = two();
