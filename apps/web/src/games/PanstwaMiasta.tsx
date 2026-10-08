@@ -1,4 +1,4 @@
-import { HandPalm } from "@phosphor-icons/react";
+import { HandPalm, ThumbsDown } from "@phosphor-icons/react";
 import { type LobbyPlayer, type PanstwaMiastaMove, type PanstwaMiastaView, PM_ANSWER_MAX, PM_CATEGORIES, pmFits, pmNormalize } from "@mini-games/games";
 import { useEffect, useRef, useState } from "react";
 import { Scores } from "../screens/ui.tsx";
@@ -194,6 +194,8 @@ function Answers({
               const key = `${c}:${id}`;
               const struck = !fits || rejected?.has(key) || (scored && view.roundScores[id]?.[c] === 0);
               const same = fits ? valid.filter((q) => pmNormalize(view.answers[q][c]) === pmNormalize(answer)).length : 0;
+              // Cudze głosy są jawne dopiero w podsumowaniu.
+              const against = scored ? view.players.filter((v) => view.votes[v]?.some((x) => x.player === id && x.category === c)).length : 0;
               const canToggle = onToggle && fits && id !== me;
               const Row = canToggle ? "button" : "div";
               return (
@@ -205,6 +207,12 @@ function Answers({
                   <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: player(id)?.color }} aria-label={player(id)?.nick} />
                   <span className={`flex-1 ${struck ? "text-fg-subtle line-through" : ""}`}>{answer || "brak"}</span>
                   {same > 1 && !struck && <span className="font-mono text-xs text-fg-muted">x{same}</span>}
+                  {against > 0 && (
+                    <span className="flex items-center gap-1 font-mono text-xs text-fg-muted" aria-label={`Przeciw: ${against}`}>
+                      <ThumbsDown size={14} aria-hidden />
+                      {against}
+                    </span>
+                  )}
                   {scored && <span className="w-8 text-right font-mono">{view.roundScores[id]?.[c] ?? 0}</span>}
                 </Row>
               );
