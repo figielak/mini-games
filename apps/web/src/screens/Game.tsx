@@ -10,7 +10,7 @@ import { PiecWRzedzie } from "../games/PiecWRzedzie.tsx";
 import { Refleks } from "../games/Refleks.tsx";
 import { Schulte } from "../games/Schulte.tsx";
 import { Simon } from "../games/Simon.tsx";
-import { Statki } from "../games/Statki.tsx";
+import { FleetLeft, Statki } from "../games/Statki.tsx";
 import { Stoper } from "../games/Stoper.tsx";
 import { Stroop } from "../games/Stroop.tsx";
 import { Screen, type Send } from "./ui.tsx";
@@ -52,8 +52,10 @@ export function Game({ view, me, dropped, send }: Props) {
     );
   }
 
-  // Chińczyk: wyraźne „Twój ruch!” w kolorze gracza, pasek czasu i pionki w domu zamiast punktów.
+  // Wspólny nagłówek: wyraźne „Twój ruch!” w kolorze gracza i pasek czasu. Chińczyk zamiast punktów pokazuje pionki w domu.
   const ludo = def.id === "chinczyk" ? (game.view as ChinczykView) : null;
+  // Statki w bitwie zamiast punktów pokazują pozostałą flotę.
+  const fleet = def.id === "statki" && (game.view as StatkiView).phase === "battle" ? (game.view as StatkiView) : null;
   const myColor = view.players.find((p) => p.id === me)?.color;
 
   // Państwa-miasta w trakcie partii mają własny nagłówek: runda, pasek czasu fazy, litera.
@@ -71,9 +73,7 @@ export function Game({ view, me, dropped, send }: Props) {
       : myTurn
         ? (game.view as { phase?: string }).phase === "placing"
           ? "Ustaw statki"
-          : ludo
-            ? "Twój ruch!"
-            : "Twoja tura"
+          : "Twój ruch!"
         : `Czekamy na: ${waitingNicks}`;
 
   return (
@@ -81,12 +81,11 @@ export function Game({ view, me, dropped, send }: Props) {
       {!ownHeader && (
         <header className="tile flex flex-col gap-3 p-4">
           <div className="flex items-center justify-between gap-3">
-            <h1 className="text-xl font-semibold" style={ludo && myTurn ? { color: myColor } : undefined}>
+            <h1 className="text-xl font-semibold" style={myTurn ? { color: myColor } : undefined}>
               {status}
             </h1>
-            {view.phase === "playing" && !ludo && <Countdown game={game} />}
           </div>
-          {view.phase === "playing" && ludo && <Countdown game={game} total={def.turnSeconds} color={myTurn ? myColor : undefined} />}
+          {view.phase === "playing" && <Countdown game={game} total={def.turnSeconds} color={myTurn ? myColor : undefined} />}
           <ul className="flex flex-wrap gap-2">
             {view.seats.map((id) => {
               const p = view.players.find((pl) => pl.id === id);
@@ -94,7 +93,7 @@ export function Game({ view, me, dropped, send }: Props) {
               return (
                 <li
                   key={id}
-                  className={`flex min-h-9 items-center gap-2 rounded-full border px-3 text-sm transition-colors ${
+                  className={`flex min-h-9 items-center gap-2 rounded-full border px-3 text-sm transition-colors ${fleet ? "w-full" : ""} ${
                     active ? "border-line-hover bg-surface" : "border-transparent text-fg-muted"
                   }`}
                 >
@@ -112,6 +111,8 @@ export function Game({ view, me, dropped, send }: Props) {
                         />
                       ))}
                     </span>
+                  ) : fleet ? (
+                    <FleetLeft board={fleet.boards[id]} color={p?.color ?? "#8b8b92"} />
                   ) : (
                     <span className="font-mono">{view.scores[id] ?? 0}</span>
                   )}
@@ -294,7 +295,7 @@ function OverActions({ host, send }: { host: boolean; send: Send }) {
  */
 /**
  * `tense`: pasek w kolorze akcentu (gra na czas, np. Państwa-miasta), a nie spokojny szary.
- * `color`: pasek w kolorze gracza (Chińczyk, moja tura). Czerwień i tak przychodzi na ostatnie 10 s.
+ * `color`: pasek w kolorze gracza (moja tura). Czerwień i tak przychodzi na ostatnie 10 s.
  */
 function Countdown({ game, total, tense, color }: { game: NonNullable<RoomView["game"]>; total?: number; tense?: boolean; color?: string }) {
   const deadline = useMemo(() => (game.msLeft === null ? null : Date.now() + game.msLeft), [game]);

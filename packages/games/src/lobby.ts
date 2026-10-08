@@ -12,6 +12,8 @@ export interface LobbyPlayer {
   nick: string;
   color: string;
   connected: boolean;
+  /** Gość potwierdził, że jest gotów do wybranej gry. Gospodarza nie dotyczy: on daje start. */
+  ready: boolean;
 }
 
 export type Phase = "lobby" | "playing" | "over";
@@ -48,6 +50,7 @@ export const ROOM_MESSAGES = {
   pickGame: z.object({ gameId: z.string() }),
   toggleSeat: z.object({ id: z.string() }),
   pickColor: z.object({ color: z.enum(PLAYER_COLORS) }),
+  ready: z.object({ ready: z.boolean() }),
   start: z.unknown(),
   rematch: z.unknown(),
   toLobby: z.unknown(),

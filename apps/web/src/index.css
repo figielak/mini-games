@@ -180,6 +180,14 @@ body::before {
   }
 }
 
+/* Pięć w rzędzie: świeżo postawiony kamień wskakuje na planszę. */
+@keyframes stone-pop {
+  from {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
 /* Turlanie kostki w Kampus Tour. */
 @keyframes dice-tumble {
   0%,

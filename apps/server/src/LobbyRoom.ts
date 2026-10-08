@@ -66,6 +66,12 @@ export class LobbyRoom extends Room {
       if (!this.isHost(client) || this.phase !== "lobby" || !def) return;
       this.gameId = gameId;
       this.seats = [...this.players.keys()].slice(0, def.maxPlayers);
+      this.resetReady();
+    });
+
+    this.on("ready", (client, { ready }) => {
+      const player = this.players.get(client.sessionId);
+      if (player && this.phase === "lobby" && this.gameId) player.ready = ready;
     });
 
     this.on("toggleSeat", (client, { id }) => {
@@ -87,6 +93,7 @@ export class LobbyRoom extends Room {
       const def = this.gameId ? GAMES[this.gameId] : undefined;
       if (!this.isHost(client) || this.phase !== "lobby" || !def) return;
       if (this.seats.length < def.minPlayers || this.seats.length > def.maxPlayers) return;
+      if (this.seats.some((id) => id !== this.hostId && !this.players.get(id)?.ready)) return;
       this.startMatch(def);
     });
 
@@ -108,6 +115,7 @@ export class LobbyRoom extends Room {
       if (!this.isHost(client) || this.phase !== "over") return;
       this.phase = "lobby";
       this.match = null;
+      this.resetReady();
     });
   }
 
@@ -129,7 +137,7 @@ export class LobbyRoom extends Room {
   onJoin(client: Client, _options: unknown, auth: { nick: string }) {
     const taken = new Set([...this.players.values()].map((p) => p.color));
     const color = PLAYER_COLORS.find((c) => !taken.has(c))!;
-    this.players.set(client.sessionId, { id: client.sessionId, nick: auth.nick, color, connected: true });
+    this.players.set(client.sessionId, { id: client.sessionId, nick: auth.nick, color, connected: true, ready: false });
     if (!this.hostId) this.hostId = client.sessionId;
     // Gra już wybrana i jest wolne miejsce: nowy gracz od razu gra, gospodarz nie musi go zaznaczać.
     const def = this.gameId ? GAMES[this.gameId] : undefined;
@@ -197,6 +205,10 @@ export class LobbyRoom extends Room {
 
   private isHost(client: Client) {
     return client.sessionId === this.hostId;
+  }
+
+  private resetReady() {
+    for (const p of this.players.values()) p.ready = false;
   }
 
   private startMatch(def: GameDefinition<unknown, unknown>) {

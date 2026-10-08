@@ -1,7 +1,27 @@
-import { Check, Crown, Play, ShareNetwork, SignOut } from "@phosphor-icons/react";
+import {
+  Boat,
+  Buildings,
+  Calculator,
+  Check,
+  CircleDashed,
+  Crown,
+  DiceFive,
+  GlobeHemisphereEast,
+  GridNine,
+  HandWaving,
+  type Icon,
+  Lightning,
+  NumberSquareOne,
+  Palette,
+  Play,
+  ShareNetwork,
+  SignOut,
+  SquaresFour,
+  Timer,
+} from "@phosphor-icons/react";
 import { GAMES, MAX_PLAYERS, PLAYER_COLORS, type RoomView } from "@mini-games/games";
 import { useState } from "react";
-import { Screen, type Send } from "./ui.tsx";
+import { Screen, type Send, StickyBar } from "./ui.tsx";
 
 interface Props {
   view: RoomView | null;
@@ -14,42 +34,22 @@ interface Props {
 export function Lobby({ view, me, dropped, send, onLeave }: Props) {
   const isHost = view?.hostId === me;
   const def = view?.gameId ? GAMES[view.gameId] : undefined;
+  const hostNick = view?.players.find((p) => p.id === view.hostId)?.nick ?? "gospodarz";
+  const guests = view?.seats.filter((id) => id !== view.hostId) ?? [];
+  const readyCount = guests.filter((id) => view!.players.find((p) => p.id === id)?.ready).length;
+  const meSeated = !!view?.seats.includes(me);
+  const meReady = !!view?.players.find((p) => p.id === me)?.ready;
   const startBlocker = !def
-    ? "Wybierz grę."
+    ? "Wybierz grę"
     : view!.seats.length < def.minPlayers
-      ? `Zaznacz ${def.minPlayers} graczy do gry.`
-      : null;
+      ? `Zaznacz ${def.minPlayers} graczy do gry`
+      : readyCount < guests.length
+        ? `Czekamy na gotowość (${readyCount}/${guests.length})`
+        : null;
 
   return (
     <Screen dropped={dropped}>
       {view ? <Code code={view.code} /> : <div className="tile h-36 animate-pulse" aria-label="Wczytywanie" />}
-
-      <section className="tile">
-        <h2 className="label mb-3">Gra</h2>
-        {isHost ? (
-          <div className="flex flex-col gap-2" role="radiogroup" aria-label="Wybór gry">
-            {Object.values(GAMES).map((g) => (
-              <button
-                key={g.id}
-                type="button"
-                role="radio"
-                aria-checked={view?.gameId === g.id}
-                className={`flex min-h-12 items-center justify-between rounded-inset border px-4 text-left transition-colors ${
-                  view?.gameId === g.id ? "border-accent bg-accent-soft" : "border-line hover:border-line-hover"
-                }`}
-                onClick={() => send("pickGame", { gameId: g.id })}
-              >
-                {g.name}
-                <span className="font-mono text-sm text-fg-muted">
-                  {g.minPlayers === g.maxPlayers ? g.minPlayers : `${g.minPlayers}-${g.maxPlayers}`} os.
-                </span>
-              </button>
-            ))}
-          </div>
-        ) : (
-          <p className={def ? "" : "text-fg-muted"}>{def ? def.name : "Gospodarz wybiera grę."}</p>
-        )}
-      </section>
 
       <section className="tile">
         <div className="mb-3 flex items-baseline justify-between">
@@ -73,7 +73,17 @@ export function Lobby({ view, me, dropped, send, onLeave }: Props) {
                   </span>
                   <span className="ml-auto flex items-center gap-2 text-sm text-fg-muted">
                     {!p.connected && "rozłączony"}
-                    {def && (seated ? <span className="text-fg">gra</span> : "ogląda")}
+                    {def &&
+                      (!seated ? (
+                        "ogląda"
+                      ) : p.ready || p.id === view.hostId ? (
+                        <span className="flex items-center gap-1 text-fg">
+                          <Check size={14} weight="bold" aria-hidden />
+                          gotowy
+                        </span>
+                      ) : (
+                        "niegotowy"
+                      ))}
                     {p.id === view.hostId && <Crown size={18} weight="fill" aria-label="Gospodarz" />}
                   </span>
                 </>
@@ -113,26 +123,98 @@ export function Lobby({ view, me, dropped, send, onLeave }: Props) {
         )}
       </section>
 
-      <div className="mt-auto flex flex-col gap-2 pt-6">
-        {isHost ? (
-          <>
-            {startBlocker && <p className="text-center text-sm text-fg-muted">{startBlocker}</p>}
+      {view &&
+        GROUPS.map(([title, quick]) => (
+          <section key={title}>
+            <h2 className="label mb-2 px-1">{title}</h2>
+            <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label={title}>
+              {Object.values(GAMES)
+                .filter((g) => (g.minPlayers === 1) === quick)
+                .map((g) => {
+                  const Icon = ICONS[g.id] ?? Play;
+                  const tooMany = view.players.length > g.maxPlayers;
+                  const picked = view.gameId === g.id;
+                  return (
+                    <button
+                      key={g.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={picked}
+                      disabled={!isHost || tooMany}
+                      className={`flex min-h-20 flex-col items-start gap-1 rounded-inset border p-3 text-left transition-colors ${
+                        picked ? "border-accent bg-accent-soft" : "border-line enabled:hover:border-line-hover"
+                      } ${tooMany ? "opacity-40" : ""}`}
+                      onClick={() => send("pickGame", { gameId: g.id })}
+                    >
+                      <Icon size={22} weight={picked ? "fill" : "regular"} aria-hidden />
+                      <span className="leading-tight">{g.name}</span>
+                      <span className="font-mono text-xs text-fg-muted">
+                        {tooMany
+                          ? `max ${g.maxPlayers} os.`
+                          : g.minPlayers === g.maxPlayers
+                            ? `${g.minPlayers} os.`
+                            : `${g.minPlayers}-${g.maxPlayers} os.`}
+                      </span>
+                    </button>
+                  );
+                })}
+            </div>
+          </section>
+        ))}
+
+      <button type="button" className="btn btn-ghost mt-auto w-full" onClick={onLeave}>
+        <SignOut size={18} aria-hidden />
+        Wyjdź z pokoju
+      </button>
+
+      {view && (
+        <StickyBar>
+          {isHost ? (
             <button type="button" className="btn btn-primary w-full" disabled={!!startBlocker} onClick={() => send("start")}>
-              <Play size={18} weight="fill" aria-hidden />
-              Start
+              {!startBlocker && <Play size={18} weight="fill" aria-hidden />}
+              <span className="truncate">{startBlocker ?? `Zagraj: ${def!.name}`}</span>
             </button>
-          </>
-        ) : (
-          view && <p className="text-center text-sm text-fg-muted">Czekamy, aż gospodarz zacznie.</p>
-        )}
-        <button type="button" className="btn btn-ghost w-full" onClick={onLeave}>
-          <SignOut size={18} aria-hidden />
-          Wyjdź z pokoju
-        </button>
-      </div>
+          ) : def && meSeated ? (
+            <button
+              type="button"
+              className={`btn w-full ${meReady ? "btn-ghost" : "btn-primary"}`}
+              aria-pressed={meReady}
+              onClick={() => send("ready", { ready: !meReady })}
+            >
+              {meReady ? <Check size={18} weight="bold" aria-hidden /> : <HandWaving size={18} weight="fill" aria-hidden />}
+              <span className="truncate">{meReady ? `Gotowy, czekamy na ${hostNick}` : `Jestem gotowy: ${def.name}`}</span>
+            </button>
+          ) : (
+            <p className="flex min-h-12 w-full items-center justify-center text-center text-sm text-fg-muted">
+              {def ? `Oglądasz. Czekamy, aż ${hostNick} zacznie` : `Czekamy, aż ${hostNick} wybierze grę`}
+            </p>
+          )}
+        </StickyBar>
+      )}
     </Screen>
   );
 }
+
+/** Szybkie gry to te, w które da się grać solo (minPlayers 1); reszta to planszowe i turowe. */
+const GROUPS: [string, boolean][] = [
+  ["Planszowe i turowe", false],
+  ["Szybkie i refleksowe", true],
+];
+
+const ICONS: Record<string, Icon> = {
+  "piec-w-rzedzie": GridNine,
+  statki: Boat,
+  chinczyk: DiceFive,
+  "kampus-tour": Buildings,
+  "panstwa-miasta": GlobeHemisphereEast,
+  refleks: Lightning,
+  simon: SquaresFour,
+  stoper: Timer,
+  schulte: NumberSquareOne,
+  stroop: Palette,
+  liczenie: Calculator,
+  kolo: CircleDashed,
+};
 
 /** Nazwy kolorów z PLAYER_COLORS (ta sama kolejność), dla czytników ekranu. */
 const COLOR_NAMES = ["niebieski", "żółty", "zielony", "fioletowy", "morski", "różowy"];
@@ -176,6 +258,12 @@ function Code({ code }: { code: string }) {
   const [copied, setCopied] = useState(false);
   const url = `${location.origin}/?kod=${code}`;
 
+  async function copy() {
+    await navigator.clipboard.writeText(code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
   async function share() {
     if (navigator.share) {
       // Anulowanie arkusza udostępniania to nie błąd.
@@ -189,13 +277,12 @@ function Code({ code }: { code: string }) {
 
   return (
     <section className="tile flex items-end justify-between gap-4">
-      <div>
-        <h2 className="label">Kod pokoju</h2>
+      <button type="button" className="text-left" onClick={copy} aria-label={`Kod pokoju ${code}, kopiuj`}>
+        <h2 className="label">{copied ? "Skopiowano!" : "Kod pokoju"}</h2>
         <p className="mt-1 font-mono text-6xl font-medium tracking-[0.12em]">{code}</p>
-      </div>
-      <button type="button" className="btn btn-primary shrink-0 px-4" onClick={share}>
-        {copied ? <Check size={18} weight="bold" aria-hidden /> : <ShareNetwork size={18} weight="bold" aria-hidden />}
-        {copied ? "Skopiowano" : "Udostępnij"}
+      </button>
+      <button type="button" className="btn btn-ghost size-12 shrink-0 p-0" onClick={share} aria-label="Udostępnij link">
+        {copied ? <Check size={20} weight="bold" aria-hidden /> : <ShareNetwork size={20} weight="bold" aria-hidden />}
       </button>
     </section>
   );
