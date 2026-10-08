@@ -25,7 +25,7 @@ export interface State {
   answers: Record<PlayerId, string[]>;
   /** Kto skończył pisać. */
   done: PlayerId[];
-  /** Kto dał STOP w tej rundzie pisania. */
+  /** Kto pierwszy oddał kartkę (STOP) w tej rundzie pisania. */
   stop: PlayerId | null;
   votes: Record<PlayerId, Cell[]>;
   /** Kto kliknął „Dalej” po podsumowaniu. */
@@ -37,7 +37,7 @@ export interface State {
 
 export type View = State;
 
-const SECONDS = { write: 90, stop: 10, vote: 45, summary: 20 };
+const SECONDS = { write: 90, stop: 7, vote: 45, summary: 20 };
 const EMPTY = CATEGORIES.map(() => "");
 
 /** Porównanie duplikatów: bez wielkości liter, polskich znaków i nadmiarowych spacji. */
@@ -110,7 +110,7 @@ export const panstwaMiasta: GameDefinition<State, Move> = {
         const s = { ...state, answers: { ...state.answers, [player]: move.answers } };
         if (!move.done) return s;
         s.done = [...s.done, player];
-        if (!s.stop && move.answers.every((a) => a.trim())) s.stop = player;
+        s.stop ??= player;
         // Kto nic nie wysłał, nie ma też wpisu w answers.
         if (s.done.length === s.players.length) return { ...s, phase: "vote", stop: null };
         return s;

@@ -4,7 +4,7 @@ import { CATEGORIES, LETTERS, type Move, panstwaMiasta as game, ROUNDS, type Sta
 
 // Testy napisane przed implementacją. Ustalają zasady:
 // - 6 kategorii, 5 rund, każda na inną literę,
-// - wszyscy piszą naraz; kto pierwszy odda komplet, daje STOP (reszta ma 10 s),
+// - wszyscy piszą naraz; kto pierwszy odda kartkę, daje STOP (reszta ma 7 s),
 // - potem głosowanie: odpowiedź odpada, gdy odrzuci ją ponad połowa pozostałych; zła litera odpada sama,
 // - punkty: 15 jedyna ważna w kategorii, 10 unikalna, 5 powtórzona, 0 brak/odrzucona,
 // - ranking po sumie punktów.
@@ -60,23 +60,21 @@ describe("pisanie", () => {
     expect(s.stop).toBeNull();
   });
 
-  test("Gotowe z kompletem daje STOP i skraca czas do 10 s", () => {
+  test("Gotowe daje STOP i skraca czas do 7 s", () => {
     let s = start([A, B, C]);
     s = send(s, A, write(on("K")));
     expect(s.stop).toBe(A);
     expect(game.waitingFor(s)).toEqual([B, C]);
-    expect(game.turn!(s)).toEqual({ key: `write:0:${A}`, seconds: 10 });
-    // drugi komplet nie przejmuje STOP-u
+    expect(game.turn!(s)).toEqual({ key: `write:0:${A}`, seconds: 7 });
+    // drugie oddanie nie przejmuje STOP-u
     s = send(s, B, write(on("K")));
     expect(s.stop).toBe(A);
   });
 
-  test("Gotowe bez kompletu nie daje STOP-u", () => {
-    let s = start([A, B]);
+  test("Gotowe bez kompletu też daje STOP", () => {
+    let s = start([A, B, C]);
     s = send(s, A, write(on("K", "", "a")));
-    expect(s.stop).toBeNull();
-    s = send(s, B, write(["  ", ...on("K").slice(1)]));
-    expect(s.stop).toBeNull();
+    expect(s.stop).toBe(A);
   });
 
   test("po Gotowe nie można już pisać; obcy i zła faza odpadają", () => {

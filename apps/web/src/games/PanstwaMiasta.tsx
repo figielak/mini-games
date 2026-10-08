@@ -109,7 +109,7 @@ function StopBanner({ nick }: { nick?: string }) {
   return (
     <span role="status" className="mb-2 flex items-center gap-2 font-semibold text-warning">
       <HandPalm size={20} weight="fill" aria-hidden />
-      STOP! {nick ?? "Ktoś"} ma komplet
+      STOP! {nick ?? "Ktoś"} oddaje kartkę
     </span>
   );
 }
@@ -134,14 +134,25 @@ function Writing({ view, me, stopBy, onMove }: { view: PanstwaMiastaView; me: st
     onMove({ type: "write", answers, done: true });
   }
 
-  // Enter przechodzi do kolejnego pola; w ostatnim wysyła formularz.
+  // Enter przechodzi dalej (bez kompletu do pustego pola); oddaje kartkę tylko w ostatnim polu przy komplecie.
   function enter(e: React.KeyboardEvent<HTMLInputElement>, i: number) {
-    if (e.key !== "Enter" || i === PM_CATEGORIES.length - 1) return;
+    if (e.key !== "Enter" || (complete && i === PM_CATEGORIES.length - 1)) return;
     e.preventDefault();
-    document.getElementById(`pm-${i + 1}`)?.focus();
+    if (complete) document.getElementById(`pm-${i + 1}`)?.focus();
+    else nextEmpty();
   }
 
   const filled = answers.filter((a) => a.trim()).length;
+  const complete = filled === PM_CATEGORIES.length;
+
+  // Bez kompletu główny przycisk przechodzi do kolejnego pustego pola (z przyzwyczajenia klika się „dalej”), oddanie jest osobno.
+  function nextEmpty() {
+    const at = PM_CATEGORIES.findIndex((_, i) => document.activeElement?.id === `pm-${i}`);
+    const order = PM_CATEGORIES.map((_, k) => (at + 1 + k) % PM_CATEGORIES.length);
+    const i = order.find((j) => !answers[j].trim()) ?? 0;
+    document.getElementById(`pm-${i}`)?.focus();
+  }
+
   return (
     <form className="flex flex-col gap-3" onSubmit={submit}>
       <div className="tile flex flex-col gap-5 p-4">
@@ -165,7 +176,7 @@ function Writing({ view, me, stopBy, onMove }: { view: PanstwaMiastaView; me: st
                   autoCorrect="off"
                   autoCapitalize="words"
                   spellCheck={false}
-                  enterKeyHint={i < PM_CATEGORIES.length - 1 ? "next" : "done"}
+                  enterKeyHint={complete && i === PM_CATEGORIES.length - 1 ? "done" : "next"}
                   aria-invalid={typed && !ok}
                   onKeyDown={(e) => enter(e, i)}
                   onChange={(e) => change(i, e.target.value)}
@@ -180,9 +191,21 @@ function Writing({ view, me, stopBy, onMove }: { view: PanstwaMiastaView; me: st
         <span className="w-10 shrink-0 font-mono text-sm text-fg-muted" aria-label={`Wypełnione ${filled} z ${PM_CATEGORIES.length}`}>
           {filled}/{PM_CATEGORIES.length}
         </span>
-        <button type="submit" className="btn btn-primary flex-1">
-          {filled === PM_CATEGORIES.length && !view.stop ? "STOP!" : "Gotowe"}
-        </button>
+        {complete ? (
+          <button type="submit" className="btn btn-primary flex-1">
+            {view.stop ? "Gotowe" : "STOP!"}
+          </button>
+        ) : (
+          <>
+            <button type="submit" className="btn btn-ghost">
+              Oddaj
+            </button>
+            {/* onPointerDown bez utraty fokusu: inaczej klawiatura chowa się i skacze przy każdym polu */}
+            <button type="button" className="btn btn-primary flex-1" onPointerDown={(e) => e.preventDefault()} onClick={nextEmpty}>
+              Dalej
+            </button>
+          </>
+        )}
       </StickyBar>
     </form>
   );
