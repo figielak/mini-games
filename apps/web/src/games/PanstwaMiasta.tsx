@@ -21,7 +21,6 @@ export function PanstwaMiasta({ view, me, players, waitingFor, ranking, timer, o
   const player = (id: string) => players.find((p) => p.id === id);
   const letter = view.letters[view.round];
   const playing = view.players.includes(me);
-  const finished = view.players.filter((id) => !waitingFor.includes(id));
 
   return (
     <div className="flex flex-col gap-3">
@@ -42,17 +41,23 @@ export function PanstwaMiasta({ view, me, players, waitingFor, ranking, timer, o
         </header>
       )}
 
-      {/* Jedna cienka linia: kto już skończył bieżący krok (pisanie, głos, „Dalej”). */}
-      {timer && (finished.length > 0 || !playing) && (
-        <p role="status" className="flex items-center gap-1.5 text-sm">
-          {finished.length > 0 && (
-            <>
-              <Check size={16} weight="bold" className="shrink-0 text-success" aria-hidden />
-              <span className="truncate">Gotowe: {finished.map((id) => (id === me ? "ty" : (player(id)?.nick ?? "Gracz"))).join(", ")}</span>
-            </>
-          )}
-          {!playing && <span className="ml-auto text-fg-muted">Oglądasz</span>}
-        </p>
+      {/* Jedna cienka linia z graczami: punkty i fajka przy tych, którzy skończyli bieżący krok (pisanie, głos, „Dalej”). */}
+      {timer && (
+        <ul className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm" aria-label="Gracze">
+          {view.players.map((id) => {
+            const finished = !waitingFor.includes(id);
+            return (
+              <li key={id} className={`flex items-center gap-1.5 ${finished ? "" : "text-fg-muted"}`}>
+                <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: player(id)?.color }} aria-hidden />
+                {player(id)?.nick ?? "Gracz"}
+                {id === me && <span className="text-fg-muted">(ty)</span>}
+                <span className="font-mono text-fg-muted">{view.totals[id]}</span>
+                {finished && <Check size={14} weight="bold" className="text-success" aria-label="gotowe" />}
+              </li>
+            );
+          })}
+          {!playing && <li className="ml-auto text-fg-muted">Oglądasz</li>}
+        </ul>
       )}
 
       {view.phase === "write" &&
