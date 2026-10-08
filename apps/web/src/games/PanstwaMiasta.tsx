@@ -1,7 +1,7 @@
 import { Check, HandPalm, ThumbsDown } from "@phosphor-icons/react";
 import { type LobbyPlayer, type PanstwaMiastaMove, type PanstwaMiastaView, PM_ANSWER_MAX, PM_CATEGORIES, pmFits, pmNormalize } from "@mini-games/games";
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { Scores } from "../screens/ui.tsx";
+import { Scores, StickyBar } from "../screens/ui.tsx";
 
 interface Props {
   view: PanstwaMiastaView;
@@ -103,11 +103,6 @@ export function PanstwaMiasta({ view, me, players, waitingFor, ranking, timer, o
       )}
     </div>
   );
-}
-
-/** Przycisk przyklejony do dołu ekranu: przy otwartej klawiaturze i długiej liście zostaje pod kciukiem. */
-function StickyBar({ children }: { children: ReactNode }) {
-  return <div className="sticky bottom-0 -mx-4 flex items-center gap-3 bg-bg/90 px-4 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">{children}</div>;
 }
 
 function StopBanner({ nick }: { nick?: string }) {

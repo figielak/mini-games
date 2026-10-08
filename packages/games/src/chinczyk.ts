@@ -8,6 +8,18 @@ const BASE = -1;
 
 export type Move = { type: "roll" } | { type: "move"; pawn: number };
 
+/** Ostatni rzut i jego skutek: klient animuje kostkę i pionek oraz pokazuje komunikat. */
+export interface Last {
+  /** Numer rzutu w partii; zmiana oznacza nowy rzut (także z tym samym wynikiem). */
+  roll: number;
+  player: PlayerId;
+  dice: number;
+  /** Ruch po rzucie; brak, dopóki gracz wybiera pionek. */
+  move?: { pawn: number; from: number; to: number; captured: PlayerId[] };
+  /** Rzut bez ruchu: trzecia szóstka z rzędu albo brak możliwego ruchu. */
+  note?: "sixes" | "none";
+}
+
 export interface State {
   players: PlayerId[];
   /** Pole toru, z którego startuje gracz. */
@@ -22,9 +34,10 @@ export interface State {
   /** Próby, gdy żaden pionek nie stoi na torze. */
   tries: number;
   ranking: PlayerId[];
+  last: Last | null;
 }
 
-export type View = Omit<State, "turn" | "sixes" | "tries"> & {
+export type View = Omit<State, "turn" | "sixes"> & {
   turn: PlayerId | null;
   /** Pionki gracza na turze, którymi można się teraz ruszyć. */
   movable: number[];
@@ -72,18 +85,22 @@ function endTurn(s: State): State {
 
 function movePawn(s: State, player: PlayerId, pawn: number): State {
   const to = target(s.pawns[player][pawn], s.dice!)!;
+  const from = s.pawns[player][pawn];
   const pawns: State["pawns"] = { ...s.pawns, [player]: s.pawns[player].map((p, i) => (i === pawn ? to : p)) };
+  const captured: PlayerId[] = [];
 
   // Zbicie: pionek przeciwnika na tym samym polu toru wraca do domku startowego.
   if (onTrack(to)) {
     const at = square(s, player, to);
     for (const other of s.players) {
       if (other === player) continue;
-      pawns[other] = pawns[other].map((p) => (onTrack(p) && square(s, other, p) === at ? BASE : p));
+      const hit = (p: number) => onTrack(p) && square(s, other, p) === at;
+      if (pawns[other].some(hit)) captured.push(other);
+      pawns[other] = pawns[other].map((p) => (hit(p) ? BASE : p));
     }
   }
 
-  const next: State = { ...s, pawns };
+  const next: State = { ...s, pawns, last: { ...s.last!, move: { pawn, from, to, captured } } };
   if (pawns[player].every((p) => p >= TRACK)) {
     const ranking = [...s.ranking, player];
     const left = s.players.filter((p) => !ranking.includes(p));
@@ -115,6 +132,7 @@ export const chinczyk: GameDefinition<State, Move> = {
       sixes: 0,
       tries: 3,
       ranking: [],
+      last: null,
     };
   },
 
@@ -129,17 +147,19 @@ export const chinczyk: GameDefinition<State, Move> = {
 
     const dice = Math.floor(rng() * 6) + 1;
     const sixes = dice === 6 ? s.sixes + 1 : 0;
-    const rolled: State = { ...s, dice, sixes };
-    if (sixes === 3) return endTurn(rolled);
+    const last: Last = { roll: (s.last?.roll ?? 0) + 1, player, dice };
+    const rolled: State = { ...s, dice, sixes, last };
+    const none = { ...rolled, last: { ...last, note: "none" as const } };
+    if (sixes === 3) return endTurn({ ...rolled, last: { ...last, note: "sixes" } });
 
     const options = movablePawns(rolled, player, dice);
     if (options.length === 1) return movePawn(rolled, player, options[0]);
     if (options.length > 1) return { ...rolled, phase: "move" };
 
     // Brak ruchu: szóstka i tak daje kolejny rzut; bez pionków na torze są 3 próby.
-    if (dice === 6) return { ...rolled, phase: "roll" };
-    if (!s.pawns[player].some(onTrack) && s.tries > 1) return { ...rolled, tries: s.tries - 1 };
-    return endTurn(rolled);
+    if (dice === 6) return { ...none, phase: "roll" };
+    if (!s.pawns[player].some(onTrack) && s.tries > 1) return { ...none, tries: s.tries - 1 };
+    return endTurn(none);
   },
 
   playerView: (s): View => ({
@@ -150,6 +170,8 @@ export const chinczyk: GameDefinition<State, Move> = {
     phase: s.phase,
     dice: s.dice,
     ranking: s.ranking,
+    tries: s.tries,
+    last: s.last,
     movable: legalMoves(s),
   }),
 

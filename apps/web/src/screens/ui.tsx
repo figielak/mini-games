@@ -35,3 +35,8 @@ export function Scores({ rows }: { rows: { id: string; nick: string; color?: str
     </ol>
   );
 }
+
+/** Przycisk przyklejony do dołu ekranu: przy otwartej klawiaturze i długiej liście zostaje pod kciukiem. */
+export function StickyBar({ children }: { children: ReactNode }) {
+  return <div className="sticky bottom-0 -mx-4 flex items-center gap-3 bg-bg/90 px-4 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">{children}</div>;
+}

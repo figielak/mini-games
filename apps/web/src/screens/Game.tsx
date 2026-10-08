@@ -1,5 +1,5 @@
 import { ArrowCounterClockwise, Timer, UsersThree } from "@phosphor-icons/react";
-import { type ChinczykView, GAMES, type KampusTourView, type PanstwaMiastaView, type PiecWRzedzieView, type RefleksView, type RoomView, type SimonView, type StatkiView } from "@mini-games/games";
+import { CHINCZYK_TRACK, type ChinczykView, GAMES, type KampusTourView, type PanstwaMiastaView, type PiecWRzedzieView, type RefleksView, type RoomView, type SimonView, type StatkiView } from "@mini-games/games";
 import { useEffect, useMemo, useState } from "react";
 import { Chinczyk } from "../games/Chinczyk.tsx";
 import { KampusTour } from "../games/KampusTour.tsx";
@@ -47,6 +47,10 @@ export function Game({ view, me, dropped, send }: Props) {
     );
   }
 
+  // Chińczyk: wyraźne „Twój ruch!” w kolorze gracza, pasek czasu i pionki w domu zamiast punktów.
+  const ludo = def.id === "chinczyk" ? (game.view as ChinczykView) : null;
+  const myColor = view.players.find((p) => p.id === me)?.color;
+
   // Państwa-miasta w trakcie partii mają własny nagłówek: runda, pasek czasu fazy, litera.
   const ownHeader = def.id === "panstwa-miasta" && view.phase === "playing";
 
@@ -62,7 +66,9 @@ export function Game({ view, me, dropped, send }: Props) {
       : myTurn
         ? (game.view as { phase?: string }).phase === "placing"
           ? "Ustaw statki"
-          : "Twoja tura"
+          : ludo
+            ? "Twój ruch!"
+            : "Twoja tura"
         : `Czekamy na: ${waitingNicks}`;
 
   return (
@@ -70,9 +76,12 @@ export function Game({ view, me, dropped, send }: Props) {
       {!ownHeader && (
         <header className="tile flex flex-col gap-3 p-4">
           <div className="flex items-center justify-between gap-3">
-            <h1 className="text-xl font-semibold">{status}</h1>
-            {view.phase === "playing" && <Countdown game={game} />}
+            <h1 className="text-xl font-semibold" style={ludo && myTurn ? { color: myColor } : undefined}>
+              {status}
+            </h1>
+            {view.phase === "playing" && !ludo && <Countdown game={game} />}
           </div>
+          {view.phase === "playing" && ludo && <Countdown game={game} total={def.turnSeconds} tense={myTurn} />}
           <ul className="flex flex-wrap gap-2">
             {view.seats.map((id) => {
               const p = view.players.find((pl) => pl.id === id);
@@ -87,7 +96,20 @@ export function Game({ view, me, dropped, send }: Props) {
                   <span className="size-2.5 rounded-full" style={{ backgroundColor: p?.color }} aria-hidden />
                   {nick(id)}
                   {id === me && " (ty)"}
-                  <span className="font-mono">{view.scores[id] ?? 0}</span>
+                  {ludo ? (
+                    <span className="flex gap-1" aria-label={`W domu: ${ludo.pawns[id].filter((p) => p >= CHINCZYK_TRACK).length} z 4`}>
+                      {[...ludo.pawns[id]].sort((a, b) => b - a).map((pos, i) => (
+                        <span
+                          key={i}
+                          className="size-2 rounded-full border"
+                          style={{ borderColor: p?.color, backgroundColor: pos >= CHINCZYK_TRACK ? p?.color : undefined }}
+                          aria-hidden
+                        />
+                      ))}
+                    </span>
+                  ) : (
+                    <span className="font-mono">{view.scores[id] ?? 0}</span>
+                  )}
                 </li>
               );
             })}

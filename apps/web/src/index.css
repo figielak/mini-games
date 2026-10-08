@@ -167,6 +167,19 @@ body::before {
   }
 }
 
+/* Chińczyk: pionek, którym można się ruszyć, pulsuje obwódką. */
+@keyframes ring-pulse {
+  0%,
+  100% {
+    outline-offset: 1px;
+    outline-color: var(--color-accent);
+  }
+  50% {
+    outline-offset: 4px;
+    outline-color: transparent;
+  }
+}
+
 /* Turlanie kostki w Kampus Tour. */
 @keyframes dice-tumble {
   0%,

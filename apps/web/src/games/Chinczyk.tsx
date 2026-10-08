@@ -1,5 +1,7 @@
-import { DiceFive, DiceFour, DiceOne, DiceSix, DiceThree, DiceTwo } from "@phosphor-icons/react";
+import { useEffect, useRef, useState } from "react";
+import { ArrowRight, DiceFive, DiceFour, DiceOne, DiceSix, DiceThree, DiceTwo } from "@phosphor-icons/react";
 import { CHINCZYK_TRACK as TRACK, type ChinczykView, type LobbyPlayer } from "@mini-games/games";
+import { StickyBar } from "../screens/ui.tsx";
 
 type Move = { type: "roll" } | { type: "move"; pawn: number };
 
@@ -33,58 +35,201 @@ const BASES: Cell[][] = [
   [[9, 9], [10, 9], [9, 10], [10, 10]],
   [[0, 9], [1, 9], [0, 10], [1, 10]],
 ];
+/** Kierunek ruchu z pola startowego każdego miejsca (obrót strzałki w prawo). */
+const START_ARROW = [0, 90, 180, 270];
+const CENTER = 5 * 11 + 5;
 const DICE = [DiceOne, DiceTwo, DiceThree, DiceFour, DiceFive, DiceSix];
 
 const key = ([x, y]: Cell) => y * 11 + x;
 const mix = (color: string, percent: number) => `color-mix(in srgb, ${color} ${percent}%, var(--color-bg))`;
+/** Kolor gracza o stałej jasności (OKLCH): niebieski i żółty wychodzą równie wyraźne. */
+const tint = (color: string, lightness: number, chroma: number) => `oklch(from ${color} ${lightness} calc(c * ${chroma}) h)`;
+/** Miejsce bez gracza: domki tylko zaznaczone, żeby plansza była całością. */
+const UNUSED = mix("var(--color-fg)", 6);
+
+/** Tempo animacji: krok pionka o jedno pole i czas turlania kostki. */
+const STEP_MS = 180;
+const ROLL_MS = 700;
+const reducedMotion = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/** Czy kostka się właśnie turla: przez chwilę po każdym nowym rzucie (nie po odświeżeniu strony). */
+function useRolling(roll: number | undefined): boolean {
+  const last = useRef(roll);
+  const [rolling, setRolling] = useState(false);
+  useEffect(() => {
+    if (last.current === roll) return;
+    last.current = roll;
+    if (reducedMotion) return;
+    setRolling(true);
+    const t = setTimeout(() => setRolling(false), ROLL_MS);
+    return () => clearTimeout(t);
+  }, [roll]);
+  return rolling;
+}
+
+/**
+ * Pozycje pionków do wyświetlenia: pionek idzie pole po polu (wyjście z domku to jeden krok).
+ * Zbicia i dalekie skoki (powrót po zerwanym połączeniu) zmieniają się od razu, ale dopiero gdy nikt już nie idzie.
+ */
+function useWalk(target: Record<string, number[]>, paused: boolean): Record<string, number[]> {
+  const [shown, setShown] = useState(target);
+  useEffect(() => {
+    if (paused) return;
+    const walking = (p: string, i: number) => {
+      const from = shown[p]?.[i];
+      return from !== undefined && target[p][i] > from && target[p][i] - from <= 6;
+    };
+    const ids = Object.keys(target);
+    if (ids.every((p) => target[p].every((pos, i) => shown[p]?.[i] === pos))) return;
+    if (reducedMotion || !ids.some((p) => target[p].some((_, i) => walking(p, i)))) return setShown(target);
+    const t = setTimeout(() => {
+      setShown((prev) => Object.fromEntries(ids.map((p) => [p, (prev[p] ?? target[p]).map((pos, i) => (walking(p, i) ? (pos < 0 ? 0 : pos + 1) : pos))])));
+    }, STEP_MS);
+    return () => clearTimeout(t);
+  }, [shown, target, paused]);
+  return shown;
+}
+
+/** Kostka: w trakcie turlania co chwilę losowe oczka i podskakiwanie, potem wynik z serwera. */
+function Die({ value, rolling, color }: { value: number; rolling: boolean; color?: string }) {
+  const [face, setFace] = useState(value);
+  useEffect(() => {
+    if (!rolling) return;
+    const id = setInterval(() => setFace(1 + Math.floor(Math.random() * 6)), 90);
+    return () => clearInterval(id);
+  }, [rolling]);
+  const Face = DICE[(rolling ? face : value) - 1];
+  return (
+    <Face
+      size={48}
+      weight="fill"
+      className={`shrink-0 ${rolling ? "animate-[dice-tumble_0.3s_ease-in-out_infinite]" : ""}`}
+      style={{ color }}
+      aria-label={rolling ? "Rzut kostką" : `Wyrzucono ${value}`}
+    />
+  );
+}
 
 export function Chinczyk({ view, me, players, canMove, onMove }: Props) {
   const color = (id: string) => players.find((p) => p.id === id)?.color ?? "#8b8b92";
-  const myMove = canMove && view.phase === "move";
+  const nick = (id: string) => players.find((p) => p.id === id)?.nick ?? "?";
+  const last = view.last;
+  const rolling = useRolling(last?.roll);
+  const shown = useWalk(view.pawns, rolling);
+  const settled = !rolling && view.players.every((p) => shown[p]?.every((pos, i) => pos === view.pawns[p][i]));
+  const myMove = canMove && settled && view.phase === "move";
 
-  // Każde pole planszy: tło (tor, start, domek gracza) i ewentualny pionek.
-  const cells = new Map<number, { background?: string; owner?: string; pawn?: { player: string; index: number } }>();
+  // Wybrany pionek pokazuje cel; drugie dotknięcie (pionka albo celu) wykonuje ruch.
+  const [selected, setSelected] = useState<number | null>(null);
+  useEffect(() => setSelected(null), [last?.roll, view.phase]);
+  const pick = selected !== null && myMove && view.movable.includes(selected) ? selected : null;
+
+  // Zbity pionek: krótka wibracja u właściciela, raz na ruch.
+  const buzzed = useRef(last?.roll);
+  useEffect(() => {
+    if (!settled || !last?.move || buzzed.current === last.roll) return;
+    buzzed.current = last.roll;
+    if (last.move.captured.includes(me)) navigator.vibrate?.([60, 40, 60]);
+  }, [settled, last, me]);
+
+  const seatOf = (player: string) => view.starts[player] / (TRACK / 4);
+  const cellOf = (player: string, pos: number, index: number) =>
+    pos < 0 ? BASES[seatOf(player)][index] : pos < TRACK ? TRACK_CELLS[(view.starts[player] + pos) % TRACK] : HOMES[seatOf(player)][pos - TRACK];
+
+  // Gracz na każdym z czterech miejsc (przy dwóch graczach dwa miejsca puste).
+  const seats = [0, 1, 2, 3].map((seat) => view.players.find((p) => seatOf(p) === seat));
+
+  // Każde pole planszy: tło (tor, start, domek gracza), strzałka kierunku na starcie i ewentualny pionek.
+  const cells = new Map<number, { background?: string; arrow?: number; pawn?: { player: string; index: number } }>();
   for (const c of TRACK_CELLS) cells.set(key(c), {});
+  seats.forEach((player, seat) => {
+    const c = player && color(player);
+    if (c) cells.set(key(TRACK_CELLS[seat * (TRACK / 4)]), { background: tint(c, 0.62, 0.9), arrow: START_ARROW[seat] });
+    for (const cell of HOMES[seat]) cells.set(key(cell), { background: c ? tint(c, 0.42, 0.7) : UNUSED });
+    for (const cell of BASES[seat]) cells.set(key(cell), { background: c ? tint(c, 0.3, 0.5) : UNUSED });
+  });
   for (const player of view.players) {
-    const seat = view.starts[player] / (TRACK / 4);
-    const c = color(player);
-    cells.set(key(TRACK_CELLS[view.starts[player]]), { background: mix(c, 45), owner: player });
-    for (const cell of HOMES[seat]) cells.set(key(cell), { background: mix(c, 22), owner: player });
-    for (const cell of BASES[seat]) cells.set(key(cell), { background: mix(c, 14), owner: player });
-
-    view.pawns[player].forEach((pos, index) => {
-      const cell =
-        pos < 0 ? BASES[seat][index] : pos < TRACK ? TRACK_CELLS[(view.starts[player] + pos) % TRACK] : HOMES[seat][pos - TRACK];
-      cells.set(key(cell), { ...cells.get(key(cell)), pawn: { player, index } });
+    (shown[player] ?? view.pawns[player]).forEach((pos, index) => {
+      const k = key(cellOf(player, pos, index));
+      cells.set(k, { ...cells.get(k), pawn: { player, index } });
     });
   }
 
-  const Dice = view.dice ? DICE[view.dice - 1] : null;
+  // Podgląd celu wybranego pionka (jak w regułach: z domku startowego na pole 0).
+  const from = pick !== null ? view.pawns[me][pick] : null;
+  const to = from === null ? null : from < 0 ? 0 : from + view.dice!;
+  const targetKey = to === null ? null : key(cellOf(me, to, pick!));
+  const victim = targetKey === null ? undefined : cells.get(targetKey)?.pawn;
+  const capture = victim && victim.player !== me ? victim.player : null;
+
+  const status = (() => {
+    if (!last || rolling) return null;
+    if (last.note === "sixes") return "Trzecia szóstka z rzędu, tura przepada.";
+    if (last.note === "none") {
+      if (last.dice === 6) return "Brak ruchu, ale szóstka daje kolejny rzut.";
+      if (view.pawns[last.player].some((p) => p >= 0 && p < TRACK)) return "Brak możliwego ruchu.";
+      return view.turn === last.player ? `Bez szóstki. Próba ${4 - view.tries} z 3.` : "Bez szóstki, tura przechodzi.";
+    }
+    if (!last.move || !settled) return null;
+    if (last.move.to >= TRACK && view.ranking.includes(last.player))
+      return `${nick(last.player)} kończy na ${view.ranking.indexOf(last.player) + 1}. miejscu!`;
+    if (last.move.captured.length) return `${nick(last.player)} zbija: ${last.move.captured.map(nick).join(", ")}!`;
+    if (last.dice === 6 && view.turn === last.player) return "Szóstka, kolejny rzut.";
+    return null;
+  })();
+
+  const prompt = (() => {
+    if (view.phase === "over" || !view.turn) return null;
+    if (!settled) return null;
+    if (myMove) {
+      if (pick === null) return "Dotknij podświetlonego pionka, żeby zobaczyć cel.";
+      return capture ? `Zbijesz pionek: ${nick(capture)}. Dotknij celu, żeby ruszyć.` : "Dotknij celu albo pionka jeszcze raz, żeby ruszyć.";
+    }
+    if (canMove) return null;
+    return view.phase === "move" ? `${nick(view.turn)} wybiera pionek…` : `${nick(view.turn)} rzuca kostką…`;
+  })();
+
+  const move = (pawn: number) => onMove({ type: "move", pawn });
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="grid aspect-square w-full gap-[3px]" style={{ gridTemplateColumns: "repeat(11, minmax(0, 1fr))" }}>
+    <div className="flex flex-1 flex-col gap-3">
+      <div className="tile grid aspect-square w-full gap-[3px] p-2" style={{ gridTemplate: "repeat(11, minmax(0, 1fr)) / repeat(11, minmax(0, 1fr))" }}>
         {Array.from({ length: 121 }, (_, i) => {
+          if (i === CENTER) return <Finish key={i} colors={seats.map((p) => (p ? tint(color(p), 0.62, 0.9) : UNUSED))} />;
           const cell = cells.get(i);
           if (!cell) return <span key={i} />;
           const pawn = cell.pawn;
           const movable = !!pawn && myMove && pawn.player === me && view.movable.includes(pawn.index);
-          const inner = pawn && (
+          const isPick = movable && pawn!.index === pick;
+          const isTarget = i === targetKey;
+          const inner = pawn ? (
             <span
-              className={`size-[70%] rounded-full border-2 border-bg ${movable ? "outline-2 outline-offset-1 outline-accent" : ""}`}
+              className={`size-[70%] rounded-full border-2 border-bg ${
+                isPick ? "outline-2 outline-offset-1 outline-accent" : movable ? "animate-[ring-pulse_1s_ease-in-out_infinite] outline-2 outline-accent" : ""
+              }`}
               style={{ backgroundColor: color(pawn.player) }}
             />
+          ) : isTarget ? (
+            // Duch pionka na polu docelowym.
+            <span className="size-[60%] rounded-full border-2 border-dashed opacity-70" style={{ borderColor: color(me) }} />
+          ) : (
+            cell.arrow !== undefined && (
+              <ArrowRight weight="bold" className="size-[55%] text-bg" style={{ transform: `rotate(${cell.arrow}deg)` }} aria-hidden />
+            )
           );
           // Tor wyraźnie jaśniejszy od tła: surface-inset zlewał się ze stroną.
-          const className = "grid place-items-center rounded-full bg-[color-mix(in_srgb,var(--color-fg)_11%,var(--color-bg))]";
-          return movable ? (
+          const className = `grid place-items-center rounded-full bg-[color-mix(in_srgb,var(--color-fg)_11%,var(--color-bg))] ${
+            isTarget ? `outline-2 outline-offset-1 ${capture ? "outline-warning" : "outline-fg"}` : ""
+          }`;
+          const action = isTarget ? () => move(pick!) : movable ? () => (isPick ? move(pawn!.index) : setSelected(pawn!.index)) : null;
+          return action ? (
             <button
               key={i}
               type="button"
-              aria-label={`Rusz pionek ${pawn!.index + 1}`}
+              aria-label={isTarget ? `Rusz pionek ${pick! + 1} tutaj` : isPick ? `Rusz pionek ${pawn!.index + 1}` : `Wybierz pionek ${pawn!.index + 1}`}
               className={className}
               style={{ backgroundColor: cell.background }}
-              onClick={() => onMove({ type: "move", pawn: pawn!.index })}
+              onClick={action}
             >
               {inner}
             </button>
@@ -97,23 +242,51 @@ export function Chinczyk({ view, me, players, canMove, onMove }: Props) {
       </div>
 
       <div className="tile flex min-h-20 items-center gap-4 p-4">
-        {Dice ? (
-          <Dice size={48} weight="fill" style={{ color: view.turn ? color(view.turn) : undefined }} aria-label={`Wyrzucono ${view.dice}`} />
+        {last ? (
+          <Die value={last.dice} rolling={rolling} color={color(last.player)} />
         ) : (
-          <span className="size-12 rounded-inset border border-line" aria-hidden />
+          <span className="size-12 shrink-0 rounded-inset border border-line" aria-hidden />
         )}
-        <div className="flex-1">
-          {canMove && view.phase === "roll" ? (
-            <button type="button" className="btn btn-primary w-full" onClick={() => onMove({ type: "roll" })}>
-              Rzuć kostką
-            </button>
-          ) : (
-            <p className="text-sm text-fg-muted">
-              {myMove ? "Dotknij podświetlonego pionka." : view.dice ? `Ostatni rzut: ${view.dice}` : "Czekamy na pierwszy rzut."}
+        <div className="flex flex-1 flex-col gap-1" aria-live="polite">
+          {last && (
+            <p className="text-sm">
+              <span className="font-bold" style={{ color: color(last.player) }}>
+                {nick(last.player)}
+              </span>{" "}
+              {rolling ? "rzuca…" : `wyrzuca ${last.dice}`}
             </p>
           )}
+          {status && <p className="text-sm font-bold">{status}</p>}
+          {prompt && <p className="text-sm text-fg-muted">{prompt}</p>}
         </div>
       </div>
+
+      {/* Rzut to główna akcja: duży przycisk przy dolnej krawędzi, w zasięgu kciuka. */}
+      {canMove && settled && view.phase === "roll" && (
+        <>
+          {/* Odstęp spycha pasek na dół ekranu; sticky trzyma go pod kciukiem, gdy plansza się nie mieści. */}
+          <span className="-mt-3 flex-1" aria-hidden />
+          <StickyBar>
+            <button type="button" className="btn btn-primary h-14 w-full text-lg" onClick={() => onMove({ type: "roll" })}>
+              <DiceFive size={24} weight="fill" aria-hidden />
+              Rzuć
+              {!view.pawns[me].some((p) => p >= 0 && p < TRACK) && <span className="font-normal">(próba {4 - view.tries} z 3)</span>}
+            </button>
+          </StickyBar>
+        </>
+      )}
     </div>
+  );
+}
+
+/** Meta na środku krzyża: cztery trójkąty skierowane do domków (lewo, góra, prawo, dół). */
+function Finish({ colors }: { colors: string[] }) {
+  const triangles = ["0,0 1,1 0,2", "0,0 2,0 1,1", "2,0 2,2 1,1", "0,2 2,2 1,1"];
+  return (
+    <svg viewBox="0 0 2 2" className="size-full overflow-hidden rounded-[6px]" role="img" aria-label="Meta">
+      {triangles.map((points, i) => (
+        <polygon key={points} points={points} fill={colors[i]} />
+      ))}
+    </svg>
   );
 }
