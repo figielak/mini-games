@@ -1,13 +1,17 @@
 import { ArrowCounterClockwise, Timer, UsersThree } from "@phosphor-icons/react";
-import { CHINCZYK_TRACK, type ChinczykView, GAMES, type KampusTourView, type PanstwaMiastaView, type PiecWRzedzieView, type RefleksView, type RoomView, type SimonView, type StatkiView } from "@mini-games/games";
+import { CHINCZYK_TRACK, type ChinczykView, GAMES, type KampusTourView, type LiczenieView, type PanstwaMiastaView, type PiecWRzedzieView, type RefleksView, type RoomView, type SchulteView, type SimonView, type StatkiView, type StoperView, type StroopView } from "@mini-games/games";
 import { useEffect, useMemo, useState } from "react";
 import { Chinczyk } from "../games/Chinczyk.tsx";
 import { KampusTour } from "../games/KampusTour.tsx";
+import { Liczenie } from "../games/Liczenie.tsx";
 import { PanstwaMiasta } from "../games/PanstwaMiasta.tsx";
 import { PiecWRzedzie } from "../games/PiecWRzedzie.tsx";
 import { Refleks } from "../games/Refleks.tsx";
+import { Schulte } from "../games/Schulte.tsx";
 import { Simon } from "../games/Simon.tsx";
 import { Statki } from "../games/Statki.tsx";
+import { Stoper } from "../games/Stoper.tsx";
+import { Stroop } from "../games/Stroop.tsx";
 import { Screen, type Send } from "./ui.tsx";
 
 interface Props {
@@ -164,6 +168,50 @@ export function Game({ view, me, dropped, send }: Props) {
         />
       )}
 
+      {def.id === "stoper" && (
+        <Stoper
+          key={(game.view as StoperView).nonce}
+          view={game.view as StoperView}
+          me={me}
+          players={view.players}
+          ranking={game.result?.ranking}
+          onMove={(move) => send("move", move)}
+        />
+      )}
+
+      {def.id === "schulte" && (
+        <Schulte
+          key={(game.view as SchulteView).grid.join()}
+          view={game.view as SchulteView}
+          me={me}
+          players={view.players}
+          ranking={game.result?.ranking}
+          onMove={(move) => send("move", move)}
+        />
+      )}
+
+      {def.id === "stroop" && (
+        <Stroop
+          key={(game.view as StroopView).trials.map((t) => t.word * 4 + t.ink).join("")}
+          view={game.view as StroopView}
+          me={me}
+          players={view.players}
+          ranking={game.result?.ranking}
+          onMove={(move) => send("move", move)}
+        />
+      )}
+
+      {def.id === "liczenie" && (
+        <Liczenie
+          key={(game.view as LiczenieView).problems.map((p) => p.text).join()}
+          view={game.view as LiczenieView}
+          me={me}
+          players={view.players}
+          ranking={game.result?.ranking}
+          onMove={(move) => send("move", move)}
+        />
+      )}
+
       {def.id === "simon" && (
         <Simon
           key={(game.view as SimonView).sequence.join("")}
@@ -211,7 +259,7 @@ export function Game({ view, me, dropped, send }: Props) {
   );
 }
 
-const MINI_GAMES = new Set(["refleks", "simon", "panstwa-miasta"]);
+const MINI_GAMES = new Set(["refleks", "simon", "stoper", "schulte", "stroop", "liczenie", "panstwa-miasta"]);
 
 function OverActions({ host, send }: { host: boolean; send: Send }) {
   if (!host) return <p className="text-center text-sm text-fg-muted">Czekamy na decyzję gospodarza.</p>;

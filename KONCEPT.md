@@ -56,6 +56,11 @@ gracz z największym majątkiem (gotówka + wartość pól i budynków).
 
 - **Refleks**: dotknij pola, gdy zmieni kolor; 30 s, wynik = liczba trafień (remis: niższa średnia reakcja), falstart kosztuje czas.
 - **Simon**: powtarzanie rosnącej sekwencji 4 kolorów, wynik = najdłuższa seria.
+- **Stoper 10 s**: licznik znika po 3 s, dotknij przy dokładnie 10,00 s; wynik = odchyłka w ms (mniej lepiej).
+- **Tabela Schultego**: siatka 5×5 z liczbami 1-25, dotykasz po kolei; wynik = czas + 3 s za każdą pomyłkę.
+- **Stroop**: nazwa koloru napisana innym kolorem, wybierasz kolor liter; 30 s, wynik = trafienia (remis: niższa średnia).
+- **Szybkie liczenie**: 30 s działań (+, −, ×, :) z czterema odpowiedziami; wynik jak w Stroopie.
+  W obu pomyłka blokuje na 1 s (inaczej losowe klepanie byłoby szybsze niż myślenie).
 - 1-6 graczy naraz, każdy gra u siebie to samo wyzwanie (wylosowane na serwerze), na końcu ranking.
   Partia toczy się na kliencie (opóźnienie Wi-Fi zepsułoby pomiar), serwer dostaje tylko wynik i odrzuca nierealne wartości.
 
