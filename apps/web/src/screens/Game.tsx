@@ -47,6 +47,9 @@ export function Game({ view, me, dropped, send }: Props) {
     );
   }
 
+  // Państwa-miasta w trakcie partii mają własny nagłówek: runda, pasek czasu fazy, litera.
+  const ownHeader = def.id === "panstwa-miasta" && view.phase === "playing";
+
   const status =
     view.phase === "over"
       ? game.result?.winner
@@ -64,37 +67,39 @@ export function Game({ view, me, dropped, send }: Props) {
 
   return (
     <Screen dropped={dropped}>
-      <header className="tile flex flex-col gap-3 p-4">
-        <div className="flex items-center justify-between gap-3">
-          <h1 className="text-xl font-semibold">{status}</h1>
-          {view.phase === "playing" && <Countdown game={game} />}
-        </div>
-        <ul className="flex flex-wrap gap-2">
-          {view.seats.map((id) => {
-            const p = view.players.find((pl) => pl.id === id);
-            const active = view.phase === "playing" && game.waitingFor.includes(id);
-            return (
-              <li
-                key={id}
-                className={`flex min-h-9 items-center gap-2 rounded-full border px-3 text-sm transition-colors ${
-                  active ? "border-line-hover bg-surface" : "border-transparent text-fg-muted"
-                }`}
-              >
-                <span className="size-2.5 rounded-full" style={{ backgroundColor: p?.color }} aria-hidden />
-                {nick(id)}
-                {id === me && " (ty)"}
-                <span className="font-mono">{view.scores[id] ?? 0}</span>
-              </li>
-            );
-          })}
-        </ul>
-        {!seated && (
-          <p className="flex items-center gap-2 text-sm text-fg-muted">
-            <UsersThree size={16} aria-hidden />
-            Oglądasz
-          </p>
-        )}
-      </header>
+      {!ownHeader && (
+        <header className="tile flex flex-col gap-3 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <h1 className="text-xl font-semibold">{status}</h1>
+            {view.phase === "playing" && <Countdown game={game} />}
+          </div>
+          <ul className="flex flex-wrap gap-2">
+            {view.seats.map((id) => {
+              const p = view.players.find((pl) => pl.id === id);
+              const active = view.phase === "playing" && game.waitingFor.includes(id);
+              return (
+                <li
+                  key={id}
+                  className={`flex min-h-9 items-center gap-2 rounded-full border px-3 text-sm transition-colors ${
+                    active ? "border-line-hover bg-surface" : "border-transparent text-fg-muted"
+                  }`}
+                >
+                  <span className="size-2.5 rounded-full" style={{ backgroundColor: p?.color }} aria-hidden />
+                  {nick(id)}
+                  {id === me && " (ty)"}
+                  <span className="font-mono">{view.scores[id] ?? 0}</span>
+                </li>
+              );
+            })}
+          </ul>
+          {!seated && (
+            <p className="flex items-center gap-2 text-sm text-fg-muted">
+              <UsersThree size={16} aria-hidden />
+              Oglądasz
+            </p>
+          )}
+        </header>
+      )}
 
       {def.id === "piec-w-rzedzie" && (
         <PiecWRzedzie
@@ -154,7 +159,9 @@ export function Game({ view, me, dropped, send }: Props) {
           view={game.view as PanstwaMiastaView}
           me={me}
           players={view.players}
+          waitingFor={game.waitingFor}
           ranking={game.result?.ranking}
+          timer={ownHeader && <Countdown game={game} total={def.turn?.(game.view).seconds} />}
           onMove={(move) => send("move", move)}
         />
       )}
@@ -221,7 +228,7 @@ function Countdown({ game, total }: { game: NonNullable<RoomView["game"]>; total
       <div className="flex items-center gap-2">
         <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-line" role="progressbar" aria-label="Czas tury" aria-valuenow={seconds}>
           <div
-            className={`h-full rounded-full transition-[width] duration-300 ease-linear ${seconds <= 10 ? "bg-warning" : "bg-fg-muted"}`}
+            className={`h-full rounded-full transition-[width] duration-300 ease-linear ${seconds <= 10 ? "animate-pulse bg-warning" : "bg-fg-muted"}`}
             style={{ width: `${Math.min(1, left) * 100}%` }}
           />
         </div>

@@ -1,33 +1,60 @@
-import { HandPalm, ThumbsDown } from "@phosphor-icons/react";
+import { Check, HandPalm, ThumbsDown } from "@phosphor-icons/react";
 import { type LobbyPlayer, type PanstwaMiastaMove, type PanstwaMiastaView, PM_ANSWER_MAX, PM_CATEGORIES, pmFits, pmNormalize } from "@mini-games/games";
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Scores } from "../screens/ui.tsx";
 
 interface Props {
   view: PanstwaMiastaView;
   me: string;
   players: LobbyPlayer[];
+  /** Na kogo czeka serwer: w nagłówku znaczek przy tych, którzy już skończyli. */
+  waitingFor: string[];
   ranking?: string[];
+  /** Pasek czasu fazy; bez niego (koniec partii) nagłówek gry chowa się, bo pokazuje go ekran gry. */
+  timer?: ReactNode;
   onMove: (move: PanstwaMiastaMove) => void;
 }
 
 const DRAFT_MS = 500;
+const PHASE_LABEL = { write: "Pisz", vote: "Głosowanie", summary: "Wyniki rundy", over: "Koniec" } as const;
 
-export function PanstwaMiasta({ view, me, players, ranking, onMove }: Props) {
+export function PanstwaMiasta({ view, me, players, waitingFor, ranking, timer, onMove }: Props) {
   const player = (id: string) => players.find((p) => p.id === id);
   const letter = view.letters[view.round];
   const playing = view.players.includes(me);
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-between">
-        <span className="font-mono text-sm text-fg-muted">
-          Runda {view.round + 1}/{view.letters.length}
-        </span>
-        <span className="text-5xl font-semibold" aria-label={`Litera ${letter}`}>
-          {letter}
-        </span>
-      </div>
+      {timer && (
+        <header className="flex flex-col gap-3">
+          <div className="flex items-baseline justify-between">
+            <h1 className="text-xl font-semibold">
+              Runda {view.round + 1}/{view.letters.length}
+            </h1>
+            <span className="text-sm text-fg-muted">{PHASE_LABEL[view.phase]}</span>
+          </div>
+          {timer}
+          <div className="flex items-center gap-4">
+            <span
+              className="flex size-20 shrink-0 items-center justify-center rounded-[20px] border border-line-hover bg-surface text-6xl font-semibold"
+              aria-label={`Litera ${letter}`}
+            >
+              {letter}
+            </span>
+            <ul className="flex flex-wrap gap-x-3 gap-y-1 text-sm">
+              {view.players.map((id) => (
+                <li key={id} className={`flex items-center gap-1.5 ${waitingFor.includes(id) ? "text-fg-muted" : ""}`}>
+                  <span className="size-2 rounded-full" style={{ backgroundColor: player(id)?.color }} aria-hidden />
+                  {player(id)?.nick ?? "Gracz"}
+                  {id === me && <span className="text-fg-muted">(ty)</span>}
+                  {!waitingFor.includes(id) && <Check size={14} weight="bold" className="text-success" aria-label="gotowe" />}
+                </li>
+              ))}
+              {!playing && <li className="text-fg-muted">Oglądasz</li>}
+            </ul>
+          </div>
+        </header>
+      )}
 
       {view.phase === "write" &&
         (playing && !view.done.includes(me) ? (
@@ -62,14 +89,21 @@ export function PanstwaMiasta({ view, me, players, ranking, onMove }: Props) {
             }))}
           />
           {view.phase === "summary" && playing && (
-            <button type="button" className="btn btn-primary w-full" disabled={view.ready.includes(me)} onClick={() => onMove({ type: "next" })}>
-              {view.ready.includes(me) ? "Czekamy na resztę" : "Dalej"}
-            </button>
+            <StickyBar>
+              <button type="button" className="btn btn-primary w-full" disabled={view.ready.includes(me)} onClick={() => onMove({ type: "next" })}>
+                {view.ready.includes(me) ? "Czekamy na resztę" : "Dalej"}
+              </button>
+            </StickyBar>
           )}
         </>
       )}
     </div>
   );
+}
+
+/** Przycisk przyklejony do dołu ekranu: przy otwartej klawiaturze i długiej liście zostaje pod kciukiem. */
+function StickyBar({ children }: { children: ReactNode }) {
+  return <div className="sticky bottom-0 -mx-4 flex items-center gap-3 bg-bg/90 px-4 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">{children}</div>;
 }
 
 function StopBanner({ nick }: { nick?: string }) {
@@ -83,6 +117,7 @@ function StopBanner({ nick }: { nick?: string }) {
 
 /** Pola odpowiedzi. Szkic idzie na serwer w tle, więc przepada najwyżej pół sekundy pisania. */
 function Writing({ view, me, stopBy, onMove }: { view: PanstwaMiastaView; me: string; stopBy?: string | null; onMove: Props["onMove"] }) {
+  const letter = view.letters[view.round];
   const [answers, setAnswers] = useState(() => view.answers[me] ?? PM_CATEGORIES.map(() => ""));
   const timer = useRef<number>(undefined);
   useEffect(() => () => clearTimeout(timer.current), []);
@@ -100,33 +135,56 @@ function Writing({ view, me, stopBy, onMove }: { view: PanstwaMiastaView; me: st
     onMove({ type: "write", answers, done: true });
   }
 
-  const full = answers.every((a) => a.trim());
+  // Enter przechodzi do kolejnego pola; w ostatnim wysyła formularz.
+  function enter(e: React.KeyboardEvent<HTMLInputElement>, i: number) {
+    if (e.key !== "Enter" || i === PM_CATEGORIES.length - 1) return;
+    e.preventDefault();
+    document.getElementById(`pm-${i + 1}`)?.focus();
+  }
+
+  const filled = answers.filter((a) => a.trim()).length;
   return (
-    <form className="tile flex flex-col gap-3 p-4" onSubmit={submit}>
-      {stopBy && <StopBanner nick={stopBy} />}
-      {PM_CATEGORIES.map((category, i) => (
-        <div key={category} className="flex flex-col gap-1">
-          <label htmlFor={`pm-${i}`} className="label">
-            {category}
-          </label>
-          <input
-            id={`pm-${i}`}
-            className="field"
-            value={answers[i]}
-            maxLength={PM_ANSWER_MAX}
-            autoComplete="off"
-            autoCorrect="off"
-            autoCapitalize="words"
-            spellCheck={false}
-            enterKeyHint={i < PM_CATEGORIES.length - 1 ? "next" : "done"}
-            aria-invalid={answers[i].trim() !== "" && !pmFits(view.letters[view.round], answers[i])}
-            onChange={(e) => change(i, e.target.value)}
-          />
-        </div>
-      ))}
-      <button type="submit" className="btn btn-primary w-full">
-        {full && !view.stop ? "STOP!" : "Gotowe"}
-      </button>
+    <form className="flex flex-col gap-3" onSubmit={submit}>
+      <div className="tile flex flex-col gap-4 p-4">
+        {stopBy && <StopBanner nick={stopBy} />}
+        {PM_CATEGORIES.map((category, i) => {
+          const typed = answers[i].trim() !== "";
+          const ok = typed && pmFits(letter, answers[i]);
+          return (
+            <div key={category} className="flex flex-col gap-1.5">
+              <label htmlFor={`pm-${i}`} className="text-[13px] font-medium text-fg">
+                {category}
+              </label>
+              <div className="relative">
+                <input
+                  id={`pm-${i}`}
+                  className="field pr-10"
+                  value={answers[i]}
+                  placeholder={`${letter}…`}
+                  maxLength={PM_ANSWER_MAX}
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="words"
+                  spellCheck={false}
+                  enterKeyHint={i < PM_CATEGORIES.length - 1 ? "next" : "done"}
+                  aria-invalid={typed && !ok}
+                  onKeyDown={(e) => enter(e, i)}
+                  onChange={(e) => change(i, e.target.value)}
+                />
+                {ok && <Check size={18} weight="bold" className="pointer-events-none absolute top-1/2 right-3.5 -translate-y-1/2 text-success" aria-hidden />}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <StickyBar>
+        <span className="w-10 shrink-0 font-mono text-sm text-fg-muted" aria-label={`Wypełnione ${filled} z ${PM_CATEGORIES.length}`}>
+          {filled}/{PM_CATEGORIES.length}
+        </span>
+        <button type="submit" className="btn btn-primary flex-1">
+          {filled === PM_CATEGORIES.length && !view.stop ? "STOP!" : "Gotowe"}
+        </button>
+      </StickyBar>
     </form>
   );
 }
@@ -154,9 +212,11 @@ function Voting({ view, me, player, onMove }: { view: PanstwaMiastaView; me: str
     <>
       <p className="text-sm text-fg-muted">Dotknij cudzej odpowiedzi, która się nie liczy. Odpada, gdy odrzuci ją ponad połowa pozostałych.</p>
       <Answers view={view} player={player} me={me} rejected={rejected} onToggle={toggle} />
-      <button type="button" className="btn btn-primary w-full" onClick={submit}>
-        {rejected.size ? `Zatwierdź (odrzucam ${rejected.size})` : "Wszystko się zgadza"}
-      </button>
+      <StickyBar>
+        <button type="button" className="btn btn-primary w-full" onClick={submit}>
+          {rejected.size ? `Zatwierdź (odrzucam ${rejected.size})` : "Wszystko się zgadza"}
+        </button>
+      </StickyBar>
     </>
   );
 }
