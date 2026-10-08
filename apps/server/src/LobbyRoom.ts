@@ -202,9 +202,14 @@ export class LobbyRoom extends Room {
     const match = this.match!;
     if (!match.def.validateMove(match.state, player, move)) return;
     const before = match.def.waitingFor(match.state).join();
+    const keyBefore = match.def.turn?.(match.state).key;
     match.state = match.def.applyMove(match.state, player, move, match.rng);
     const result = match.def.isOver(match.state);
     if (result) return this.finish(result);
+    if (match.def.turn) {
+      if (match.def.turn(match.state).key !== keyBefore) this.startTurnTimer();
+      return;
+    }
     // Nowy limit, gdy zmienia się, na kogo czekamy, albo jeden gracz ma kolejny ruch (np. strzał po trafieniu).
     // Przestawianie statków w fazie równoczesnej nie przedłuża czasu.
     const after = match.def.waitingFor(match.state);
@@ -229,8 +234,9 @@ export class LobbyRoom extends Room {
     this.turnTimer?.clear();
     this.turnEndsAt = null;
     const { def, state, rng } = this.match!;
-    if (!def.turnSeconds || !def.timeoutMove || def.waitingFor(state).length === 0) return;
-    const ms = def.turnSeconds * 1000;
+    const seconds = def.turn?.(state).seconds ?? def.turnSeconds;
+    if (!seconds || !def.timeoutMove || def.waitingFor(state).length === 0) return;
+    const ms = seconds * 1000;
     this.turnEndsAt = Date.now() + ms;
     this.turnTimer = this.clock.setTimeout(() => {
       // Ruch zastępczy za każdego, na kogo wciąż czekamy (w rozstawianiu może to być dwóch graczy).

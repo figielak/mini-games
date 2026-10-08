@@ -59,6 +59,14 @@ gracz z największym majątkiem (gotówka + wartość pól i budynków).
 - 1-6 graczy naraz, każdy gra u siebie to samo wyzwanie (wylosowane na serwerze), na końcu ranking.
   Partia toczy się na kliencie (opóźnienie Wi-Fi zepsułoby pomiar), serwer dostaje tylko wynik i odrzuca nierealne wartości.
 
+### 2.5 Państwa-miasta
+
+- 2-6 graczy, 5 rund, każda na inną literę (bez Ą Ę Ń Ó Ś Ź Ż Q V X Y), kategorie: Państwo, Miasto, Zwierzę, Roślina, Rzecz, Imię.
+- Wszyscy piszą naraz (90 s). Kto pierwszy odda komplet, daje STOP i reszta ma jeszcze 10 s. Szkic leci na serwer w tle, więc po czasie albo odświeżeniu nic nie przepada.
+- Głosowanie (45 s): odpowiedź odpada, gdy odrzuci ją ponad połowa pozostałych; zła pierwsza litera odpada sama.
+- Punkty: 15 jedyna ważna w kategorii, 10 unikalna, 5 powtórzona (bez wielkości liter i polskich znaków), 0 brak lub odrzucona.
+- Limit zależny od fazy: opcjonalne `turn(state) → { key, seconds }` w `GameDefinition`; licznik startuje od nowa tylko przy zmianie `key`.
+
 ## 3. Architektura
 
 ```

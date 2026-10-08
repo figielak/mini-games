@@ -1,8 +1,9 @@
 import { ArrowCounterClockwise, Timer, UsersThree } from "@phosphor-icons/react";
-import { type ChinczykView, GAMES, type KampusTourView, type PiecWRzedzieView, type RefleksView, type RoomView, type SimonView, type StatkiView } from "@mini-games/games";
+import { type ChinczykView, GAMES, type KampusTourView, type PanstwaMiastaView, type PiecWRzedzieView, type RefleksView, type RoomView, type SimonView, type StatkiView } from "@mini-games/games";
 import { useEffect, useMemo, useState } from "react";
 import { Chinczyk } from "../games/Chinczyk.tsx";
 import { KampusTour } from "../games/KampusTour.tsx";
+import { PanstwaMiasta } from "../games/PanstwaMiasta.tsx";
 import { PiecWRzedzie } from "../games/PiecWRzedzie.tsx";
 import { Refleks } from "../games/Refleks.tsx";
 import { Simon } from "../games/Simon.tsx";
@@ -147,6 +148,17 @@ export function Game({ view, me, dropped, send }: Props) {
         />
       )}
 
+      {def.id === "panstwa-miasta" && (
+        <PanstwaMiasta
+          key={(game.view as PanstwaMiastaView).letters.join("")}
+          view={game.view as PanstwaMiastaView}
+          me={me}
+          players={view.players}
+          ranking={game.result?.ranking}
+          onMove={(move) => send("move", move)}
+        />
+      )}
+
       {/* Mini-gry pokazują ranking same, razem z wynikami. */}
       {view.phase === "over" && !MINI_GAMES.has(def.id) && game.result?.ranking && game.result.ranking.length > 2 && (
         <ol className="tile flex flex-col gap-1 p-4">
@@ -170,7 +182,7 @@ export function Game({ view, me, dropped, send }: Props) {
   );
 }
 
-const MINI_GAMES = new Set(["refleks", "simon"]);
+const MINI_GAMES = new Set(["refleks", "simon", "panstwa-miasta"]);
 
 function OverActions({ host, send }: { host: boolean; send: Send }) {
   if (!host) return <p className="text-center text-sm text-fg-muted">Czekamy na decyzję gospodarza.</p>;

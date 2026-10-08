@@ -24,6 +24,8 @@ export interface GameDefinition<State, Move> {
   waitingFor(state: State): PlayerId[];
   /** Limit czasu tury; po nim platforma wykonuje timeoutMove za gracza. */
   turnSeconds?: number;
+  /** Zamiast turnSeconds: limit zależny od fazy. Odlicza od nowa tylko przy zmianie key (np. STOP w Państwach-miastach). */
+  turn?(state: State): { key: string; seconds: number };
   timeoutMove?(state: State, player: PlayerId, rng: Rng): Move;
 }
 

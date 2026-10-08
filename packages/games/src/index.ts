@@ -1,6 +1,7 @@
 import type { GameDefinition } from "./core.ts";
 import { chinczyk } from "./chinczyk.ts";
 import { kampusTour } from "./kampus-tour.ts";
+import { panstwaMiasta } from "./panstwa-miasta.ts";
 import { piecWRzedzie } from "./piec-w-rzedzie.ts";
 import { refleks } from "./refleks.ts";
 import { simon } from "./simon.ts";
@@ -29,6 +30,14 @@ export {
   type TileKind as KampusTileKind,
   type View as KampusTourView,
 } from "./kampus-tour.ts";
+export {
+  ANSWER_MAX as PM_ANSWER_MAX,
+  CATEGORIES as PM_CATEGORIES,
+  fits as pmFits,
+  type Move as PanstwaMiastaMove,
+  normalize as pmNormalize,
+  type View as PanstwaMiastaView,
+} from "./panstwa-miasta.ts";
 export type { View as PiecWRzedzieView } from "./piec-w-rzedzie.ts";
 export { DURATION_MS as REFLEKS_DURATION_MS, type View as RefleksView } from "./refleks.ts";
 export type { View as SimonView } from "./simon.ts";
@@ -42,4 +51,5 @@ export const GAMES: Record<string, GameDefinition<any, any>> = {
   [kampusTour.id]: kampusTour,
   [refleks.id]: refleks,
   [simon.id]: simon,
+  [panstwaMiasta.id]: panstwaMiasta,
 };
