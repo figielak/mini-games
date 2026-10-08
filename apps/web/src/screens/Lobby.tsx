@@ -6,6 +6,7 @@ import {
   CircleDashed,
   Crown,
   DiceFive,
+  DotsNine,
   Eyedropper,
   GlobeHemisphereEast,
   GridNine,
@@ -216,6 +217,7 @@ const ICONS: Record<string, Icon> = {
   liczenie: Calculator,
   kolo: CircleDashed,
   kolor: Eyedropper,
+  kropki: DotsNine,
 };
 
 /** Nazwy kolorów z PLAYER_COLORS (ta sama kolejność), dla czytników ekranu. */
