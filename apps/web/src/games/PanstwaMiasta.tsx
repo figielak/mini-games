@@ -182,12 +182,12 @@ function Answers({
 }) {
   const letter = view.letters[view.round];
   return (
-    <section className="tile flex flex-col gap-4 p-4">
+    <>
       {PM_CATEGORIES.map((category, c) => {
         const valid = view.players.filter((p) => pmFits(letter, view.answers[p]?.[c] ?? ""));
         return (
-          <div key={category} className="flex flex-col gap-1">
-            <h3 className="label">{category}</h3>
+          <section key={category} className="tile flex flex-col gap-1 p-3">
+            <h3 className="px-2 pb-1 font-semibold">{category}</h3>
             {view.players.map((id) => {
               const answer = view.answers[id]?.[c]?.trim() ?? "";
               const fits = valid.includes(id);
@@ -217,9 +217,9 @@ function Answers({
                 </Row>
               );
             })}
-          </div>
+          </section>
         );
       })}
-    </section>
+    </>
   );
 }
