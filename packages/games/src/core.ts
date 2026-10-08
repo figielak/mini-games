@@ -63,3 +63,19 @@ export function rankResults<R>(players: PlayerId[], results: Record<PlayerId, R>
   const clear = ranking.length > 1 && compare(results[ranking[0]], results[ranking[1]]) !== 0;
   return clear ? { winner: ranking[0], ranking } : { ranking };
 }
+
+/** Tasuje kopię tablicy (Fisher-Yates). */
+export function shuffle<T>(items: readonly T[], rng: Rng): T[] {
+  const a = [...items];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+export const average = (times: number[]) => (times.length ? times.reduce((a, b) => a + b, 0) / times.length : Infinity);
+
+/** Porównanie wyników „na trafienia”: więcej trafień wyżej, przy równej liczbie niższa średnia czasu. */
+export const byHitsThenAverage = (a: { times: number[] }, b: { times: number[] }) =>
+  b.times.length - a.times.length || average(a.times) - average(b.times);

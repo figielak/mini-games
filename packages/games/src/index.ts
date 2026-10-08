@@ -1,11 +1,15 @@
 import type { GameDefinition } from "./core.ts";
 import { chinczyk } from "./chinczyk.ts";
 import { kampusTour } from "./kampus-tour.ts";
+import { liczenie } from "./liczenie.ts";
 import { panstwaMiasta } from "./panstwa-miasta.ts";
 import { piecWRzedzie } from "./piec-w-rzedzie.ts";
 import { refleks } from "./refleks.ts";
+import { schulte } from "./schulte.ts";
 import { simon } from "./simon.ts";
 import { statki } from "./statki.ts";
+import { stoper } from "./stoper.ts";
+import { stroop } from "./stroop.ts";
 
 export * from "./core.ts";
 export * from "./lobby.ts";
@@ -41,6 +45,11 @@ export {
 export type { View as PiecWRzedzieView } from "./piec-w-rzedzie.ts";
 export { DURATION_MS as REFLEKS_DURATION_MS, type View as RefleksView } from "./refleks.ts";
 export type { View as SimonView } from "./simon.ts";
+export { PENALTY_MS as SCHULTE_PENALTY_MS, SIZE as SCHULTE_SIZE, total as schulteTotal, type View as SchulteView } from "./schulte.ts";
+export { TARGET_MS as STOPER_TARGET_MS, VISIBLE_MS as STOPER_VISIBLE_MS, type View as StoperView } from "./stoper.ts";
+export { COLORS as STROOP_COLORS, type View as StroopView } from "./stroop.ts";
+export type { View as LiczenieView } from "./liczenie.ts";
+export { DURATION_MS as QUIZ_DURATION_MS, type QuizMove } from "./quiz.ts";
 export { FLEET_LENGTHS, isValidFleet, randomFleet, SIZE as STATKI_SIZE, type Ship, shipCells, type Shot, type View as StatkiView } from "./statki.ts";
 
 // ponytail: `any`, bo każda gra ma inny stan i ruch; platforma rozmawia z nimi tylko przez GameDefinition
@@ -51,5 +60,9 @@ export const GAMES: Record<string, GameDefinition<any, any>> = {
   [kampusTour.id]: kampusTour,
   [refleks.id]: refleks,
   [simon.id]: simon,
+  [stoper.id]: stoper,
+  [schulte.id]: schulte,
+  [stroop.id]: stroop,
+  [liczenie.id]: liczenie,
   [panstwaMiasta.id]: panstwaMiasta,
 };

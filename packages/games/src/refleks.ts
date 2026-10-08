@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { type GameDefinition, type PlayerId, rankResults } from "./core.ts";
+import { byHitsThenAverage, type GameDefinition, type PlayerId, rankResults } from "./core.ts";
 
 export const DURATION_MS = 30_000;
 const MIN_REACTION_MS = 100;
@@ -18,8 +18,6 @@ export interface State {
 }
 
 export type View = State;
-
-const average = (times: number[]) => (times.length ? times.reduce((a, b) => a + b, 0) / times.length : Infinity);
 
 // ponytail: wynik liczony na kliencie (opóźnienie Wi-Fi zjadłoby pomiar), da się go podrobić;
 // między znajomymi wystarczy, serwer odrzuca tylko nierealne wartości.
@@ -54,8 +52,7 @@ export const refleks: GameDefinition<State, Move> = {
 
   playerView: (state): View => state,
 
-  isOver: (state) =>
-    rankResults(state.players, state.results, (a, b) => b.times.length - a.times.length || average(a.times) - average(b.times)),
+  isOver: (state) => rankResults(state.players, state.results, byHitsThenAverage),
 
   waitingFor: (state) => state.players.filter((p) => !(p in state.results)),
 
