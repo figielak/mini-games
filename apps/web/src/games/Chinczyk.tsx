@@ -44,7 +44,7 @@ const key = ([x, y]: Cell) => y * 11 + x;
 const mix = (color: string, percent: number) => `color-mix(in srgb, ${color} ${percent}%, var(--color-bg))`;
 /** Kolor gracza o stałej jasności (OKLCH): niebieski i żółty wychodzą równie wyraźne. */
 const tint = (color: string, lightness: number, chroma: number) => `oklch(from ${color} ${lightness} calc(c * ${chroma}) h)`;
-/** Miejsce bez gracza: domki tylko zaznaczone, żeby plansza była całością. */
+/** Meta miejsca bez gracza: ledwo widoczna. */
 const UNUSED = mix("var(--color-fg)", 6);
 
 /** Tempo animacji: krok pionka o jedno pole i czas turlania kostki. */
@@ -140,15 +140,16 @@ export function Chinczyk({ view, me, players, canMove, onMove }: Props) {
   const seats = [0, 1, 2, 3].map((seat) => view.players.find((p) => seatOf(p) === seat));
 
   // Każde pole planszy: tło (tor, start, domek gracza), strzałka kierunku na starcie i ewentualny pionek.
-  const cells = new Map<number, { background?: string; ring?: string; arrow?: number; pawn?: { player: string; index: number } }>();
+  const cells = new Map<number, { background?: string; ring?: string; empty?: boolean; arrow?: number; pawn?: { player: string; index: number } }>();
   for (const c of TRACK_CELLS) cells.set(key(c), {});
   seats.forEach((player, seat) => {
     const c = player && color(player);
     // Start: zabarwione pole z obwódką, która zostaje widoczna także pod pionkiem.
     if (c) cells.set(key(TRACK_CELLS[seat * (TRACK / 4)]), { background: tint(c, 0.5, 0.8), ring: c, arrow: START_ARROW[seat] });
     // Domek końcowy bez gracza wygląda jak zwykłe pole: ciemniejszy pas wyglądał jak cień.
-    for (const cell of HOMES[seat]) cells.set(key(cell), { background: c ? tint(c, 0.42, 0.7) : undefined });
-    for (const cell of BASES[seat]) cells.set(key(cell), { background: c ? tint(c, 0.3, 0.5) : UNUSED });
+    // Domki miejsca bez gracza: sama cienka obwódka, żeby plansza była kompletna, a pola wyraźnie puste.
+    for (const cell of HOMES[seat]) cells.set(key(cell), c ? { background: tint(c, 0.42, 0.7) } : { empty: true });
+    for (const cell of BASES[seat]) cells.set(key(cell), c ? { background: tint(c, 0.3, 0.5) } : { empty: true });
   });
   for (const player of view.players) {
     (shown[player] ?? view.pawns[player]).forEach((pos, index) => {
@@ -201,6 +202,7 @@ export function Chinczyk({ view, me, players, canMove, onMove }: Props) {
           if (i === CENTER) return <Finish key={i} colors={seats.map((p) => (p ? tint(color(p), 0.62, 0.9) : UNUSED))} />;
           const cell = cells.get(i);
           if (!cell) return <span key={i} />;
+          if (cell.empty) return <span key={i} className="m-[3px] rounded-full border border-fg/15" aria-hidden />;
           const pawn = cell.pawn;
           const movable = !!pawn && myMove && pawn.player === me && view.movable.includes(pawn.index);
           const isPick = movable && pawn!.index === pick;
