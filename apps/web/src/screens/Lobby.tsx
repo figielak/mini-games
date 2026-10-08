@@ -1,5 +1,5 @@
 import { Check, Crown, Play, ShareNetwork, SignOut } from "@phosphor-icons/react";
-import { GAMES, MAX_PLAYERS, type RoomView } from "@mini-games/games";
+import { GAMES, MAX_PLAYERS, PLAYER_COLORS, type RoomView } from "@mini-games/games";
 import { useState } from "react";
 import { Screen, type Send } from "./ui.tsx";
 
@@ -104,6 +104,7 @@ export function Lobby({ view, me, dropped, send, onLeave }: Props) {
         ) : (
           <div className="h-11 animate-pulse rounded-inset bg-surface-inset" />
         )}
+        {view && <ColorPicker view={view} me={me} send={send} />}
         {view?.players.length === 1 && (
           <p className="mt-3 text-sm text-fg-muted">Podaj znajomym kod pokoju, żeby dołączyli.</p>
         )}
@@ -130,6 +131,44 @@ export function Lobby({ view, me, dropped, send, onLeave }: Props) {
         </button>
       </div>
     </Screen>
+  );
+}
+
+/** Nazwy kolorów z PLAYER_COLORS (ta sama kolejność), dla czytników ekranu. */
+const COLOR_NAMES = ["niebieski", "żółty", "zielony", "fioletowy", "morski", "różowy"];
+
+/** Wybór własnego koloru: zajęte przez innych są przygaszone i nieaktywne. */
+function ColorPicker({ view, me, send }: { view: RoomView; me: string; send: Send }) {
+  const mine = view.players.find((p) => p.id === me)?.color;
+  return (
+    <div className="mt-4 flex flex-col gap-1">
+      <span className="text-sm text-fg-muted">Twój kolor</span>
+      <div className="flex justify-between" role="radiogroup" aria-label="Twój kolor">
+        {PLAYER_COLORS.map((color, i) => {
+          const owner = view.players.find((p) => p.color === color);
+          const taken = !!owner && owner.id !== me;
+          return (
+            <button
+              key={color}
+              type="button"
+              role="radio"
+              aria-checked={color === mine}
+              aria-label={taken ? `${COLOR_NAMES[i]}, zajęty: ${owner.nick}` : COLOR_NAMES[i]}
+              disabled={taken}
+              className="grid size-10 place-items-center rounded-full disabled:opacity-25"
+              onClick={() => send("pickColor", { color })}
+            >
+              <span
+                className={`grid size-7 place-items-center rounded-full ${color === mine ? "outline-2 outline-offset-2 outline-fg" : ""}`}
+                style={{ backgroundColor: color }}
+              >
+                {color === mine && <Check size={14} weight="bold" className="text-bg" aria-hidden />}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

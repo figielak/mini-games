@@ -47,6 +47,7 @@ export function cleanNick(raw: unknown): string | null {
 export const ROOM_MESSAGES = {
   pickGame: z.object({ gameId: z.string() }),
   toggleSeat: z.object({ id: z.string() }),
+  pickColor: z.object({ color: z.enum(PLAYER_COLORS) }),
   start: z.unknown(),
   rematch: z.unknown(),
   toLobby: z.unknown(),

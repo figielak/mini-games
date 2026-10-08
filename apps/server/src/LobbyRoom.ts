@@ -75,6 +75,14 @@ export class LobbyRoom extends Room {
       else if (this.seats.length < def.maxPlayers) this.seats = [...this.seats, id];
     });
 
+    // Kolor zmienia się poza partią; zajętego przez kogoś innego nie da się wziąć.
+    this.on("pickColor", (client, { color }) => {
+      const player = this.players.get(client.sessionId);
+      if (!player || this.phase === "playing") return;
+      if ([...this.players.values()].some((p) => p.color === color)) return;
+      player.color = color;
+    });
+
     this.on("start", (client) => {
       const def = this.gameId ? GAMES[this.gameId] : undefined;
       if (!this.isHost(client) || this.phase !== "lobby" || !def) return;
