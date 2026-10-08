@@ -26,12 +26,7 @@ export function Stroop({ view, ...props }: Props) {
               {STROOP_COLORS[word]}
             </span>
           ),
-          options: STROOP_COLORS.map((name, c) => (
-            <>
-              <span className="size-4 shrink-0 rounded-full" style={{ backgroundColor: HUES[c] }} aria-hidden />
-              <span className="text-base">{name.toLowerCase()}</span>
-            </>
-          )),
+          options: STROOP_COLORS.map((name) => <span className="text-base">{name.toLowerCase()}</span>),
           correct: ink,
         };
       }}
