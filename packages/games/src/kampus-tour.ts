@@ -259,10 +259,10 @@ export function buildCost(tile: number, from: number, to: number): number {
   return cost;
 }
 
-/** Najwyższy możliwy poziom: bez kompletu grupy tylko poziom 1; Ksero, Stołówka i reszta bez budowy. */
+/** Najwyższy możliwy poziom: bez kompletu grupy do poziomu 2; Ksero, Stołówka i reszta bez budowy. */
 export function maxLevel(owners: Record<number, PlayerId>, tile: number): number {
   if (BOARD[tile].kind !== "property") return 0;
-  return setOf(tile).every((i) => owners[i] === owners[tile]) ? LANDMARK : 1;
+  return setOf(tile).every((i) => owners[i] === owners[tile]) ? LANDMARK : 2;
 }
 
 /** Wartość pola z budynkami: cena + koszt budowy. */

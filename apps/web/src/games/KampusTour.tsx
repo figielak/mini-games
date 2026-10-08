@@ -625,7 +625,7 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
         ["Zabudowa", level(i) ? levelName(level(i)) : "brak"],
       );
       if (view.juwenalia?.tile === i) rows.push(["Juwenalia", `czynsz ×${view.juwenalia.factor}`]);
-      text = "Budujesz po staniu na swoim polu. Bez kompletu grupy tylko poziom 1.";
+      text = "Budujesz po staniu na swoim polu. Bez kompletu grupy do poziomu 2.";
     } else if (tile.kind === "utility") {
       text = "Pole usługowe: można je kupić, ale nie można na nim budować. Czynsz zależy od rzutu, a z oboma (Ksero i Stołówka) jest wyższy.";
       rows.push(
