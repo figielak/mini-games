@@ -3,7 +3,7 @@ import { createRng } from "./core.ts";
 import { ATTEMPTS, kolo as game, judge, type Move, type Point, type State } from "./kolo.ts";
 
 // Testy napisane przed implementacją. Ustalają zasady:
-// - 1-6 graczy naraz, każdy ma 10 prób, oddaje punkty (współrzędne 0-1 względem płótna), liczy się najlepsza,
+// - 1-6 graczy naraz, każdy ma 10 prób, oddaje punkty (współrzędne 0-1 względem płótna), liczy się najlepsza (najgorsza też zostaje, do pokazania),
 // - wynik liczy serwer: 0-1000 (dziesiąte części procenta), więcej wyżej,
 // - zakładka ponad pełny obrót jest obcinana, niedokończone (< 0,9 obrotu) i za małe (R < 0,15) koło = 0,
 // - pusty rysunek kończy pozostałe próby (zostaje najlepsza, bez żadnej 0 pkt), to też ruch po limicie czasu.
@@ -100,6 +100,7 @@ describe("walidacja", () => {
   test("pusty rysunek bez prób = 0", () => {
     const t = send(s, A, result([]));
     expect(t.best[A]).toEqual({ score: 0, points: [] });
+    expect(t.worst[A]).toEqual({ score: 0, points: [] });
     expect(game.waitingFor(t)).toEqual([B]);
   });
 });
@@ -112,6 +113,7 @@ describe("próby", () => {
     s = send(s, A, result(square()));
     expect(s.attempts[A]).toBe(3);
     expect(s.best[A].score).toBe(score(circle()));
+    expect(s.worst[A].score).toBe(score(square()));
     expect(game.waitingFor(s)).toEqual([A, B]);
   });
 
