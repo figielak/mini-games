@@ -140,12 +140,14 @@ export function Chinczyk({ view, me, players, canMove, onMove }: Props) {
   const seats = [0, 1, 2, 3].map((seat) => view.players.find((p) => seatOf(p) === seat));
 
   // Każde pole planszy: tło (tor, start, domek gracza), strzałka kierunku na starcie i ewentualny pionek.
-  const cells = new Map<number, { background?: string; arrow?: number; pawn?: { player: string; index: number } }>();
+  const cells = new Map<number, { background?: string; ring?: string; arrow?: number; pawn?: { player: string; index: number } }>();
   for (const c of TRACK_CELLS) cells.set(key(c), {});
   seats.forEach((player, seat) => {
     const c = player && color(player);
-    if (c) cells.set(key(TRACK_CELLS[seat * (TRACK / 4)]), { background: tint(c, 0.62, 0.9), arrow: START_ARROW[seat] });
-    for (const cell of HOMES[seat]) cells.set(key(cell), { background: c ? tint(c, 0.42, 0.7) : UNUSED });
+    // Start: zabarwione pole z obwódką, która zostaje widoczna także pod pionkiem.
+    if (c) cells.set(key(TRACK_CELLS[seat * (TRACK / 4)]), { background: tint(c, 0.5, 0.8), ring: c, arrow: START_ARROW[seat] });
+    // Domek końcowy bez gracza wygląda jak zwykłe pole: ciemniejszy pas wyglądał jak cień.
+    for (const cell of HOMES[seat]) cells.set(key(cell), { background: c ? tint(c, 0.42, 0.7) : undefined });
     for (const cell of BASES[seat]) cells.set(key(cell), { background: c ? tint(c, 0.3, 0.5) : UNUSED });
   });
   for (const player of view.players) {
@@ -182,13 +184,14 @@ export function Chinczyk({ view, me, players, canMove, onMove }: Props) {
     if (view.phase === "over" || !view.turn) return null;
     if (!settled) return null;
     if (myMove) {
-      if (pick === null) return "Dotknij podświetlonego pionka, żeby zobaczyć cel.";
+      if (pick === null) return "Wybierz pionek.";
       return capture ? `Zbijesz pionek: ${nick(capture)}. Dotknij celu, żeby ruszyć.` : "Dotknij celu albo pionka jeszcze raz, żeby ruszyć.";
     }
     if (canMove) return null;
     return view.phase === "move" ? `${nick(view.turn)} wybiera pionek…` : `${nick(view.turn)} rzuca kostką…`;
   })();
 
+  const rollNow = canMove && settled && view.phase === "roll";
   const move = (pawn: number) => onMove({ type: "move", pawn });
 
   return (
@@ -228,53 +231,63 @@ export function Chinczyk({ view, me, players, canMove, onMove }: Props) {
               type="button"
               aria-label={isTarget ? `Rusz pionek ${pick! + 1} tutaj` : isPick ? `Rusz pionek ${pawn!.index + 1}` : `Wybierz pionek ${pawn!.index + 1}`}
               className={className}
-              style={{ backgroundColor: cell.background }}
+              style={{ backgroundColor: cell.background, boxShadow: cell.ring && `inset 0 0 0 2px ${cell.ring}` }}
               onClick={action}
             >
               {inner}
             </button>
           ) : (
-            <span key={i} className={className} style={{ backgroundColor: cell.background }}>
+            <span key={i} className={className} style={{ backgroundColor: cell.background, boxShadow: cell.ring && `inset 0 0 0 2px ${cell.ring}` }}>
               {inner}
             </span>
           );
         })}
       </div>
 
-      <div className="tile flex min-h-20 items-center gap-4 p-4">
-        {last ? (
-          <Die value={last.dice} rolling={rolling} color={color(last.player)} />
-        ) : (
-          <span className="size-12 shrink-0 rounded-inset border border-line" aria-hidden />
-        )}
-        <div className="flex flex-1 flex-col gap-1" aria-live="polite">
-          {last && (
-            <p className="text-sm">
-              <span className="font-bold" style={{ color: color(last.player) }}>
-                {nick(last.player)}
-              </span>{" "}
-              {rolling ? "rzuca…" : `wyrzuca ${last.dice}`}
-            </p>
-          )}
-          {status && <p className="text-sm font-bold">{status}</p>}
-          {prompt && <p className="text-sm text-fg-muted">{prompt}</p>}
-        </div>
-      </div>
+      {/* Odstęp spycha dolny obszar na dół ekranu; sticky trzyma go pod kciukiem, gdy plansza się nie mieści. */}
+      <span className="-mt-3 flex-1" aria-hidden />
 
-      {/* Rzut to główna akcja: duży przycisk przy dolnej krawędzi, w zasięgu kciuka. */}
-      {canMove && settled && view.phase === "roll" && (
-        <>
-          {/* Odstęp spycha pasek na dół ekranu; sticky trzyma go pod kciukiem, gdy plansza się nie mieści. */}
-          <span className="-mt-3 flex-1" aria-hidden />
-          <StickyBar>
-            <button type="button" className="btn btn-primary h-14 w-full text-lg" onClick={() => onMove({ type: "roll" })}>
-              <DiceFive size={24} weight="fill" aria-hidden />
-              Rzuć
-              {!view.pawns[me].some((p) => p >= 0 && p < TRACK) && <span className="font-normal">(próba {4 - view.tries} z 3)</span>}
-            </button>
-          </StickyBar>
-        </>
-      )}
+      {/* Jeden obszar na dole: przy rzucie duży przycisk w kolorze gracza, poza tym ostatni rzut i podpowiedź. */}
+      <StickyBar>
+        <div className="flex w-full flex-col gap-2" aria-live="polite">
+          {rollNow ? (
+            <>
+              {/* Kolejną próbę na szóstkę pokazuje już przycisk. */}
+              {status && !(last?.note === "none" && last.dice !== 6) && <p className="text-center text-sm font-bold">{status}</p>}
+              <button
+                type="button"
+                className="btn h-14 w-full text-lg font-semibold text-bg"
+                style={{ backgroundColor: color(me) }}
+                onClick={() => onMove({ type: "roll" })}
+              >
+                <DiceFive size={24} weight="fill" aria-hidden />
+                Rzuć
+                {!view.pawns[me].some((p) => p >= 0 && p < TRACK) && <span className="font-normal">(próba {4 - view.tries} z 3)</span>}
+              </button>
+            </>
+          ) : (
+            <div className="tile flex min-h-14 items-center gap-3 px-4 py-2">
+              {last ? (
+                <Die value={last.dice} rolling={rolling} color={color(last.player)} />
+              ) : (
+                <span className="size-12 shrink-0 rounded-inset border border-line" aria-hidden />
+              )}
+              <div className="flex flex-1 flex-col gap-0.5">
+                {last && (
+                  <p className="text-sm">
+                    <span className="font-bold" style={{ color: color(last.player) }}>
+                      {last.player === me ? "Ty" : nick(last.player)}
+                    </span>{" "}
+                    {last.player === me ? (rolling ? "rzucasz…" : `wyrzucasz ${last.dice}`) : rolling ? "rzuca…" : `wyrzuca ${last.dice}`}
+                  </p>
+                )}
+                {status && <p className="text-sm font-bold">{status}</p>}
+                {prompt && <p className="text-sm text-fg-muted">{prompt}</p>}
+              </div>
+            </div>
+          )}
+        </div>
+      </StickyBar>
     </div>
   );
 }

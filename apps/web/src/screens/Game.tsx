@@ -81,7 +81,7 @@ export function Game({ view, me, dropped, send }: Props) {
             </h1>
             {view.phase === "playing" && !ludo && <Countdown game={game} />}
           </div>
-          {view.phase === "playing" && ludo && <Countdown game={game} total={def.turnSeconds} tense={myTurn} />}
+          {view.phase === "playing" && ludo && <Countdown game={game} total={def.turnSeconds} color={myTurn ? myColor : undefined} />}
           <ul className="flex flex-wrap gap-2">
             {view.seats.map((id) => {
               const p = view.players.find((pl) => pl.id === id);
@@ -101,7 +101,7 @@ export function Game({ view, me, dropped, send }: Props) {
                       {[...ludo.pawns[id]].sort((a, b) => b - a).map((pos, i) => (
                         <span
                           key={i}
-                          className="size-2 rounded-full border"
+                          className="size-2.5 rounded-full border"
                           style={{ borderColor: p?.color, backgroundColor: pos >= CHINCZYK_TRACK ? p?.color : undefined }}
                           aria-hidden
                         />
@@ -232,8 +232,11 @@ function OverActions({ host, send }: { host: boolean; send: Send }) {
  * Sekundy do końca tury. Liczone od chwili odebrania wiadomości, nie od zegara serwera.
  * Termin zależy od obiektu wiadomości, nie od liczby: każda nowa tura przychodzi z tym samym msLeft (60000).
  */
-/** `tense`: pasek w kolorze akcentu (gra na czas, np. Państwa-miasta), a nie spokojny szary. */
-function Countdown({ game, total, tense }: { game: NonNullable<RoomView["game"]>; total?: number; tense?: boolean }) {
+/**
+ * `tense`: pasek w kolorze akcentu (gra na czas, np. Państwa-miasta), a nie spokojny szary.
+ * `color`: pasek w kolorze gracza (Chińczyk, moja tura). Czerwień i tak przychodzi na ostatnie 10 s.
+ */
+function Countdown({ game, total, tense, color }: { game: NonNullable<RoomView["game"]>; total?: number; tense?: boolean; color?: string }) {
   const deadline = useMemo(() => (game.msLeft === null ? null : Date.now() + game.msLeft), [game]);
   const [now, setNow] = useState(Date.now);
 
@@ -252,7 +255,7 @@ function Countdown({ game, total, tense }: { game: NonNullable<RoomView["game"]>
         <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-line" role="progressbar" aria-label="Czas tury" aria-valuenow={seconds}>
           <div
             className={`h-full rounded-full transition-[width] duration-300 ease-linear ${seconds <= 10 ? "animate-pulse bg-warning" : tense ? "bg-accent" : "bg-fg-muted"}`}
-            style={{ width: `${Math.min(1, left) * 100}%` }}
+            style={{ width: `${Math.min(1, left) * 100}%`, backgroundColor: seconds > 10 ? color : undefined }}
           />
         </div>
         <span className={`w-8 text-right font-mono text-xs ${seconds <= 10 ? "text-warning" : "text-fg-muted"}`}>{seconds}s</span>
