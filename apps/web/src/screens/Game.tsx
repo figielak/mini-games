@@ -1,9 +1,10 @@
 import { ArrowCounterClockwise, Timer, UsersThree } from "@phosphor-icons/react";
-import { CHINCZYK_TRACK, type ChinczykView, GAMES, type KampusTourView, type KoloView, type LiczenieView, type PanstwaMiastaView, type PiecWRzedzieView, type RefleksView, type RoomView, type SchulteView, type SimonView, type StatkiView, type StoperView, type StroopView } from "@mini-games/games";
+import { CHINCZYK_TRACK, type ChinczykView, GAMES, type KampusTourView, type KolorView, type KoloView, type LiczenieView, type PanstwaMiastaView, type PiecWRzedzieView, type RefleksView, type RoomView, type SchulteView, type SimonView, type StatkiView, type StoperView, type StroopView } from "@mini-games/games";
 import { useEffect, useMemo, useState } from "react";
 import { Chinczyk } from "../games/Chinczyk.tsx";
 import { KampusTour } from "../games/KampusTour.tsx";
 import { Kolo } from "../games/Kolo.tsx";
+import { Kolor } from "../games/Kolor.tsx";
 import { Liczenie } from "../games/Liczenie.tsx";
 import { PanstwaMiasta } from "../games/PanstwaMiasta.tsx";
 import { PiecWRzedzie } from "../games/PiecWRzedzie.tsx";
@@ -192,6 +193,17 @@ export function Game({ view, me, dropped, send }: Props) {
         />
       )}
 
+      {def.id === "kolor" && (
+        <Kolor
+          key={JSON.stringify((game.view as KolorView).targets)}
+          view={game.view as KolorView}
+          me={me}
+          players={view.players}
+          ranking={game.result?.ranking}
+          onMove={(move) => send("move", move)}
+        />
+      )}
+
       {def.id === "schulte" && (
         <Schulte
           key={(game.view as SchulteView).grid.join()}
@@ -272,7 +284,7 @@ export function Game({ view, me, dropped, send }: Props) {
   );
 }
 
-const MINI_GAMES = new Set(["refleks", "simon", "stoper", "schulte", "stroop", "liczenie", "kolo", "panstwa-miasta"]);
+const MINI_GAMES = new Set(["refleks", "simon", "stoper", "schulte", "stroop", "liczenie", "kolo", "kolor", "panstwa-miasta"]);
 
 function OverActions({ host, send }: { host: boolean; send: Send }) {
   if (!host) return <p className="text-center text-sm text-fg-muted">Czekamy na decyzję gospodarza.</p>;

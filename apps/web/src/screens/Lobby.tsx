@@ -6,6 +6,7 @@ import {
   CircleDashed,
   Crown,
   DiceFive,
+  Eyedropper,
   GlobeHemisphereEast,
   GridNine,
   HandWaving,
@@ -214,6 +215,7 @@ const ICONS: Record<string, Icon> = {
   stroop: Palette,
   liczenie: Calculator,
   kolo: CircleDashed,
+  kolor: Eyedropper,
 };
 
 /** Nazwy kolorów z PLAYER_COLORS (ta sama kolejność), dla czytników ekranu. */
