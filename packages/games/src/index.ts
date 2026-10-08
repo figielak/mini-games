@@ -2,6 +2,7 @@ import type { GameDefinition } from "./core.ts";
 import { chinczyk } from "./chinczyk.ts";
 import { kampusTour } from "./kampus-tour.ts";
 import { kolo } from "./kolo.ts";
+import { kolor } from "./kolor.ts";
 import { liczenie } from "./liczenie.ts";
 import { panstwaMiasta } from "./panstwa-miasta.ts";
 import { piecWRzedzie } from "./piec-w-rzedzie.ts";
@@ -51,6 +52,7 @@ export { TARGET_MS as STOPER_TARGET_MS, VISIBLE_MS as STOPER_VISIBLE_MS, type Vi
 export { COLORS as STROOP_COLORS, type View as StroopView } from "./stroop.ts";
 export type { View as LiczenieView } from "./liczenie.ts";
 export { ATTEMPTS as KOLO_ATTEMPTS, judge as koloJudge, MAX_POINTS as KOLO_MAX_POINTS, type Point as KoloPoint, type View as KoloView } from "./kolo.ts";
+export { COUNT as KOLOR_COUNT, distance as kolorDistance, type Hsb, hsbToRgb as kolorHsbToRgb, SHOW_MS as KOLOR_SHOW_MS, type View as KolorView } from "./kolor.ts";
 export { DURATION_MS as QUIZ_DURATION_MS, type QuizMove } from "./quiz.ts";
 export { FLEET_LENGTHS, isValidFleet, randomFleet, SIZE as STATKI_SIZE, type Ship, shipCells, type Shot, type View as StatkiView } from "./statki.ts";
 
@@ -67,5 +69,6 @@ export const GAMES: Record<string, GameDefinition<any, any>> = {
   [stroop.id]: stroop,
   [liczenie.id]: liczenie,
   [kolo.id]: kolo,
+  [kolor.id]: kolor,
   [panstwaMiasta.id]: panstwaMiasta,
 };
