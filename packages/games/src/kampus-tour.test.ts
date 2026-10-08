@@ -428,12 +428,12 @@ describe("budowanie", () => {
     expect(view(built).cash[A]).toBe(START_CASH - 15);
   });
 
-  test("bez kompletu tylko poziom 1, wyższe poziomy i landmark z kompletem grupy", () => {
+  test("bez kompletu do poziomu 2, poziom 3 i landmark z kompletem grupy", () => {
     const alone = onOwn({ owners: { 17: A } });
-    expect(game.validateMove(alone, A, { type: "build", level: 1 })).toBe(true);
-    expect(game.validateMove(alone, A, { type: "build", level: 2 })).toBe(false);
-    // Na poziomie 1 bez kompletu nie ma czego budować: tura idzie dalej.
-    expect(game.waitingFor(onOwn({ owners: { 17: A }, levels: { 17: 1 } }))).toEqual([B]);
+    expect(game.validateMove(alone, A, { type: "build", level: 2 })).toBe(true);
+    expect(game.validateMove(alone, A, { type: "build", level: 3 })).toBe(false);
+    // Na poziomie 2 bez kompletu nie ma czego budować: tura idzie dalej.
+    expect(game.waitingFor(onOwn({ owners: { 17: A }, levels: { 17: 2 } }))).toEqual([B]);
 
     let s = onOwn({ levels: { 17: 3 } });
     s = play(s, A, { type: "build", level: 4 });
