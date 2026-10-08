@@ -1,12 +1,12 @@
 import { describe, expect, test } from "vitest";
 import { createRng } from "./core.ts";
-import { kolo as game, judge, type Move, type Point, type State } from "./kolo.ts";
+import { ATTEMPTS, kolo as game, judge, type Move, type Point, type State } from "./kolo.ts";
 
 // Testy napisane przed implementacją. Ustalają zasady:
-// - 1-6 graczy naraz, każdy rysuje jedno koło, oddaje punkty (współrzędne 0-1 względem płótna),
+// - 1-6 graczy naraz, każdy ma 10 prób, oddaje punkty (współrzędne 0-1 względem płótna), liczy się najlepsza,
 // - wynik liczy serwer: 0-1000 (dziesiąte części procenta), więcej wyżej,
 // - zakładka ponad pełny obrót jest obcinana, niedokończone (< 0,9 obrotu) i za małe (R < 0,15) koło = 0,
-// - pusty rysunek = poddanie (0 pkt), to też ruch po limicie czasu.
+// - pusty rysunek kończy pozostałe próby (zostaje najlepsza, bez żadnej 0 pkt), to też ruch po limicie czasu.
 
 const A = "ania";
 const B = "bartek";
@@ -81,33 +81,64 @@ describe("ocena", () => {
 describe("walidacja", () => {
   const s = game.setup([A, B], createRng(1));
   test("wszyscy grają naraz, rewanż to nowa partia", () => {
+    expect(ATTEMPTS).toBe(10);
     expect(game.waitingFor(s)).toEqual([A, B]);
     expect(game.setup([A, B], createRng(2)).nonce).not.toBe(s.nonce);
   });
   test("obcy gracz", () => expect(game.validateMove(s, C, result(circle()))).toBe(false));
-  test("drugi wynik", () => expect(game.validateMove(send(s, A, result(circle())), A, result(circle()))).toBe(false));
+  test("kolejne próby do dziesiątej", () => {
+    let t = s;
+    for (let i = 0; i < ATTEMPTS; i++) t = send(t, A, result(circle()));
+    expect(t.attempts[A]).toBe(ATTEMPTS);
+    expect(game.validateMove(t, A, result(circle()))).toBe(false);
+    expect(game.validateMove(t, A, result([]))).toBe(false);
+  });
   test("5 punktów", () => expect(game.validateMove(s, A, result(circle().slice(0, 5)))).toBe(false));
   test("ponad 1000 punktów", () => expect(game.validateMove(s, A, result(circle({ n: 1001 })))).toBe(false));
   test("współrzędna poza płótnem", () => expect(game.validateMove(s, A, result([...circle(), [1.5, 0.5]]))).toBe(false));
   test("NaN", () => expect(game.validateMove(s, A, result([...circle(), [Number.NaN, 0.5]]))).toBe(false));
-  test("pusty rysunek = poddanie", () => expect(send(s, A, result([]))).toMatchObject({ results: { [A]: { score: 0, points: [] } } }));
+  test("pusty rysunek bez prób = 0", () => {
+    const t = send(s, A, result([]));
+    expect(t.best[A]).toEqual({ score: 0, points: [] });
+    expect(game.waitingFor(t)).toEqual([B]);
+  });
+});
+
+describe("próby", () => {
+  test("zostaje najlepsza, gracz gra do dziesiątej", () => {
+    let s = game.setup([A, B], createRng(1));
+    s = send(s, A, result(square()));
+    s = send(s, A, result(circle()));
+    s = send(s, A, result(square()));
+    expect(s.attempts[A]).toBe(3);
+    expect(s.best[A].score).toBe(score(circle()));
+    expect(game.waitingFor(s)).toEqual([A, B]);
+  });
+
+  test("pusty rysunek kończy próby, zostaje najlepsza", () => {
+    let s = game.setup([A], createRng(1));
+    s = send(s, A, result(square()));
+    s = send(s, A, result([]));
+    expect(s.best[A].score).toBe(score(square()));
+    expect(game.waitingFor(s)).toEqual([]);
+  });
 });
 
 describe("koniec", () => {
-  test("lepsze koło wygrywa", () => {
+  test("lepsze koło wygrywa, dopiero gdy wszyscy skończą", () => {
     let s = game.setup([A, B, C], createRng(1));
-    expect(game.isOver(s)).toBeNull();
     s = send(s, A, result(square()));
+    s = send(s, A, result([]));
     s = send(s, B, result(circle()));
     s = send(s, C, result([]));
-    expect(s.results[B].score).toBe(score(circle()));
+    expect(game.isOver(s)).toBeNull();
+    s = send(s, B, result([]));
     expect(game.isOver(s)).toEqual({ winner: B, ranking: [B, A, C] });
   });
 
   test("remis: bez zwycięzcy", () => {
     let s = game.setup([A, B], createRng(1));
-    s = send(s, A, result(circle()));
-    s = send(s, B, result(circle()));
+    for (const p of [A, B]) s = send(send(s, p, result(circle())), p, result([]));
     expect(game.isOver(s)).toEqual({ ranking: [A, B] });
   });
 
