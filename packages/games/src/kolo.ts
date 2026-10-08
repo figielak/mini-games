@@ -34,6 +34,8 @@ export interface State {
   attempts: Record<PlayerId, number>;
   /** Najlepsza próba każdego gracza. */
   best: Record<PlayerId, Result>;
+  /** Najgorsza próba, do pokazania obok najlepszej. */
+  worst: Record<PlayerId, Result>;
 }
 
 export type View = State;
@@ -105,7 +107,7 @@ export const kolo: GameDefinition<State, Move> = {
   turnSeconds: 120,
   moveSchema: z.object({ type: z.literal("result"), points: z.array(z.tuple([z.number(), z.number()])).max(MAX_POINTS) }),
 
-  setup: (players, rng) => ({ players, nonce: Math.floor(rng() * 2 ** 32), attempts: {}, best: {} }),
+  setup: (players, rng) => ({ players, nonce: Math.floor(rng() * 2 ** 32), attempts: {}, best: {}, worst: {} }),
 
   validateMove: (state, player, { points }) =>
     state.players.includes(player) &&
@@ -113,13 +115,25 @@ export const kolo: GameDefinition<State, Move> = {
     (points.length === 0 || (points.length >= MIN_POINTS && points.length <= MAX_POINTS && points.every(([x, y]) => inCanvas(x) && inCanvas(y)))),
 
   applyMove: (state, player, { points }) => {
-    const prev = state.best[player];
+    const best = state.best[player];
+    const worst = state.worst[player];
     if (points.length === 0) {
-      return { ...state, attempts: { ...state.attempts, [player]: ATTEMPTS }, best: { ...state.best, [player]: prev ?? { score: 0, points: [] } } };
+      const none = { score: 0, points: [] };
+      return {
+        ...state,
+        attempts: { ...state.attempts, [player]: ATTEMPTS },
+        best: { ...state.best, [player]: best ?? none },
+        worst: { ...state.worst, [player]: worst ?? none },
+      };
     }
     const { score, points: cut } = judge(points);
-    const best = prev && prev.score >= score ? prev : { score, points: cut };
-    return { ...state, attempts: { ...state.attempts, [player]: (state.attempts[player] ?? 0) + 1 }, best: { ...state.best, [player]: best } };
+    const now = { score, points: cut };
+    return {
+      ...state,
+      attempts: { ...state.attempts, [player]: (state.attempts[player] ?? 0) + 1 },
+      best: { ...state.best, [player]: best && best.score >= score ? best : now },
+      worst: { ...state.worst, [player]: worst && worst.score <= score ? worst : now },
+    };
   },
 
   playerView: (state): View => state,

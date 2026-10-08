@@ -135,18 +135,30 @@ export function Kolo({ view, me, players, ranking, onMove }: Props) {
   return (
     <>
       <Scores rows={rows} />
-      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      <ul className="flex flex-col gap-3">
         {rows
           .filter((r) => r.score !== null)
           .map((r) => (
-            <li key={r.id} className="tile flex flex-col gap-1 p-2">
-              <svg viewBox="0 0 1 1" className="aspect-square w-full" aria-label={`Koło gracza ${r.nick}`}>
-                <Drawing points={view.best[r.id].points} color={r.color} />
-              </svg>
-              <span className="flex justify-between gap-2 text-sm">
-                <span className="truncate">{r.nick}</span>
-                <span className="font-mono">{r.score}</span>
-              </span>
+            <li key={r.id} className="tile flex flex-col gap-2 p-3">
+              <span className="truncate">{r.nick}</span>
+              <div className="grid grid-cols-2 gap-3">
+                {(
+                  [
+                    ["Najlepsze", view.best[r.id]],
+                    ["Najgorsze", view.worst[r.id]],
+                  ] as const
+                ).map(([label, attempt]) => (
+                  <figure key={label} className="flex flex-col gap-1">
+                    <svg viewBox="0 0 1 1" className="aspect-square w-full rounded-[10px] bg-bg" aria-label={`${label} koło gracza ${r.nick}`}>
+                      <Drawing points={attempt.points} color={r.color} />
+                    </svg>
+                    <figcaption className="flex justify-between gap-2 text-sm text-fg-muted">
+                      {label}
+                      <span className="font-mono text-fg">{percent(attempt.score)}</span>
+                    </figcaption>
+                  </figure>
+                ))}
+              </div>
             </li>
           ))}
       </ul>
