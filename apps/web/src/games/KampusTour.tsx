@@ -963,7 +963,7 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
                     ))}
                   </ul>
                 )}
-                {actions && <div className="flex w-full max-w-xs gap-2">{actions}</div>}
+                {actions && <div className="flex w-full max-w-xs flex-wrap gap-2">{actions}</div>}
                 {over && summaryHidden && view.stats && (
                   <button type="button" className="btn btn-ghost min-h-9 px-4 text-sm" onClick={() => setSummaryHidden(false)}>
                     Podsumowanie

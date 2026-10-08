@@ -70,7 +70,7 @@ export function KampusSummary({ title, stats, players, nick, color, finalWealth,
             )}
           </dl>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {actions}
           <button type="button" className="btn btn-ghost" onClick={onClose}>
             Plansza

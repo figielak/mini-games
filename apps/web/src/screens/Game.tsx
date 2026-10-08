@@ -48,7 +48,7 @@ export function Game({ view, me, dropped, send }: Props) {
         result={game.result}
         onMove={(move) => send("move", move)}
         timer={view.phase === "playing" && <Countdown game={game} total={def.turnSeconds} />}
-        actions={view.phase === "over" && <OverActions host={view.hostId === me} send={send} />}
+        actions={view.phase === "over" && <OverActions view={view} me={me} send={send} />}
       />
     );
   }
@@ -277,7 +277,7 @@ export function Game({ view, me, dropped, send }: Props) {
 
       {view.phase === "over" && (
         <div className="mt-auto flex flex-col gap-2 pt-4">
-          <OverActions host={view.hostId === me} send={send} />
+          <OverActions view={view} me={me} send={send} />
         </div>
       )}
     </Screen>
@@ -286,15 +286,27 @@ export function Game({ view, me, dropped, send }: Props) {
 
 const MINI_GAMES = new Set(["refleks", "simon", "stoper", "schulte", "stroop", "liczenie", "kolo", "kolor", "panstwa-miasta"]);
 
-function OverActions({ host, send }: { host: boolean; send: Send }) {
-  if (!host) return <p className="text-center text-sm text-fg-muted">Czekamy na decyzję gospodarza.</p>;
+/** Rewanż rusza, gdy kliknie go każdy grający; „Do lobby” od jednej osoby kończy serię. */
+function OverActions({ view, me, send }: { view: RoomView; me: string; send: Send }) {
+  const seated = view.players.filter((p) => view.seats.includes(p.id));
+  const wants = seated.filter((p) => p.ready);
+  const waiting = seated.filter((p) => !p.ready);
+  const iWant = wants.some((p) => p.id === me);
   return (
     <>
-      <button type="button" className="btn btn-primary w-full" onClick={() => send("rematch")}>
-        <ArrowCounterClockwise size={18} weight="bold" aria-hidden />
-        Rewanż
-      </button>
-      <button type="button" className="btn btn-ghost w-full" onClick={() => send("toLobby")}>
+      {wants.length > 0 && (
+        <p className="basis-full text-center text-sm text-fg-muted" role="status">
+          Rewanż chce: {wants.map((p) => p.nick).join(", ")}
+          {waiting.length > 0 && <> · czekamy na: {waiting.map((p) => p.nick).join(", ")}</>}
+        </p>
+      )}
+      {view.seats.includes(me) && (
+        <button type="button" className="btn btn-primary flex-1" disabled={iWant} onClick={() => send("rematch")}>
+          <ArrowCounterClockwise size={18} weight="bold" aria-hidden />
+          {iWant ? "Czekamy na resztę" : "Rewanż"}
+        </button>
+      )}
+      <button type="button" className="btn btn-ghost flex-1" onClick={() => send("toLobby")}>
         Do lobby
       </button>
     </>

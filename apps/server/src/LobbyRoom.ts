@@ -103,16 +103,17 @@ export class LobbyRoom extends Room {
       if (move.success) this.play(client.sessionId, move.data);
     });
 
+    // Po partii `ready` znaczy „chcę rewanż”; rewanż rusza, gdy chcą wszyscy grający.
     this.on("rematch", (client) => {
-      const def = this.gameId ? GAMES[this.gameId] : undefined;
-      if (!this.isHost(client) || this.phase !== "over" || !def) return;
-      // Na zmianę: kto zaczynał, w rewanżu rusza się ostatni.
-      this.seats = [...this.seats.slice(1), this.seats[0]];
-      this.startMatch(def);
+      const player = this.players.get(client.sessionId);
+      if (!player || this.phase !== "over" || !this.seats.includes(client.sessionId)) return;
+      player.ready = true;
+      this.maybeRematch();
     });
 
+    // Każdy może zakończyć serię i zabrać wszystkich do lobby.
     this.on("toLobby", (client) => {
-      if (!this.isHost(client) || this.phase !== "over") return;
+      if (!this.players.has(client.sessionId) || this.phase !== "over") return;
       this.phase = "lobby";
       this.match = null;
       this.resetReady();
@@ -167,6 +168,7 @@ export class LobbyRoom extends Room {
       this.seats = this.seats.filter((s) => s !== client.sessionId);
       // Walkower: w grze 1v1 wygrywa ten, kto został.
       if (this.phase === "playing") this.finish(this.seats.length === 1 ? { winner: this.seats[0] } : {});
+      else this.maybeRematch();
     }
     this.update();
   }
@@ -211,6 +213,16 @@ export class LobbyRoom extends Room {
     for (const p of this.players.values()) p.ready = false;
   }
 
+  private maybeRematch() {
+    const def = this.gameId ? GAMES[this.gameId] : undefined;
+    if (this.phase !== "over" || !def || this.seats.length < def.minPlayers) return;
+    if (!this.seats.every((id) => this.players.get(id)?.ready)) return;
+    // Na zmianę: kto zaczynał, w rewanżu rusza się ostatni.
+    this.seats = [...this.seats.slice(1), this.seats[0]];
+    this.resetReady();
+    this.startMatch(def);
+  }
+
   private startMatch(def: GameDefinition<unknown, unknown>) {
     const rng = createRng(crypto.getRandomValues(new Uint32Array(1))[0]);
     this.match = { def, state: def.setup(this.seats, rng), rng, result: null };
@@ -240,6 +252,7 @@ export class LobbyRoom extends Room {
     if (!this.match) return;
     this.match.result = result;
     this.phase = "over";
+    this.resetReady();
     this.turnTimer?.clear();
     this.turnEndsAt = null;
     if (!result.winner) return;
