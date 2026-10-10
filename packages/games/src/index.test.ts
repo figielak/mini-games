@@ -24,7 +24,12 @@ test("rejestr: id z sieci nie trafia w pola prototypu obiektu, a klucz to id gry
   for (const [id, game] of Object.entries(GAMES)) expect(game.id).toBe(id);
 });
 
-describe.each(Object.values(GAMES))("$name: kontrakt", (game) => {
+// Gra z trybami przechodzi kontrakt w każdym trybie.
+const CASES = Object.values(GAMES).flatMap((game) =>
+  (game.modes ?? [undefined]).map((mode) => ({ game, mode: mode?.id, name: mode ? `${game.name} (${mode.name})` : game.name })),
+);
+
+describe.each(CASES)("$name: kontrakt", ({ game, mode }) => {
   test.each([...new Set([game.minPlayers, game.maxPlayers])])("%i graczy: losowa partia do końca", (n) => {
     for (const seed of SEEDS) {
       const players = ["p1", "p2", "p3", "p4", "p5", "p6"].slice(0, n);
@@ -32,7 +37,7 @@ describe.each(Object.values(GAMES))("$name: kontrakt", (game) => {
       const views = (s: unknown) => [...players, ""].map((viewer) => JSON.stringify(game.playerView(s, viewer)));
       const seen = new Map<string, unknown>();
       const phases = (visited[game.id] ??= new Set());
-      let s = game.setup(players, rng);
+      let s = game.setup(players, rng, mode);
 
       for (let steps = 0; !game.isOver(s); steps++) {
         if (steps > MAX_STEPS) throw new Error(`seed ${seed}: partia się nie kończy`);
