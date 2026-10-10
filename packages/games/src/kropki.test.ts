@@ -1,17 +1,19 @@
 import { describe, expect, test } from "vitest";
 import { createRng } from "./core.ts";
-import { GAP, kropki as game, MAX, MIN, type Move, ROUNDS, type State } from "./kropki.ts";
+import { GAP, kropki as game, MAX, MIN, type Move, ROUNDS, type State, type View } from "./kropki.ts";
 
 // Testy napisane przed implementacją. Ustalają zasady:
 // - 1-6 graczy naraz, każdy liczy te same 10 układów kropek (MIN-MAX kropek, pozycje 0-1 z odstępem),
 // - odpowiedź to 10 liczb całkowitych 0-99; wynik = suma błędów |odpowiedź − liczba|,
-// - mniejsza suma wyżej; pusta odpowiedź (limit czasu) liczy się jak same zera.
+// - mniejsza suma wyżej; pusta odpowiedź (limit czasu) liczy się jak same zera,
+// - ruch progress zgłasza liczbę odpowiedzianych rund (1-9) do podglądu u rywali i nie odnawia limitu.
 
 const A = "ania";
 const B = "bartek";
 const C = "celina";
 
 const result = (answers: number[]): Move => ({ type: "result", answers });
+const progress = (done: number): Move => ({ type: "progress", done });
 const counts = (s: State) => s.rounds.map((r) => r.length);
 
 function send(s: State, player: string, move: Move): State {
@@ -87,5 +89,51 @@ describe("koniec", () => {
   test("po limicie czasu pusta odpowiedź", () => {
     const s = game.setup([A, B], createRng(1));
     expect(game.timeoutMove!(s, A, createRng(1))).toEqual(result([]));
+  });
+});
+
+describe("postęp", () => {
+  const s = game.setup([A, B], createRng(1));
+
+  test("na starcie pusty, po zgłoszeniu widzą go wszyscy", () => {
+    expect((game.playerView(s, B) as View).progress).toEqual({});
+    const after = send(s, A, progress(3));
+    expect((game.playerView(after, B) as View).progress).toEqual({ [A]: 3 });
+    expect((game.playerView(after, "") as View).progress).toEqual({ [A]: 3 });
+    expect(s.progress).toEqual({});
+  });
+
+  test("nie kończy gry i nie zmienia, na kogo czekamy", () => {
+    const after = send(s, A, progress(ROUNDS - 1));
+    expect(game.isOver(after)).toBeNull();
+    expect(game.waitingFor(after)).toEqual([A, B]);
+    expect(game.validateMove(after, A, result(counts(s)))).toBe(true);
+  });
+
+  test("może spaść (gracz odświeżył stronę i zaczyna od nowa)", () => {
+    expect(send(send(s, A, progress(5)), A, progress(1)).progress[A]).toBe(1);
+  });
+
+  test.each([
+    ["zero", progress(0)],
+    ["ostatnia runda (to już wynik)", progress(ROUNDS)],
+    ["ułamek", progress(1.5)],
+  ])("odrzucony: %s", (_, move) => expect(game.validateMove(s, A, move)).toBe(false));
+  test("obcy gracz", () => expect(game.validateMove(s, C, progress(3))).toBe(false));
+  test("po oddaniu wyniku", () => expect(game.validateMove(send(s, A, result(counts(s))), A, progress(3))).toBe(false));
+
+  test("limit tury ma stały klucz, więc postęp go nie odnawia", () => {
+    expect(game.turn!(s)).toEqual({ key: "run", seconds: game.turnSeconds });
+    expect(game.turn!(send(s, A, progress(5)))).toEqual(game.turn!(s));
+  });
+
+  test("schemat odrzuca śmieci z sieci", () => {
+    const ok = (m: unknown) => game.moveSchema.safeParse(m).success;
+    expect(ok(progress(3))).toBe(true);
+    expect(ok(result([]))).toBe(true);
+    expect(ok({ type: "progress" })).toBe(false);
+    expect(ok({ type: "progress", done: "3" })).toBe(false);
+    expect(ok({ type: "result", answers: Array(ROUNDS + 1).fill(1) })).toBe(false);
+    expect(ok({ type: "skok" })).toBe(false);
   });
 });
