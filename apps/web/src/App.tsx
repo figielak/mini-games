@@ -6,6 +6,7 @@ import { forgetRoom, resumeRoom, watchRoom } from "./net.ts";
 import { Home } from "./screens/Home.tsx";
 import { Game } from "./screens/Game.tsx";
 import { Lobby } from "./screens/Lobby.tsx";
+import { MiniGames } from "./screens/MiniGames.tsx";
 import { Setup } from "./screens/Setup.tsx";
 
 export function App() {
@@ -14,6 +15,8 @@ export function App() {
   const [view, setView] = useState<RoomView | null>(null);
   const [dropped, setDropped] = useState(false);
   const [notice, setNotice] = useState<string>();
+  // Gospodarz otworzył listę mini-gier; samo otwarcie nie zmienia nic w pokoju.
+  const [mini, setMini] = useState(false);
 
   useEffect(() => {
     resumeRoom().then((r) => {
@@ -41,8 +44,17 @@ export function App() {
   if (!room) return <Home onRoom={setRoom} notice={notice} />;
   const send = (type: string, payload?: unknown) => room.send(type, payload);
   if (view && view.phase !== "lobby") return <Game view={view} me={room.sessionId} dropped={dropped} send={send} />;
-  const lobby = { me: room.sessionId, dropped, send, onLeave: () => room.leave() };
-  // Gra główna ma własny ekran przed partią; mini-gry startują prosto z listy w lobby.
-  if (view?.gameId && GAMES[view.gameId]?.minPlayers > 1) return <Setup view={view} {...lobby} />;
-  return <Lobby view={view} {...lobby} />;
+  const me = room.sessionId;
+  const screen = { me, dropped, send, onLeave: () => room.leave() };
+  const def = view?.gameId ? GAMES[view.gameId] : undefined;
+  // Gra główna ma własny ekran przed partią; mini-gry wybiera się na osobnej liście.
+  if (view && def && def.minPlayers > 1) return <Setup view={view} {...screen} />;
+  if (view && (def || (mini && view.hostId === me))) {
+    const back = () => {
+      setMini(false);
+      send("pickGame", { gameId: null });
+    };
+    return <MiniGames view={view} {...screen} onBack={back} />;
+  }
+  return <Lobby view={view} {...screen} onMini={() => setMini(true)} onTournament={() => {}} />;
 }

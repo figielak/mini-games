@@ -1,8 +1,7 @@
-import { ArrowLeft, Check, Play, ShareNetwork, SignOut } from "@phosphor-icons/react";
+import { Play } from "@phosphor-icons/react";
 import { GAMES, type RoomView } from "@mini-games/games";
-import { useState } from "react";
 import { BLURBS, ICONS, Players, seats, StartBar } from "./Lobby.tsx";
-import { Screen, type Send } from "./ui.tsx";
+import { Screen, type Send, TopBar } from "./ui.tsx";
 
 interface Props {
   view: RoomView;
@@ -17,40 +16,9 @@ export function Setup({ view, me, dropped, send, onLeave }: Props) {
   const isHost = view.hostId === me;
   const def = GAMES[view.gameId!];
   const GameIcon = ICONS[def.id] ?? Play;
-  const [copied, setCopied] = useState(false);
-
-  async function share() {
-    const url = `${location.origin}/?kod=${view.code}`;
-    if (navigator.share) {
-      // Anulowanie arkusza udostępniania to nie błąd.
-      await navigator.share({ title: "Gry", text: `Dołącz do pokoju ${view.code}`, url }).catch(() => {});
-      return;
-    }
-    await navigator.clipboard.writeText(url);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
-
   return (
     <Screen dropped={dropped}>
-      <div className="flex items-center justify-between">
-        {isHost ? (
-          <button type="button" className="-ml-2 flex min-h-12 items-center gap-1.5 px-2 text-sm text-fg-muted" onClick={() => send("pickGame", { gameId: null })}>
-            <ArrowLeft size={16} aria-hidden />
-            Gry
-          </button>
-        ) : (
-          <button type="button" className="-ml-2 flex min-h-12 items-center gap-1.5 px-2 text-sm text-fg-muted" onClick={onLeave}>
-            <SignOut size={16} aria-hidden />
-            Wyjdź
-          </button>
-        )}
-        <button type="button" className="-mr-2 flex min-h-12 items-center gap-2 px-2" onClick={share} aria-label={`Kod pokoju ${view.code}, udostępnij link`}>
-          <span className="text-sm text-fg-muted">{copied ? "Skopiowano!" : "Kod"}</span>
-          <span className="font-mono text-lg font-medium tracking-[0.12em]">{view.code}</span>
-          {copied ? <Check size={16} weight="bold" aria-hidden /> : <ShareNetwork size={16} weight="bold" aria-hidden />}
-        </button>
-      </div>
+      <TopBar code={view.code} onBack={isHost ? () => send("pickGame", { gameId: null }) : undefined} onLeave={onLeave} />
 
       <section className="tile">
         <div className="flex items-center gap-3">

@@ -12,6 +12,7 @@ import {
   Crown,
   DiceFive,
   DotsNine,
+  GameController,
   Eyedropper,
   GlobeHemisphereEast,
   GridNine,
@@ -31,6 +32,7 @@ import {
   SquaresFour,
   Stack,
   Timer,
+  Trophy,
 } from "@phosphor-icons/react";
 import { GAMES, type LobbyPlayer, MAX_PLAYERS, PLAYER_COLORS, type RoomView } from "@mini-games/games";
 import { useState } from "react";
@@ -43,9 +45,11 @@ interface Props {
   dropped: boolean;
   send: Send;
   onLeave: () => void;
+  onMini: () => void;
+  onTournament: () => void;
 }
 
-export function Lobby({ view, me, dropped, send, onLeave }: Props) {
+export function Lobby({ view, me, dropped, send, onLeave, onMini, onTournament }: Props) {
   if (!view) {
     return (
       <Screen dropped={dropped}>
@@ -55,62 +59,25 @@ export function Lobby({ view, me, dropped, send, onLeave }: Props) {
     );
   }
   const isHost = view.hostId === me;
-  const def = view.gameId ? GAMES[view.gameId] : undefined;
-  const DefIcon = (def && ICONS[def.id]) || Play;
 
   return (
     <Screen dropped={dropped}>
       <Code code={view.code} onLeave={onLeave} />
       <Players view={view} me={me} send={send} />
 
-      {/* Gospodarz: siatka gier. Gra główna otwiera ekran gry (Setup.tsx), mini-gra startuje stąd. */}
-      {isHost &&
-        GROUPS.map(([title, quick]) => (
-          <section key={title}>
-            <h2 className="label mb-2 px-1">{title}</h2>
-            <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label={title}>
-              {Object.values(GAMES)
-                .filter((g) => (g.minPlayers === 1) === quick)
-                .map((g) => {
-                  const Icon = ICONS[g.id] ?? Play;
-                  const tooMany = view.players.length > g.maxPlayers;
-                  const picked = view.gameId === g.id;
-                  return (
-                    <button
-                      key={g.id}
-                      type="button"
-                      role="radio"
-                      aria-checked={picked}
-                      disabled={tooMany}
-                      className={`flex min-h-20 flex-col items-start gap-1 rounded-inset border p-3 text-left transition-colors ${
-                        picked ? "border-accent bg-accent-soft" : "border-line enabled:hover:border-line-hover"
-                      } ${tooMany ? "opacity-40" : ""}`}
-                      onClick={() => send("pickGame", { gameId: g.id })}
-                    >
-                      <Icon size={22} weight={picked ? "fill" : "regular"} aria-hidden />
-                      <span className="leading-tight">{g.name}</span>
-                      <span className="font-mono text-xs text-fg-muted">
-                        {tooMany ? (g.minPlayers === g.maxPlayers ? "tylko " : "max ") + `${g.maxPlayers} os.` : seats(g)}
-                      </span>
-                    </button>
-                  );
-                })}
-            </div>
-          </section>
-        ))}
-
-      {/* Gość: jedna karta na całą szerokość z opisem wybranej mini-gry. */}
-      {!isHost && def && (
-        <section className="tile">
-          <h2 className="label mb-3">Wybrana gra</h2>
-          <div className="flex items-center gap-3">
-            <DefIcon size={28} weight="fill" className="shrink-0" aria-hidden />
-            <div className="min-w-0">
-              <p className="leading-tight">{def.name}</p>
-              <p className="font-mono text-xs text-fg-muted">{seats(def)}</p>
-            </div>
+      {/* Gospodarz: gry główne otwierają ekran gry (Setup.tsx), dwa ostatnie kafle prowadzą do turnieju i listy mini-gier. */}
+      {isHost && (
+        <section>
+          <h2 className="label mb-2 px-1">Gry</h2>
+          <div className="grid grid-cols-2 gap-2">
+            {Object.values(GAMES)
+              .filter((g) => g.minPlayers > 1)
+              .map((g) => (
+                <GameTile key={g.id} game={g} players={view.players.length} onClick={() => send("pickGame", { gameId: g.id })} />
+              ))}
+            <Tile icon={Trophy} name="Turniej" hint="1-6 os." disabled onClick={onTournament} />
+            <Tile icon={GameController} name="Mini-gry" hint={`${MINI_GAMES.length} gier`} onClick={onMini} />
           </div>
-          <p className="mt-3 text-sm text-fg-muted">{BLURBS[def.id]}</p>
         </section>
       )}
 
@@ -251,11 +218,42 @@ export function StartBar({ view, me, send }: { view: RoomView; me: string; send:
   );
 }
 
-/** Szybkie gry to te, w które da się grać solo (minPlayers 1); reszta to planszowe i turowe. */
-const GROUPS: [string, boolean][] = [
-  ["Planszowe i turowe", false],
-  ["Szybkie i refleksowe", true],
-];
+/** Mini-gry to gry, w które da się grać solo (minPlayers 1); reszta to gry główne. */
+export const MINI_GAMES = Object.values(GAMES).filter((g) => g.minPlayers === 1);
+
+/** Kafel w siatce gier: ikona, nazwa i jedna linijka pod spodem. */
+export function Tile({ icon: TileIcon, name, hint, picked, disabled, onClick }: { icon: Icon; name: string; hint: string; picked?: boolean; disabled?: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={picked}
+      disabled={disabled}
+      className={`flex min-h-20 flex-col items-start gap-1 rounded-inset border p-3 text-left transition-colors ${
+        picked ? "border-accent bg-accent-soft" : "border-line enabled:hover:border-line-hover"
+      } ${disabled ? "opacity-40" : ""}`}
+      onClick={onClick}
+    >
+      <TileIcon size={22} weight={picked ? "fill" : "regular"} aria-hidden />
+      <span className="leading-tight">{name}</span>
+      <span className="font-mono text-xs text-fg-muted">{hint}</span>
+    </button>
+  );
+}
+
+/** Kafel gry; nieaktywny, gdy w pokoju jest więcej osób, niż gra ma miejsc. */
+export function GameTile({ game: g, players, picked, onClick }: { game: { id: string; name: string; minPlayers: number; maxPlayers: number }; players: number; picked?: boolean; onClick: () => void }) {
+  const tooMany = players > g.maxPlayers;
+  return (
+    <Tile
+      icon={ICONS[g.id] ?? Play}
+      name={g.name}
+      hint={tooMany ? (g.minPlayers === g.maxPlayers ? "tylko " : "max ") + `${g.maxPlayers} os.` : seats(g)}
+      picked={picked}
+      disabled={tooMany}
+      onClick={onClick}
+    />
+  );
+}
 
 export const ICONS: Record<string, Icon> = {
   "piec-w-rzedzie": GridNine,
