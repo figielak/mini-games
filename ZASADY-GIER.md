@@ -136,6 +136,8 @@ Wspólne zasady w `quiz.ts`, wspólny ekran `Quiz.tsx`.
 ### Który rok? (`rok`)
 - 10 rund, w każdej jeden event historyczny / wynalazek / premiera bez wskazania roku; gracz ustawia rok suwakiem.
 - Zasady: 1-6 graczy, mini-gra, limit partii 240 s, zakres lat 1900-2025, ta sama 10-elementowa pula dla wszystkich.
+- Pula `EVENTS` w `rok.ts`: ok. 160 wydarzeń z jednoznacznym rokiem w czterech działach (historia świata, historia Polski,
+  wynalazki i technologia, popkultura); tekst nie zawiera czterocyfrowej liczby, premiera to rok pierwszej premiery.
 - Jeden ruch z 10 odpowiedziami (int 1900-2025). Wynik liczy serwer: suma |odpowiedź − rok|, mniej lepiej.
 - Pusta lista = limit czasu, liczona jako najgorszy możliwy wynik rundy: `max(rok − MIN_YEAR, MAX_YEAR − rok)`.
 - Ruch `progress` (`done` = liczba odpowiedzianych rund, int 1-9) po każdej odpowiedzi poza ostatnią: tylko do podglądu u rywali,

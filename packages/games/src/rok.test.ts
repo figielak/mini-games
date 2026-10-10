@@ -36,6 +36,16 @@ test("10 rund, zakres lat, unikatowe teksty, ten sam seed i inne seedy", () => {
   expect(game.waitingFor(one)).toEqual([A, B]);
 });
 
+test("pula: każdy rok w zakresie, teksty bez powtórek i bez czterocyfrowej liczby", () => {
+  expect(new Set(EVENTS.map((e) => e.text)).size).toBe(EVENTS.length);
+  for (const e of EVENTS) {
+    expect(Number.isInteger(e.year) && e.year >= MIN_YEAR && e.year <= MAX_YEAR, e.text).toBe(true);
+    expect(e.text, e.text).not.toMatch(/\d{4}/);
+    expect(e.text.trim()).toBe(e.text);
+    expect(e.text.length).toBeGreaterThan(0);
+  }
+});
+
 describe("walidacja", () => {
   const s = game.setup([A, B], createRng(1));
   const ok = years(s);
@@ -62,8 +72,8 @@ describe("liczenie i koniec", () => {
     const worst = exact.map((year) => Math.max(year - MIN_YEAR, MAX_YEAR - year));
     s = send(s, A, result(exact));
     s = send(s, B, result([]));
-    s = send(s, C, result(new Array(ROUNDS).fill(0)));
-    expect(s.results).toEqual({ [A]: 0, [B]: worst.reduce((a, b) => a + b, 0), [C]: exact.reduce((sum, year) => sum + year, 0) });
+    s = send(s, C, result(new Array(ROUNDS).fill(MIN_YEAR)));
+    expect(s.results).toEqual({ [A]: 0, [B]: worst.reduce((a, b) => a + b, 0), [C]: exact.reduce((sum, year) => sum + year - MIN_YEAR, 0) });
     expect(game.isOver(s)).toEqual({ winner: A, ranking: [A, B, C] });
   });
 

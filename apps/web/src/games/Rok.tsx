@@ -108,7 +108,7 @@ export function Rok({ view, me, players, ranking, onMove }: Props) {
     return (
       <>
         <Scores rows={rows} />
-        <p className="text-sm text-fg-muted">Suma odchylek w latach, mniej znaczy lepiej.</p>
+        <p className="text-sm text-fg-muted">Suma odchyłek w latach, mniej znaczy lepiej.</p>
         {shown.map((id) => (
           <section key={id} className="tile flex flex-col gap-2 p-3">
             <span className="text-sm">
@@ -128,7 +128,7 @@ export function Rok({ view, me, players, ranking, onMove }: Props) {
         preview={<Preview />}
         time={`${ROK_ROUNDS} rund, ${Math.round(ROK_ROUND_MS / 1000)} s na każdą`}
         task="Ustaw rok suwakiem i zaznacz odpowiedź"
-        score="Liczy się suma odchylek w latach, mniej znaczy lepiej"
+        score="Liczy się suma odchyłek w latach, mniej znaczy lepiej"
         onStart={() => setPhase("answer")}
       />
     );
