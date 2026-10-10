@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { createRng, GAMES } from "./index.ts";
+import { createRng, GAMES, ROOM_MESSAGES } from "./index.ts";
 
 // Kontrakt wspólny dla każdej gry z rejestru, sprawdzany na losowych partiach granych ruchami po limicie czasu:
 // - ruch po limicie czasu każdego gracza, na którego czekamy, przechodzi przez moveSchema i validateMove,
@@ -26,6 +26,13 @@ test("rejestr: id z sieci nie trafia w pola prototypu obiektu, a klucz to id gry
 
 test("mini-gry mają zasady narzucone z góry: tryby tylko w grach głównych", () => {
   for (const game of Object.values(GAMES)) if (game.minPlayers === 1) expect(game.modes, game.id).toBeUndefined();
+});
+
+test("pickGame: id gry albo null (powrót do listy gier)", () => {
+  expect(ROOM_MESSAGES.pickGame.safeParse({ gameId: "statki" }).success).toBe(true);
+  expect(ROOM_MESSAGES.pickGame.safeParse({ gameId: null }).success).toBe(true);
+  expect(ROOM_MESSAGES.pickGame.safeParse({ gameId: 1 }).success).toBe(false);
+  expect(ROOM_MESSAGES.pickGame.safeParse({}).success).toBe(false);
 });
 
 // Gra z trybami przechodzi kontrakt w każdym trybie.

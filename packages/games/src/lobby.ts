@@ -55,7 +55,8 @@ export function cleanNick(raw: unknown): string | null {
 
 /** Schematy wiadomości od klienta do pokoju; serwer odrzuca wszystko, co do nich nie pasuje. */
 export const ROOM_MESSAGES = {
-  pickGame: z.object({ gameId: z.string() }),
+  // null: gospodarz wraca z ekranu gry do listy gier.
+  pickGame: z.object({ gameId: z.string().nullable() }),
   pickMode: z.object({ mode: z.string() }),
   toggleSeat: z.object({ id: z.string() }),
   pickColor: z.object({ color: z.enum(PLAYER_COLORS) }),

@@ -66,12 +66,13 @@ export class LobbyRoom extends Room {
     this.roomId = code;
     this.touch();
 
+    // gameId null: powrót z ekranu gry do listy gier.
     this.on("pickGame", (client, { gameId }) => {
-      const def = GAMES[gameId];
-      if (!this.isHost(client) || this.phase !== "lobby" || !def) return;
+      const def = gameId === null ? undefined : GAMES[gameId];
+      if (!this.isHost(client) || this.phase !== "lobby" || (gameId !== null && !def)) return;
       this.gameId = gameId;
-      this.mode = (def.modes?.find((m) => m.default) ?? def.modes?.[0])?.id ?? null;
-      this.seats = [...this.players.keys()].slice(0, def.maxPlayers);
+      this.mode = (def?.modes?.find((m) => m.default) ?? def?.modes?.[0])?.id ?? null;
+      this.seats = def ? [...this.players.keys()].slice(0, def.maxPlayers) : [];
       this.resetReady();
     });
 
