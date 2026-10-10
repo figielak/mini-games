@@ -79,8 +79,8 @@ Po partii ekran podsumowania (`KampusSummary.tsx`): wykres majątku, zapłacone 
 - **Stoper**: licznik znika po 3 s, dotknij dokładnie przy wylosowanym celu (6-14 s); wynik = odchyłka w ms (mniej lepiej).
 - **Tabela Schultego**: siatka 5×5 z liczbami 1-25, dotykasz po kolei; wynik = czas + 3 s za każdą pomyłkę.
   Tryby Klasyczna (liczby zostają widoczne) i Łatwa (znalezione gasną); postęp rywali widać w pigułkach graczy (ruch `progress`).
-- **Kolory** (`stroop`): nazwa koloru napisana innym kolorem, wybierasz kolor liter; 30 s, wynik = trafienia (remis: niższa średnia).
-- **Liczenie**: 30 s działań (+, −, ×, :) z czterema odpowiedziami; wynik jak w Kolorach.
+- **Kolor liter** (`stroop`): nazwa koloru napisana innym kolorem, wybierasz kolor liter; 30 s, wynik = trafienia (remis: niższa średnia).
+- **Liczenie**: 30 s działań (+, −, ×, :) z czterema odpowiedziami; wynik jak w Kolorze liter.
   W obu pomyłka blokuje na 1 s (inaczej losowe klepanie byłoby szybsze niż myślenie).
 - **Narysuj koło**: do 10 prób palcem, liczy się najlepsza (można zakończyć wcześniej), wynik = % idealności liczony na serwerze z punktów rysunku (dopasowanie okręgu, zakładka obcinana, poniżej 0,9 obrotu albo za małe = 0). Niedokończone koło nie zużywa próby; na końcu najlepsze i najgorsze koło każdego gracza.
 - **Odcień** (`kolor`): 5 kolorów, każdy widać 2 s, potem odtwarzasz go suwakami barwy, nasycenia i jasności; wynik = suma odległości ΔE (Lab, każda ucięta do 100, mniej lepiej), liczona na serwerze.
@@ -88,7 +88,7 @@ Po partii ekran podsumowania (`KampusSummary.tsx`): wykres majątku, zapłacone 
 - 1-6 graczy naraz, każdy gra u siebie to samo wyzwanie (wylosowane na serwerze), na końcu ranking.
   Partia toczy się na kliencie (opóźnienie Wi-Fi zepsułoby pomiar), serwer dostaje tylko wynik i odrzuca nierealne wartości.
 - Każda mini-gra ma jeden typ ruchu `result` (Narysuj koło wysyła go po każdej próbie, Tabela Schultego ma jeszcze `progress`); ranking liczy wspólne `rankResults` (core.ts), zwycięzca tylko przy 2+ graczach bez remisu.
-  Kolory i Liczenie dzielą `quiz.ts` i `Quiz.tsx`. Odświeżenie w trakcie = partia od nowa.
+  Kolor liter i Liczenie dzielą `quiz.ts` i `Quiz.tsx`. Pasek statystyk w trakcie partii to wspólne `Stats` (ui.tsx). Odświeżenie w trakcie = partia od nowa.
 
 ### 2.5 Państwa-miasta
 

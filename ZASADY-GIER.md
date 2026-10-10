@@ -15,13 +15,13 @@ Reguły platformy (limit tury, rewanż, walkower, obserwatorzy) są w `KONCEPT.m
 | Sekwencja | `simon` | 1-6 | 300 s | mini-gra |
 | Stoper | `stoper` | 1-6 | 60 s | mini-gra |
 | Tabela Schultego | `schulte` | 1-6 | 180 s | mini-gra |
-| Kolory | `stroop` | 1-6 | 60 s | mini-gra |
+| Kolor liter | `stroop` | 1-6 | 60 s | mini-gra |
 | Liczenie | `liczenie` | 1-6 | 60 s | mini-gra |
 | Narysuj koło | `kolo` | 1-6 | 120 s | mini-gra |
 | Odcień | `kolor` | 1-6 | 180 s | mini-gra |
 | Policz kropki | `kropki` | 1-6 | 120 s | mini-gra |
 
-Nazwy w UI zmieniały się (2026-10-10), `id`, nazwy plików i typów zostały stare: Sekwencja = `simon`, Kolory = `stroop`,
+Nazwy w UI zmieniały się (2026-10-10), `id`, nazwy plików i typów zostały stare: Sekwencja = `simon`, Kolor liter = `stroop`,
 Odcień = `kolor`, Gomoku = `piec-w-rzedzie`. Ranking w SQLite jest po `id`, więc `id` nie wolno zmieniać.
 
 ## 1. Mini-gry (wspólny schemat)
@@ -70,13 +70,15 @@ Odcień = `kolor`, Gomoku = `piec-w-rzedzie`. Ranking w SQLite jest po `id`, wi�
 - Limit przez `turn()` ze stałym kluczem: ruch `progress` nie odnawia 180 s, nawet gdy gra już tylko jedna osoba.
 - Ekran: trafiony kafelek błyska na zielono, pomyłka na czerwono z potrząśnięciem; lokalny zegar ma etykietę „Twój czas”.
 
-### Kolory (`stroop`) i Liczenie (`liczenie`)
+### Kolor liter (`stroop`) i Liczenie (`liczenie`)
 Wspólne zasady w `quiz.ts`, wspólny ekran `Quiz.tsx`.
 - 30 s pytań z czterema odpowiedziami; serwer losuje 200 pytań (starczy przy 150 ms na odpowiedź).
 - Pomyłka blokuje na 1 s (inaczej losowe klepanie byłoby szybsze niż myślenie).
-- Wynik: `times` (czasy poprawnych) i `errors`. Ranking jak w Refleksie: trafienia, potem niższa średnia. `errors` nie wpływa na ranking.
+- Wynik: `times` (czasy poprawnych) i `errors`. Ranking jak w Refleksie: trafienia, potem niższa średnia. `errors` nie wpływa na ranking, ale jest widoczne w pasku statystyk i w wynikach.
+- Ekran końcowy: tabela z miejscem (puchar u zwycięzcy), trafieniami, średnim czasem (od 1 s w sekundach) i błędami; pod nią notka, jak liczony jest ranking.
+- Dotknięta odpowiedź błyska: zielono przy trafieniu, czerwono z potrząśnięciem przy pomyłce.
 - Walidacja: każdy czas 150-5000 ms, suma ≤ 30 s, najwyżej 200 czasów. Limit czasu: zero trafień.
-- **Kolory**: nazwa koloru (CZERWONY, NIEBIESKI, ŻÓŁTY, ZIELONY) napisana kolorem liter; odpowiedź to kolor liter, nie słowo.
+- **Kolor liter**: nazwa koloru (CZERWONY, NIEBIESKI, ŻÓŁTY, ZIELONY) napisana kolorem liter; odpowiedź to kolor liter, nie słowo.
   W 25% plansz słowo zgadza się z kolorem (żeby nie dało się grać „zawsze inny”).
 - **Liczenie**: działania losowane po równo z czterech typów: `a + b` (10-99), `a − b` (a 20-99, b 10-a, wynik ≥ 0),
   `a × b` (2-9 × 2-12), `a : b` (dzielnik 2-9, wynik 2-12, zawsze bez reszty). Złe odpowiedzi leżą blisko poprawnej
