@@ -20,7 +20,7 @@ const EAGER: Record<string, (rng: () => number) => unknown[]> = {
 
 test("rejestr: id z sieci nie trafia w pola prototypu obiektu, a klucz to id gry", () => {
   for (const id of ["constructor", "toString", "__proto__", "hasOwnProperty", "nie-ma-takiej"]) expect(GAMES[id], id).toBeUndefined();
-  expect(Object.keys(GAMES)).toHaveLength(24);
+  expect(Object.keys(GAMES)).toHaveLength(25);
   for (const [id, game] of Object.entries(GAMES)) expect(game.id).toBe(id);
 });
 
