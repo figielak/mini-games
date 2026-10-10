@@ -1,4 +1,4 @@
-import { byHitsThenAverage, type GameDefinition, type PlayerId, type Rng, rankResults, shuffle } from "./core.ts";
+import { byHitsThenAverage, type GameDefinition, type PlayerId, type Rng, ranked, shuffle } from "./core.ts";
 import { QUESTIONS, type QuizMove, quizMoveSchema, type QuizResult, validQuiz } from "./quiz.ts";
 
 export { DURATION_MS } from "./quiz.ts";
@@ -68,7 +68,7 @@ export const liczenie: GameDefinition<State, Move> = {
 
   playerView: (state): View => state,
 
-  isOver: (state) => rankResults(state.players, state.results, byHitsThenAverage),
+  ...ranked((state: State) => state.results, byHitsThenAverage),
 
   waitingFor: (state) => state.players.filter((p) => !(p in state.results)),
 

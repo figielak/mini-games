@@ -85,13 +85,14 @@ Po partii ekran podsumowania (`KampusSummary.tsx`): wykres majątku, zapłacone 
 - **Sekwencja** (`simon`): powtarzanie rosnącej sekwencji 4 kolorów, wynik = najdłuższa seria.
 - **Stoper**: licznik znika po 3 s, dotknij dokładnie przy wylosowanym celu (6-14 s); wynik = odchyłka w ms (mniej lepiej).
 - **Tabela Schultego**: siatka 5×5 z liczbami 1-25, dotykasz po kolei; wynik = czas + 3 s za każdą pomyłkę.
-  Tryby Klasyczna (liczby zostają widoczne) i Łatwa (znalezione gasną); postęp rywali widać w pigułkach graczy (ruch `progress`).
+  Znalezione liczby zostają widoczne; postęp rywali widać w pigułkach graczy (ruch `progress`).
 - **Kolor liter** (`stroop`): nazwa koloru napisana innym kolorem, wybierasz kolor liter; 30 s, wynik = trafienia (remis: niższa średnia).
 - **Liczenie**: 30 s działań (+, −, ×, :) z czterema odpowiedziami; wynik jak w Kolorze liter.
   W obu pomyłka blokuje na 1 s (inaczej losowe klepanie byłoby szybsze niż myślenie).
 - **Narysuj koło**: do 10 prób palcem, liczy się najlepsza (można zakończyć wcześniej), wynik = % idealności liczony na serwerze z punktów rysunku (dopasowanie okręgu, zakładka obcinana, poniżej 0,9 obrotu albo za małe = 0). Niedokończone koło nie zużywa próby; na końcu najlepsze i najgorsze koło każdego gracza.
 - **Odcień** (`kolor`): 5 kolorów, każdy widać 2 s, potem odtwarzasz go suwakami barwy, nasycenia i jasności; wynik = suma odległości ΔE (Lab, każda ucięta do 100, mniej lepiej), liczona na serwerze.
 - **Policz kropki**: 10 rund, w każdej 8-40 kropek widocznych przez 1,5 s, potem wpisujesz ich liczbę; wynik = suma błędów (mniej lepiej), liczona na serwerze. Po każdej odpowiedzi kropki wracają z prawdziwą liczbą i różnicą; numer rundy rywali widać w pigułkach graczy (ruch `progress`).
+- **Kąt** (`kat`): 10 rund, w każdej kąt 5-175° (wierzchołek na środku, równe ramiona, losowy obrót) widoczny przez 1,5 s, potem wpisujesz jego miarę w stopniach (0-180); wynik = suma odchyłek w stopniach (mniej lepiej), liczona na serwerze. Po limicie czasu każda runda liczy się jak najgorsza możliwa odpowiedź. Odsłona i pigułki jak w Policz kropki.
 - **Który rok?**: 10 rund, każda z wydarzeniem historycznym / wynalazkiem / premierą; ustawiasz rok suwakiem w zakresie 1900-2025, wynik = suma odchyłek w latach (mniej lepiej), liczona na serwerze. Runda trwa najwyżej 20 s, po czasie liczy się rok ustawiony na suwaku. Po każdej odpowiedzi przez 2,5 s widać prawdziwy rok i różnicę ze znakiem, numer rundy rywali widać w pigułkach graczy (ruch `progress`).
 - **Środek**: 10 rund, w każdej odcinek pod losowym kątem, dotykasz go w połowie długości; odcinki mają 50-90% boku pola; dotknięcie jest rzutowane na odcinek, błąd liczy się wzdłuż niego w % długości odcinka, wynik = suma błędów (mniej lepiej), liczona na serwerze. Dotknięcie dalej niż 30 umownych px od odcinka (pole ma bok 300 px niezależnie od telefonu) jest ignorowane bez kary. Liczy się miejsce podniesienia palca (punkt można przesunąć, nad kaflem lupa); potem przez 1 s widać prawdziwy środek i błąd. Na końcu jedna tabela rund z wyróżnionym najlepszym w każdej.
 - **Stój!** (`stoj`): 30 s, jedno pole zapala się na zielono (dotknij) albo czerwono (nie wolno, co trzeci bodziec); odstęp między bodźcami maleje z 1000 do 500 ms. Wynik = trafienia − 2 za każdy błąd (nie mniej niż 0), przy remisie niższa średnia reakcji; liczony na serwerze z czasów reakcji na kolejne bodźce.
@@ -99,12 +100,15 @@ Po partii ekran podsumowania (`KampusSummary.tsx`): wykres majątku, zapłacone 
 - **Wieża** (`wieza`): do 30 pięter, klocek jeździ w poziomie (z każdym piętrem szybciej) i gracz zatrzymuje go dotknięciem nad poprzednim; to, co wystaje, jest ucinane, odchyłka do 2% szerokości pola wyrównuje klocek bez ucinania. Pudło kończy partię, niedotknięty klocek spada sam po 5 s; wynik = wysokość wieży, przy remisie szerszy ostatni klocek, liczony na serwerze z czasów zatrzymania. Wysokość wież rywali widać w pigułkach graczy (ruch `progress`).
 - **Rytm** (`rytm`): metronom gra 8 uderzeń (klik, błysk i wibracja) w tempie 70-130 BPM i cichnie, gracz stuka dalej w tym samym tempie przez 10 s. Wynik = średnia odchyłka odstępów między stuknięciami od odstępu metronomu w ms (mniej lepiej), liczona na serwerze z czasów stuknięć; pominięte uderzenia liczą się jak najgorsze. Grający nie widzi limitu tury ani licznika sekund (podawałyby tempo).
 - **Inny element** (`inny`): 30 s, siatka identycznych wielokątów, jeden różni się obrotem, odcieniem, rozmiarem albo kształtem (rodzaj losowany co planszę; kształt tylko dopóki siatka rośnie); dotykasz go. Siatka rośnie z każdym trafieniem na przemian o kolumnę i wiersz od 2×2 do 6×6, a różnica maleje. Pomyłka blokuje na 1 s i plansza zostaje; wynik jak w Kolorze liter.
+- **Obrót** (`obrot`): 30 s, dwie figury z klocków (poliomino z 4-7 kwadratów, klocków przybywa co 3 pary); druga to pierwsza obrócona o 90, 180 albo 270° albo jej obrócone lustrzane odbicie, gracz wybiera „Ta sama” albo „Lustro”. Figury są zawsze chiralne, więc odpowiedź jest jedna. Pomyłka blokuje na 1 s i zabiera punkt; wynik = trafienia − pomyłki (nie mniej niż 0), przy remisie niższa średnia.
+- **Mapa** (`mapa`): 10 rund, w każdej nazwa jednego z 62 większych miast Polski; gracz stawia znacznik na konturze kraju (sam kontur, bez rzek i województw), może go przenieść i zatwierdza. Wynik = suma odległości w km (haversine, każda runda zaokrąglona, mniej lepiej), liczona na serwerze z punktów w ułamkach pola. Po każdej odpowiedzi przez 1,5 s widać prawdziwe miejsce i odległość; na końcu tabela rund z wyróżnionym najlepszym w każdej.
 - 1-6 graczy naraz, każdy gra u siebie to samo wyzwanie (wylosowane na serwerze), na końcu ranking.
   Partia toczy się na kliencie (opóźnienie Wi-Fi zepsułoby pomiar), serwer dostaje tylko wynik i odrzuca nierealne wartości.
 - Każda mini-gra zaczyna od ekranu instrukcji (`Intro` w ui.tsx: animowany podgląd, trzy punkty z ikonami, „Start”). Każdy klika „Start” osobno i gra od razu;
   po 15 s (`INTRO_SECONDS`) gra rusza sama. Limit platformy startuje dopiero, gdy wystartuje ostatni gracz (wiadomość pokoju `begin`); na ekranie widać, kto już gra, a kto czyta zasady.
-- Każda mini-gra ma jeden typ ruchu `result` (Narysuj koło wysyła go po każdej próbie, Tabela Schultego, Policz kropki, Który rok? i Wieża mają jeszcze `progress`); ranking liczy wspólne `rankResults` (core.ts), zwycięzca tylko przy 2+ graczach bez remisu.
-  Kolor liter, Liczenie i Inny element dzielą `quiz.ts` i `Quiz.tsx`. Pasek statystyk w trakcie partii to wspólne `Stats` (ui.tsx). Odświeżenie w trakcie = partia od nowa.
+- Każda mini-gra ma jeden typ ruchu `result` (Narysuj koło wysyła go po każdej próbie, Tabela Schultego, Policz kropki, Kąt, Który rok? i Wieża mają jeszcze `progress`); ranking liczy wspólne `rankResults` (core.ts), zwycięzca tylko przy 2+ graczach bez remisu;
+  `places` podaje miejsca z remisami (oba z jednego komparatora przez `ranked`), z których turniej liczy punkty.
+  Kolor liter, Liczenie, Inny element i Obrót dzielą `quiz.ts` i `Quiz.tsx`, a Policz kropki i Kąt ekran `Szacowanie.tsx`. Pasek statystyk w trakcie partii to wspólne `Stats` (ui.tsx). Odświeżenie w trakcie = partia od nowa.
 
 ### 2.5 Państwa-miasta
 
@@ -114,6 +118,18 @@ Po partii ekran podsumowania (`KampusSummary.tsx`): wykres majątku, zapłacone 
 - Punkty: 15 jedyna ważna w kategorii, 10 unikalna, 5 powtórzona (bez wielkości liter i polskich znaków), 0 brak lub odrzucona.
 - Po głosowaniu podsumowanie rundy (20 s albo „Dalej” od wszystkich).
 - Limit zależny od fazy: opcjonalne `turn(state) → { key, seconds }` w `GameDefinition`; licznik startuje od nowa tylko przy zmianie `key`.
+
+### 2.6 Turniej
+
+- Seria mini-gier puszczana po kolei w jednym pokoju, 1-6 graczy. To nie jest gra z rejestru `GAMES`: pokój odpala kolejne mini-gry
+  zwykłym `startMatch` i sumuje punkty (zasady w `turniej.ts`, czyste funkcje).
+- Gospodarz ustawia liczbę gier (3 do liczby niewykluczonych, domyślnie 8). Każdą mini-grę można oznaczyć jako pewną albo wykluczoną;
+  lista jest wspólna i zaznacza ją każdy w pokoju (spory rozstrzygają gracze, nie aplikacja). Resztę losuje serwer.
+- Punkty za grę: liczba graczy ze ściśle gorszym miejscem (remisujący dostają tyle samo). Tabela: suma punktów, potem wygrane gry.
+- Po każdej grze widać jej wyniki i tabelę; następna rusza po „Dalej” od wszystkich albo sama po 15 s.
+- Remis na szczycie po ostatniej grze daje jedną dogrywkę (dolosowana gra); po niej remis zostaje bez zwycięzcy.
+- Wyjście gracza przerywa tylko bieżącą grę (bez punktów), turniej trwa. Przed czasem kończy go tylko gospodarz.
+- Zwycięzca trafia do rankingu pod `id` `turniej`; pojedyncze gry zapisują się jak zwykle.
 
 ## 3. Architektura
 
@@ -145,6 +161,7 @@ interface GameDefinition<State, Move> {
   applyMove(state: State, player: PlayerId, move: Move, rng: Rng): State;
   playerView(state: State, player: PlayerId): unknown; // ukrywanie informacji; obserwator dostaje ""
   isOver(state: State): { winner?: PlayerId; ranking?: PlayerId[] } | null;
+  places?(state: State): Record<PlayerId, number>; // mini-gry: miejsca po końcu (od 1, remis = to samo), dla turnieju
   waitingFor(state: State): PlayerId[]; // jedna osoba albo kilka w fazie równoczesnej; [] po końcu
   turnSeconds?: number;                 // limit tury
   turn?(state: State): { key: string; seconds: number }; // limit zależny od fazy, licznik od nowa przy zmianie key
@@ -153,7 +170,7 @@ interface GameDefinition<State, Move> {
 ```
 
 Rejestr gier: `GAMES` w `packages/games/src/index.ts`. Wiadomości pokoju: `ROOM_MESSAGES` w `lobby.ts`.
-Wspólne pomocnicze w `core.ts`: `createRng` (mulberry32), `roomCode`, `rankResults`, `shuffle`, `average`, `byHitsThenAverage`.
+Wspólne pomocnicze w `core.ts`: `createRng` (mulberry32), `roomCode`, `rankResults`, `rankPlaces`, `ranked`, `shuffle`, `average`, `byHitsThenAverage`, `byScoreThenAverage`.
 
 ### Reguły platformy (obowiązują każdą grę)
 
@@ -162,12 +179,18 @@ Wspólne pomocnicze w `core.ts`: `createRng` (mulberry32), `roomCode`, `rankResu
 - Gracze bez miejsca oglądają partię. Nowy gracz dostaje miejsce sam, jeśli gra wybrana i jest wolne.
 - Rewanż po zgodzie wszystkich grających, kolejność miejsc rotuje (poza mini-grami, gdzie wszyscy grają naraz); do lobby może wrócić każdy.
 - W mini-grach (gry solo, `minPlayers: 1`) limit rusza po ekranie instrukcji: gdy wszyscy klikną „Start” albo po 15 s.
-- Limit tury: 60 s w większości gier; dłużej w Sekwencji i Śledzeniu (300 s), Który rok? (240 s), Tabeli Schultego, Odcieniu i Wieży (180 s),
-  Narysuj koło i Policz kropki (120 s), Kolorze liter, Liczeniu i Innym elemencie (90 s); Państwa-miasta mają limit per faza, Statki 90 s na całe rozstawianie, Chińczyk w trybie Szybkim 20 s.
+- Limit tury: 60 s w większości gier; dłużej w Sekwencji i Śledzeniu (300 s), Który rok? (240 s), Tabeli Schultego, Odcieniu, Wieży i Mapie (180 s),
+  Narysuj koło, Policz kropki i Kąt (120 s), Kolorze liter, Liczeniu, Innym elemencie i Obrocie (90 s); Państwa-miasta mają limit per faza, Statki 90 s na całe rozstawianie, Chińczyk w trybie Szybkim 20 s.
 - Gdy gracz z miejscem zniknie z pokoju w trakcie partii (wyjdzie sam albo nie wróci w 10 minut), partia się kończy:
   jeśli został jeden gracz, wygrywa walkowerem; przy większej liczbie kończy się bez zwycięzcy.
-- Lobby: gospodarz wybiera grę (i tryb, jeśli gra ma `modes`; zmiana trybu kasuje gotowość gości) i daje start, goście potwierdzają gotowość; każdy może zmienić swój kolor
-  (poza partią); link `/?kod=ABCD` z przyciskiem udostępniania.
+- Lobby: gospodarz wybiera grę i daje start, goście potwierdzają gotowość; każdy może zmienić swój kolor
+  (poza partią); link `/?kod=ABCD` z przyciskiem udostępniania. Lista w lobby to gry główne oraz kafle „Turniej” i „Mini-gry”.
+- Gra główna (`minPlayers > 1`) po wybraniu otwiera u wszystkich ekran gry (`Setup.tsx`): opis, tryb (jeśli gra ma `modes`;
+  zmiana trybu kasuje gotowość gości), gracze i start; gospodarz wraca do listy gier przez `pickGame` z `null`.
+- Mini-gry mają osobny ekran z listą (`MiniGames.tsx`); otwiera go kafel u gospodarza (lokalnie, bez stanu w pokoju), a goście widzą go,
+  gdy gospodarz wybierze grę. Mini-gry mają zasady narzucone z góry, bez trybów.
+- Turniej ma ekran ustawień (`TournamentSetup` w `Setup.tsx`): `pickTournament` (gospodarz) ustawia liczbę gier, `markGame` (każdy) zaznacza jedną grę; obie kasują gotowość gości.
+  W trakcie turnieju `gameId` to bieżąca gra, a `tournament` w `RoomView` niesie listę gier i punkty; „Dalej” między grami to wiadomość `rematch`.
 - Limit 3 pokoi na IP, rate limit 10 wiadomości/s na klienta.
 
 **Platforma (skorupa)** jest wspólna dla wszystkich gier: pokoje z 4-znakowym kodem
@@ -200,12 +223,13 @@ Prościej i bezpiecznie dla gier z ukrytymi informacjami.
 ```
 mini-games/
 ├─ packages/
-│  └─ games/src/   # core.ts (kontrakt, RNG, utilsy), lobby.ts, index.ts (GAMES),
+│  └─ games/src/   # core.ts (kontrakt, RNG, utilsy), lobby.ts, turniej.ts, index.ts (GAMES),
 │                  # <gra>.ts + <gra>.test.ts dla każdej gry (płasko)
 ├─ apps/
 │  ├─ server/src/  # index.ts, LobbyRoom.ts (pokój Colyseus), stats.ts + stats.test.ts (SQLite, GET /api/stats)
 │  └─ web/src/     # main.tsx, App.tsx, net.ts (połączenie, token, reconnect), Dev.tsx (tryb testowy),
-│                  # screens/ (Home, Lobby, Game, ui.tsx ze wspólnymi Screen/StickyBar/Scores),
+│                  # screens/ (Home, Lobby, Setup (ekran gry głównej i turnieju przed partią), MiniGames, Game,
+│                  # ui.tsx ze wspólnymi Screen/TopBar/StickyBar/Scores),
 │                  # games/<Gra>.tsx (UI każdej gry), index.css (klasy .tile .label .btn .field)
 ├─ .github/workflows/ci.yml
 ├─ Dockerfile, docker-compose.yml, cloudflared/
@@ -250,7 +274,7 @@ podpięcie w `screens/Game.tsx` i ikona w `screens/Lobby.tsx`.
 | 5 | Kampus Tour: dodatki (Kolokwium, Juwenalia, karty, wykupienie, Bilet MPK, monopol) | Pełna wersja (gotowe) |
 | 6 | Poprawka | Gra karciana (do zrobienia) |
 | 7 | PWA, animacje, statystyki, szlify | Polerka (PWA i ranking po nicku gotowe) |
-| + | Chińczyk, Memory, mini-gry (16 sztuk), Państwa-miasta | Poza planem (gotowe) |
+| + | Chińczyk, Memory, mini-gry (19 sztuk), Państwa-miasta, Turniej z mini-gier | Poza planem (gotowe) |
 | dalej | Zapis stanu pokoi w SQLite | Do zrobienia |
 
 ## 8a. Sposób pracy

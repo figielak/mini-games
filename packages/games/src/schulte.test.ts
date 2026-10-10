@@ -7,7 +7,7 @@ import { type Move, PENALTY_MS, schulte as game, type State, type View } from ".
 // - klient oddaje czas (ms) i liczbę pomyłek; każda pomyłka to 3 s kary,
 // - czas krótszy niż 25 × 150 ms jest nierealny, dłuższy niż limit tury też,
 // - ranking po czasie z karami rosnąco; po limicie czasu ostatnie miejsce,
-// - tryby Klasyczna (domyślna) i Łatwa różnią się tylko wyglądem, tryb trafia do widoku,
+// - mini-gra ma zasady narzucone z góry: bez trybów, znalezione liczby zostają widoczne,
 // - wynik niesie 25 międzyczasów (suma równa czasowi) albo pustą listę; nie wpływają na ranking,
 // - po każdym trafieniu klient zgłasza postęp (1-24), który widzą rywale; postęp nie kończy gry i nie odnawia limitu.
 
@@ -78,18 +78,9 @@ describe("koniec", () => {
   });
 });
 
-describe("tryby", () => {
-  test("dwa tryby, domyślna Klasyczna", () => {
-    expect(game.modes!.map((m) => m.id)).toEqual(["klasyczna", "latwa"]);
-    expect(game.modes!.filter((m) => m.default).map((m) => m.id)).toEqual(["klasyczna"]);
-  });
-  test.each([
-    [undefined, "klasyczna"],
-    ["nieznany", "klasyczna"],
-    ["latwa", "latwa"],
-  ])("tryb %s w widoku to %s", (mode, expected) => {
-    expect((game.playerView(game.setup([A, B], createRng(1), mode), A) as View).mode).toBe(expected);
-  });
+test("gra nie ma trybów", () => {
+  expect(game.modes).toBeUndefined();
+  expect(game.playerView(game.setup([A, B], createRng(1), "latwa"), A)).not.toHaveProperty("mode");
 });
 
 describe("postęp", () => {

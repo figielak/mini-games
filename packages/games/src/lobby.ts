@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { GameResult, PlayerId } from "./core.ts";
+import type { Tournament } from "./turniej.ts";
 
 /** Kolory graczy: dane, nie akcent. Żaden nie przypomina czerwieni akcentu (#ff2445). */
 export const PLAYER_COLORS = ["#3b9eff", "#ffc53d", "#46a758", "#8e7cff", "#0ac5b3", "#f76fbe"] as const;
@@ -30,6 +31,8 @@ export interface RoomView {
   mode: string | null;
   /** Kto gra w wybranej grze, w kolejności ruchów. Reszta ogląda. */
   seats: PlayerId[];
+  /** Wybrany albo trwający turniej mini-gier; w trakcie `gameId` to bieżąca gra turnieju. */
+  tournament: Tournament | null;
   /** Wygrane partie w tym pokoju. */
   scores: Record<PlayerId, number>;
   game: {
@@ -55,7 +58,12 @@ export function cleanNick(raw: unknown): string | null {
 
 /** Schematy wiadomości od klienta do pokoju; serwer odrzuca wszystko, co do nich nie pasuje. */
 export const ROOM_MESSAGES = {
-  pickGame: z.object({ gameId: z.string() }),
+  // null: gospodarz wraca z ekranu gry do listy gier.
+  pickGame: z.object({ gameId: z.string().nullable() }),
+  // Wybór turnieju i zmiana liczby gier (gospodarz); zakres sprawdza cleanConfig.
+  pickTournament: z.object({ length: z.number() }),
+  // Zaznaczenie jednej gry turnieju: na pewno, bez albo z powrotem losowo. Może każdy w pokoju.
+  markGame: z.object({ id: z.string(), mark: z.enum(["must", "skip", "any"]) }),
   pickMode: z.object({ mode: z.string() }),
   toggleSeat: z.object({ id: z.string() }),
   pickColor: z.object({ color: z.enum(PLAYER_COLORS) }),

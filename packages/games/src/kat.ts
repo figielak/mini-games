@@ -2,23 +2,24 @@ import { z } from "zod";
 import { type GameDefinition, type PlayerId, ranked } from "./core.ts";
 
 export const ROUNDS = 10;
-export const MIN = 8;
-export const MAX = 40;
-/** Tyle ms widać kropki. */
+/** Zakres losowanych kątów w stopniach: bez wklęsłych, więc nie trzeba oznaczać mierzonej strony. */
+export const MIN = 5;
+export const MAX = 175;
+/** Największa odpowiedź, jaką przyjmuje serwer. */
+export const MAX_ANSWER = 180;
+/** Tyle ms widać kąt. */
 export const SHOW_MS = 1500;
-/** Minimalna odległość środków kropek (pole 0-1), żeby się nie nakładały. */
-export const GAP = 0.08;
-const MARGIN = 0.05;
 
-export type Dot = { x: number; y: number };
+/** Całe stopnie. `rotation` to kierunek pierwszego ramienia, drugie leży pod `rotation + angle`. */
+export type Round = { angle: number; rotation: number };
 
-/** Pusta lista = limit czasu (liczona jak same zera). */
+/** Pusta lista = limit czasu (w każdej rundzie najgorszy możliwy błąd). */
 export type Move = { type: "result"; answers: number[] } | { type: "progress"; done: number };
 
 export interface State {
   players: PlayerId[];
-  rounds: Dot[][];
-  /** Suma błędów. */
+  rounds: Round[];
+  /** Suma błędów w stopniach. */
   results: Record<PlayerId, number>;
   answers: Record<PlayerId, number[]>;
   /** Ile rund gracz już odpowiedział (1-9), zgłaszane przez klienta; tylko do podglądu u rywali. */
@@ -30,21 +31,13 @@ export type View = State;
 const TURN_SECONDS = 120;
 
 const int = (rng: () => number, min: number, max: number) => min + Math.floor(rng() * (max - min + 1));
+const worst = (angle: number) => Math.max(angle, MAX_ANSWER - angle);
 
-// Przy 40 kropkach zajęte jest ~25% pola, losowanie z odrzucaniem kończy się szybko.
-function scatter(rng: () => number, count: number): Dot[] {
-  const dots: Dot[] = [];
-  while (dots.length < count) {
-    const d = { x: MARGIN + rng() * (1 - 2 * MARGIN), y: MARGIN + rng() * (1 - 2 * MARGIN) };
-    if (dots.every((e) => Math.hypot(d.x - e.x, d.y - e.y) >= GAP)) dots.push(d);
-  }
-  return dots;
-}
-
-// ponytail: kropki są w widoku od startu (jak cele w Kolorze), da się podejrzeć; między znajomymi wystarczy.
-export const kropki: GameDefinition<State, Move> = {
-  id: "kropki",
-  name: "Policz kropki",
+// ponytail: kąty są w widoku od startu (jak kropki w Policz kropki), da się podejrzeć; między znajomymi wystarczy.
+// ponytail: szkielet zasad to trzecia kopia (kropki, rok, kat); wspólny moduł, gdy dojdzie czwarta albo zmieni się kształt ruchu.
+export const kat: GameDefinition<State, Move> = {
+  id: "kat",
+  name: "Kąt",
   minPlayers: 1,
   maxPlayers: 6,
   turnSeconds: TURN_SECONDS,
@@ -57,7 +50,7 @@ export const kropki: GameDefinition<State, Move> = {
 
   setup: (players, rng) => ({
     players,
-    rounds: Array.from({ length: ROUNDS }, () => scatter(rng, int(rng, MIN, MAX))),
+    rounds: Array.from({ length: ROUNDS }, () => ({ angle: int(rng, MIN, MAX), rotation: int(rng, 0, 359) })),
     results: {},
     answers: {},
     progress: {},
@@ -68,14 +61,17 @@ export const kropki: GameDefinition<State, Move> = {
     !(player in state.results) &&
     (move.type === "progress"
       ? Number.isInteger(move.done) && move.done >= 1 && move.done < ROUNDS
-      : move.answers.length === 0 || (move.answers.length === ROUNDS && move.answers.every((a) => Number.isInteger(a) && a >= 0 && a <= 99))),
+      : move.answers.length === 0 || (move.answers.length === ROUNDS && move.answers.every((a) => Number.isInteger(a) && a >= 0 && a <= MAX_ANSWER))),
 
   applyMove: (state, player, move) =>
     move.type === "progress"
       ? { ...state, progress: { ...state.progress, [player]: move.done } }
       : {
           ...state,
-          results: { ...state.results, [player]: state.rounds.reduce((s, dots, i) => s + Math.abs((move.answers[i] ?? 0) - dots.length), 0) },
+          results: {
+            ...state.results,
+            [player]: state.rounds.reduce((s, r, i) => s + (move.answers.length ? Math.abs(move.answers[i] - r.angle) : worst(r.angle)), 0),
+          },
           answers: { ...state.answers, [player]: move.answers },
         },
 

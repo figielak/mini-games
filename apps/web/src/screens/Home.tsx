@@ -1,5 +1,5 @@
 import { ArrowRight, Plus } from "@phosphor-icons/react";
-import { cleanNick, GAMES, NICK_MAX, ROOM_CODE_ALPHABET, ROOM_CODE_LENGTH } from "@mini-games/games";
+import { cleanNick, GAMES, NICK_MAX, ROOM_CODE_ALPHABET, ROOM_CODE_LENGTH, TOURNAMENT_ID } from "@mini-games/games";
 import { useEffect, useState } from "react";
 import type { Room } from "@colyseus/sdk";
 import { codeFromUrl, createRoom, errorText, fetchRanking, joinRoom, type RankingRow, savedNick } from "../net.ts";
@@ -114,7 +114,9 @@ export function Home({ onRoom, notice }: { onRoom: (room: Room) => void; notice?
 }
 
 function Ranking({ ranking, me }: { ranking: Record<string, RankingRow[]>; me: string | null }) {
-  const games = Object.entries(ranking).filter(([id]) => GAMES[id]);
+  // Turniej nie jest grą z rejestru, ale ma własny ranking.
+  const title = (id: string) => (id === TOURNAMENT_ID ? "Turniej" : GAMES[id]?.name);
+  const games = Object.entries(ranking).filter(([id]) => title(id));
   if (games.length === 0) return null;
   return (
     <section className="tile mt-3 flex flex-col gap-4" aria-labelledby="ranking">
@@ -123,7 +125,7 @@ function Ranking({ ranking, me }: { ranking: Record<string, RankingRow[]>; me: s
       </h2>
       {games.map(([id, rows]) => (
         <div key={id}>
-          <h3 className="mb-1 font-semibold">{GAMES[id].name}</h3>
+          <h3 className="mb-1 font-semibold">{title(id)}</h3>
           <ol className="flex flex-col text-sm">
             {rows.map((r, i) => (
               <li key={r.nick} className={`flex gap-3 py-0.5 ${r.nick === me ? "text-accent" : ""}`}>

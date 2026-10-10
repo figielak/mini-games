@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { type GameDefinition, type PlayerId, rankResults } from "./core.ts";
+import { type GameDefinition, type PlayerId, ranked } from "./core.ts";
 
 /** Dłuższej serii nikt nie powtórzy na wykładzie. */
 const LENGTH = 100;
@@ -38,7 +38,7 @@ export const simon: GameDefinition<State, Move> = {
 
   playerView: (state): View => state,
 
-  isOver: (state) => rankResults(state.players, state.results, (a, b) => b - a),
+  ...ranked((state: State) => state.results, (a, b) => b - a),
 
   waitingFor: (state) => state.players.filter((p) => !(p in state.results)),
 

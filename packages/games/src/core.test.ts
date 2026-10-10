@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { byHitsThenAverage, createRng, rankResults, ROOM_CODE_ALPHABET, roomCode, shuffle } from "./core.ts";
+import { byHitsThenAverage, createRng, ranked, rankPlaces, rankResults, ROOM_CODE_ALPHABET, roomCode, shuffle } from "./core.ts";
 
 test("ten sam seed daje ten sam ciąg", () => {
   const a = createRng(42);
@@ -79,5 +79,30 @@ describe("byHitsThenAverage", () => {
 
   test("pusty wynik przegrywa z każdym trafieniem", () => {
     expect(byHitsThenAverage(r(), r(5000))).toBeGreaterThan(0);
+  });
+});
+
+describe("rankPlaces: miejsca z remisami (potrzebne w turnieju)", () => {
+  const desc = (a: number, b: number) => b - a;
+
+  test("miejsce to 1 + liczba graczy ze ściśle lepszym wynikiem", () => {
+    expect(rankPlaces(["a", "b", "c"], { a: 1, b: 9, c: 5 }, desc)).toEqual({ a: 3, b: 1, c: 2 });
+  });
+
+  test("remis daje to samo miejsce, następne miejsce przeskakuje", () => {
+    expect(rankPlaces(["a", "b", "c", "d"], { a: 5, b: 5, c: 9, d: 1 }, desc)).toEqual({ a: 2, b: 2, c: 1, d: 4 });
+    expect(rankPlaces(["a", "b", "c"], { a: 5, b: 5, c: 5 }, desc)).toEqual({ a: 1, b: 1, c: 1 });
+  });
+
+  test("solo: pierwsze miejsce", () => {
+    expect(rankPlaces(["a"], { a: 0 }, desc)).toEqual({ a: 1 });
+  });
+
+  test("ranked: isOver i places z jednego komparatora", () => {
+    const game = ranked((s: { players: string[]; results: Record<string, number> }) => s.results, desc);
+    expect(game.isOver({ players: ["a", "b"], results: { a: 1 } })).toBeNull();
+    const over = { players: ["a", "b", "c"], results: { a: 2, b: 2, c: 9 } };
+    expect(game.isOver(over)).toEqual({ winner: "c", ranking: ["c", "a", "b"] });
+    expect(game.places(over)).toEqual({ a: 2, b: 2, c: 1 });
   });
 });

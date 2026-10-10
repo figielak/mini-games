@@ -23,6 +23,8 @@ export interface GameDefinition<State, Move> {
   /** Widok stanu dla konkretnego gracza: tu ukrywamy informacje. Obserwator dostaje widok dla "". */
   playerView(state: State, player: PlayerId): unknown;
   isOver(state: State): GameResult | null;
+  /** Miejsca po końcu gry (od 1, remis = to samo miejsce). Mają je mini-gry: turniej liczy z nich punkty. */
+  places?(state: State): Record<PlayerId, number>;
   /** Na kogo czekamy (ruch po kolei: jedna osoba; faza równoczesna: kilka); [] po końcu gry. */
   waitingFor(state: State): PlayerId[];
   /** Limit czasu tury; po nim platforma wykonuje timeoutMove za gracza. */
@@ -67,6 +69,17 @@ export function rankResults<R>(players: PlayerId[], results: Record<PlayerId, R>
   return clear ? { winner: ranking[0], ranking } : { ranking };
 }
 
+/** Miejsca z remisami: 1 + liczba graczy ze ściśle lepszym wynikiem. Tylko po końcu gry (każdy ma wynik). */
+export function rankPlaces<R>(players: PlayerId[], results: Record<PlayerId, R>, compare: (a: R, b: R) => number): Record<PlayerId, number> {
+  return Object.fromEntries(players.map((p) => [p, 1 + players.filter((q) => compare(results[q], results[p]) < 0).length]));
+}
+
+/** `isOver` i `places` mini-gry z jednego komparatora, żeby ranking i miejsca nie mogły się rozjechać. */
+export const ranked = <S extends { players: PlayerId[] }, R>(results: (state: S) => Record<PlayerId, R>, compare: (a: R, b: R) => number) => ({
+  isOver: (state: S) => rankResults(state.players, results(state), compare),
+  places: (state: S) => rankPlaces(state.players, results(state), compare),
+});
+
 /** Tasuje kopię tablicy (Fisher-Yates). */
 export function shuffle<T>(items: readonly T[], rng: Rng): T[] {
   const a = [...items];
@@ -83,3 +96,9 @@ export const average = (times: number[]) => (times.length ? times.reduce((a, b) 
 export const byHitsThenAverage = (a: { times: number[] }, b: { times: number[] }) =>
   // Dwa puste wyniki to remis: Infinity - Infinity dałoby NaN, a NaN !== 0 robiło zwycięzcę z pierwszego gracza.
   b.times.length - a.times.length || (a.times.length ? average(a.times) - average(b.times) : 0);
+
+/** Porównanie wyników „na punkty” (Stój!, Obrót): więcej punktów wyżej, przy równych niższa średnia czasu; dwa wyniki bez trafień to remis. */
+export const byScoreThenAverage =
+  <R extends { times: number[] }>(score: (r: R) => number) =>
+  (a: R, b: R) =>
+    score(b) - score(a) || (a.times.length || b.times.length ? average(a.times) - average(b.times) : 0);

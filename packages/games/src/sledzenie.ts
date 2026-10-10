@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { type GameDefinition, type PlayerId, rankResults } from "./core.ts";
+import { type GameDefinition, type PlayerId, ranked } from "./core.ts";
 
 export const BALLS = 8;
 export const TARGETS = 3;
@@ -118,7 +118,7 @@ export const sledzenie: GameDefinition<State, Move> = {
 
   playerView: (state): View => state,
 
-  isOver: (state) => rankResults(state.players, state.results, (a, b) => b.rounds - a.rounds || b.hits - a.hits),
+  ...ranked((state: State) => state.results, (a, b) => b.rounds - a.rounds || b.hits - a.hits),
 
   waitingFor: (state) => state.players.filter((player) => !(player in state.results)),
 

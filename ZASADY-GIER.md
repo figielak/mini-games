@@ -28,6 +28,9 @@ Reguły platformy (limit tury, rewanż, walkower, obserwatorzy) są w `KONCEPT.m
 | Wieża | `wieza` | 1-6 | 180 s | mini-gra |
 | Rytm | `rytm` | 1-6 | 60 s | mini-gra |
 | Inny element | `inny` | 1-6 | 90 s | mini-gra |
+| Obrót | `obrot` | 1-6 | 90 s | mini-gra |
+| Mapa | `mapa` | 1-6 | 180 s | mini-gra |
+| Kąt | `kat` | 1-6 | 120 s | mini-gra |
 
 Nazwy w UI zmieniały się (2026-10-10), `id`, nazwy plików i typów zostały stare: Sekwencja = `simon`, Kolor liter = `stroop`,
 Odcień = `kolor`, Gomoku = `piec-w-rzedzie`. Ranking w SQLite jest po `id`, więc `id` nie wolno zmieniać.
@@ -37,8 +40,8 @@ Odcień = `kolor`, Gomoku = `piec-w-rzedzie`. Ranking w SQLite jest po `id`, wi�
 - Wyzwanie losuje serwer w `setup` (to samo dla wszystkich) i od razu wysyła w widoku. `playerView` zwraca cały stan,
   więc nic nie jest ukryte (da się podejrzeć; świadoma decyzja, komentarze `ponytail:`).
 - Partia toczy się na kliencie. Każdy gracz wysyła jeden ruch `{ type: "result", ... }`; drugi ruch tego samego gracza jest odrzucany.
-  Wyjątki: Narysuj koło (do 10 ruchów na gracza), Tabela Schultego, Policz kropki, Który rok? i Wieża (dodatkowy ruch `progress` po każdym trafieniu, rundzie albo klocku).
-- Serwer odrzuca tylko nierealne wartości. Wynik liczy serwer tam, gdzie się da (Narysuj koło, Odcień, Policz kropki, Który rok?, Środek, Stój!, Śledzenie, Wieża, Rytm),
+  Wyjątki: Narysuj koło (do 10 ruchów na gracza), Tabela Schultego, Policz kropki, Kąt, Który rok? i Wieża (dodatkowy ruch `progress` po każdym trafieniu, rundzie albo klocku).
+- Serwer odrzuca tylko nierealne wartości. Wynik liczy serwer tam, gdzie się da (Narysuj koło, Odcień, Policz kropki, Który rok?, Środek, Stój!, Śledzenie, Wieża, Rytm, Mapa, Kąt),
   w reszcie ufa klientowi.
 - Partia zaczyna się ekranem instrukcji (platforma, nie zasady gry): każdy klika „Start” osobno (wiadomość pokoju `begin`) i gra od razu,
   po `INTRO_SECONDS` (15 s) gra rusza sama. Limit tury startuje, gdy wystartują wszyscy albo minie 15 s; wynik oddany wcześniej go nie uruchamia.
@@ -72,8 +75,7 @@ Odcień = `kolor`, Gomoku = `piec-w-rzedzie`. Ranking w SQLite jest po `id`, wi�
   Pusta lista jest dozwolona (limit czasu). Nie wpływają na ranking, służą tylko do ekranu końcowego.
 - Ekran końcowy: pod tabelą wyników wiersz z przewagą („Gracz 1 wygrywa o 0,3 s”, tylko gdy jest zwycięzca) i wykres międzyczasów
   (linia na gracza w jego kolorze, kropka na najdłużej szukanej liczbie, w legendzie „najdłużej 17 (4,1 s)”).
-- Tryby: **Klasyczna** (domyślna; znalezione liczby zostają widoczne, jak w oryginale) i **Łatwa** (`latwa`; znalezione gasną).
-  Tryb zmienia tylko wygląd, zasady i ranking są wspólne. Dotknięcie już znalezionej liczby nic nie robi w obu trybach.
+- Bez trybów: znalezione liczby zostają widoczne, jak w oryginale. Dotknięcie już znalezionej liczby nic nie robi.
 - Postęp rywali: po każdym trafieniu (poza ostatnim) klient wysyła `{ type: "progress", found }` (int 1-24, tylko gracz bez wyniku).
   Serwer zapisuje go w `progress` i pokazuje w pigułkach graczy jako pasek i `12/25`. Wartość nie musi rosnąć
   (po odświeżeniu gracz zaczyna od 1) i nie wpływa na wynik.
@@ -81,7 +83,7 @@ Odcień = `kolor`, Gomoku = `piec-w-rzedzie`. Ranking w SQLite jest po `id`, wi�
 - Ekran: trafiony kafelek błyska na zielono, pomyłka na czerwono z potrząśnięciem; lokalny zegar ma etykietę „Twój czas”.
 
 ### Kolor liter (`stroop`) i Liczenie (`liczenie`)
-Wspólne zasady w `quiz.ts`, wspólny ekran `Quiz.tsx` (dzieli je też Inny element).
+Wspólne zasady w `quiz.ts`, wspólny ekran `Quiz.tsx` (dzielą je też Inny element i Obrót).
 - 30 s pytań z czterema odpowiedziami; serwer losuje 200 pytań (starczy przy 150 ms na odpowiedź).
 - Pomyłka blokuje na 1 s (inaczej losowe klepanie byłoby szybsze niż myślenie).
 - Wynik: `times` (czasy poprawnych) i `errors`. Ranking jak w Refleksie: trafienia, potem niższa średnia. `errors` nie wpływa na ranking, ale jest widoczne w pasku statystyk i w wynikach.
@@ -135,7 +137,20 @@ Wspólne zasady w `quiz.ts`, wspólny ekran `Quiz.tsx` (dzieli je też Inny elem
   (pasek „3/10” w pigułce gracza), nie odnawia limitu (`turn` ma stały klucz), może spaść po odświeżeniu strony.
 - Ekran: kwadratowy kafel stoi w tym samym miejscu we wszystkich fazach (kropki, pole odpowiedzi, porównanie).
   Po każdej odpowiedzi kropki wracają na ekran razem z „Było 42, wpisałeś 38”, różnicą ze znakiem i sumą błędów;
-  wynik idzie na serwer dopiero po „Wyniki” na ostatnim porównaniu.
+  wynik idzie na serwer dopiero po „Wyniki” na ostatnim porównaniu. Ekran (`Szacowanie.tsx`) dzieli z Kątem.
+
+### Kąt (`kat`)
+Przebieg i ekran jak w Policz kropki (`Szacowanie.tsx`); inny jest rysunek, zakres odpowiedzi i wynik po limicie czasu.
+- 10 rund, w każdej kąt widoczny 1,5 s (`SHOW_MS`), potem gracz wpisuje jego miarę w stopniach.
+- Serwer losuje rundy, te same dla wszystkich. Runda `{ angle, rotation }`, obie liczby całkowite w stopniach: `angle` 5-175 (`MIN`, `MAX`),
+  `rotation` 0-359 to kierunek pierwszego ramienia, drugie leży pod `rotation + angle`. Bez kątów wklęsłych, więc nie trzeba oznaczać mierzonej strony.
+- Jeden ruch z 10 odpowiedziami (int 0-180, `MAX_ANSWER`). Wynik liczy serwer: suma |odpowiedź − kąt|, mniej lepiej, bez tolerancji.
+- Pusta lista = limit czasu = w każdej rundzie najgorszy możliwy błąd, czyli `max(kąt, 180 − kąt)`
+  (nie zera jak w kropkach: zero przy kącie 10° byłoby prawie trafieniem).
+- Ruch `progress` (`done` = liczba odpowiedzianych rund, int 1-9) po każdej odpowiedzi poza ostatnią: tylko do podglądu u rywali
+  (pasek „3/10” w pigułce gracza), nie odnawia limitu (`turn` ma stały klucz), może spaść po odświeżeniu strony.
+- Ekran: wierzchołek na środku kwadratowego kafla, oba ramiona tej samej długości (40% boku). Po odpowiedzi kąt wraca z łukiem przy wierzchołku
+  razem z „Było 70°, wpisałeś 62°”, różnicą ze znakiem i sumą błędów.
 
 ### Który rok? (`rok`)
 - 10 rund, w każdej jedno wydarzenie historyczne, wynalazek albo premiera; gracz ustawia rok suwakiem w zakresie 1900-2025.
@@ -283,6 +298,45 @@ Wynik, walidacja, ranking i ekran końcowy jak w Kolorze liter (`quiz.ts`, `Quiz
 - Pomyłka blokuje na 1 s i plansza zostaje (numer planszy = liczba trafień). Czas trafienia liczy się od pierwszego pokazania planszy;
   szukanie dłuższe niż 5 s liczy się jak 5 s.
 - Limit czasu: zero trafień.
+
+### Obrót (`obrot`)
+Przebieg, walidacja i ekran końcowy jak w Kolorze liter (`quiz.ts`, `Quiz.tsx`); inne są plansze i punktacja.
+- 30 s. Dwie figury z klocków obok siebie i dwie odpowiedzi: „Ta sama” (druga figura to pierwsza po obrocie) albo „Lustro”
+  (druga to lustrzane odbicie pierwszej, też obrócone).
+- Serwer losuje 200 par, te same dla wszystkich. Para `{ a, b, mirror }`: `a` i `b` to listy pól `[x, y]` dosunięte do rogu (0, 0);
+  ekran niczego nie liczy, tylko rysuje.
+- Figura `a` to losowo rosnące poliomino (każdy klocek styka się bokiem z innym) z `min(4 + floor(i / 3), 7)` klocków:
+  4 w parach 0-2, potem o jeden więcej co 3 pary, od pary 9 zawsze 7 (`MIN_CELLS`, `MAX_CELLS`).
+- Figura jest zawsze chiralna (jej odbicie nie jest żadnym z jej czterech obrotów), inaczej pytanie nie miałoby odpowiedzi;
+  niechiralna jest losowana od nowa.
+- `b` to `a` (albo odbicie `a`, gdy `mirror`) obrócone o losowe 90, 180 albo 270°, zawsze tak, żeby wyglądało inaczej niż przed obrotem
+  (figura, która po 180° wygląda tak samo, dostaje 90 albo 270°). `mirror` losowane po równo.
+- Pomyłka blokuje na 1 s i zabiera punkt, potem przychodzi następna para (druga próba przy dwóch odpowiedziach byłaby darmowa).
+  Sama kara punktowa nie wystarcza: klepanie na oślep daje średnio 0, ale z dużym rozrzutem, blokada go zmniejsza.
+- Wynik = trafienia − pomyłki, nie mniej niż 0, więcej lepiej. Przy remisie niższa średnia czasu trafień; dwa wyniki bez trafień to remis.
+  Liczy go klient jak w Kolorze liter (serwer zna `mirror`, więc mógłby liczyć sam z listy odpowiedzi, gdyby ktoś zaczął oszukiwać).
+- Limit czasu: zero trafień i zero pomyłek.
+- Ekran końcowy: tabela z punktami, średnim czasem i błędami (jak w Stój!).
+
+### Mapa (`mapa`)
+- 10 rund, w każdej nazwa miasta; gracz wskazuje je na konturze Polski (sam kontur, bez rzek i województw).
+- Serwer losuje 10 różnych miast z puli 62 (`CITIES` w `mapa-dane.ts`), te same i w tej samej kolejności dla wszystkich.
+  Pula to miasta od ok. 55 tys. mieszkańców; z konurbacji śląskiej tylko Katowice i Gliwice, bez miast przyklejonych do większych
+  (Sosnowiec, Pabianice, Pruszków), bo różnica kilku km byłaby zgadywaniem.
+- Pole gry to prostokąt geograficzny `BOUNDS` (13,9-24,3°E, 48,9-54,95°N), odwzorowanie liniowe: `x` to długość, `y` szerokość (północ u góry).
+  Kafel ma proporcje `ASPECT` (szerokość pola ściśnięta `cos 52°`), więc Polska wygląda jak na zwykłej mapie; zniekształcenie
+  na północy i południu do ok. 6% dotyczy tylko rysunku, nie wyniku.
+- Jeden ruch z 10 punktami (`x`, `y` w ułamkach pola). Wynik liczy serwer, więc nie zależy od rozmiaru telefonu.
+- Błąd rundy = odległość po ortodromie (haversine, R = 6371 km) od wskazanego punktu do miasta, zaokrąglona do pełnych km.
+  Wynik = suma z 10 rund w km (int), mniej lepiej.
+- Punkt poza konturem Polski jest ważną odpowiedzią (liczy się sama odległość). Punkt poza polem (`x` albo `y` poza 0-1) odrzuca cały ruch.
+- Pusta lista = limit czasu = 10 × 1000 km (`MAX_ERROR`, więcej niż przekątna pola, czyli niż najgorsza uczciwa runda).
+- Limit 180 s na całą partię, bez limitu na rundę.
+- Kontur (`OUTLINE`) pochodzi z Natural Earth 1:50m (domena publiczna), uproszczony do 126 punktów (dokładność ok. 2 km).
+- Ekran: nazwa miasta nad mapą, dotknięcie stawia znacznik w kolorze gracza, kolejne dotknięcie albo przeciągnięcie go przenosi,
+  „Zatwierdź” kończy rundę. Potem przez 1,5 s widać prawdziwe miejsce (pierścień), linię do znacznika i odległość w km:
+  do 20 km na zielono z „Idealnie!”, ponad 150 km kolorem ostrzeżenia.
+- Ekran końcowy: suma każdego gracza i tabela rund (miasto, km każdego gracza, najlepszy w rundzie na tle w swoim kolorze).
 
 ## 2. Gomoku (`piec-w-rzedzie`)
 
@@ -480,3 +534,29 @@ Wynik, walidacja, ranking i ekran końcowy jak w Kolorze liter (`quiz.ts`, `Quiz
 - Limit 60 s na każde odkrycie. Limit czasu: losowa zakryta karta.
 - **Ukrywanie stanu**: `playerView` jest taki sam dla wszystkich (także obserwatora) i zawiera symbole tylko kart zebranych,
   `first` i `miss`. Symbol z `miss` zostaje w widoku także po zakryciu kart na ekranie (każdy go już widział).
+
+## 8. Turniej (`turniej`)
+
+Seria mini-gier puszczana po kolei w jednym pokoju. To nie jest gra z rejestru `GAMES`: każda gra turnieju to zwykła partia mini-gry
+(instrukcja, limit, wynik i ranking jak w sekcji 1), a pokój sumuje punkty. Zasady w `turniej.ts`, przebieg w `LobbyRoom.ts`.
+
+- Gracze: wszyscy z miejscem (1-6). Skład jest stały na cały turniej; kto dołączy w trakcie, ogląda.
+- Konfiguracja `{ length, must, skip }` (sprawdza ją `cleanConfig`). Liczbę gier ustawia gospodarz (wiadomość pokoju `pickTournament`),
+  a gry zaznacza **każdy w pokoju**, także oglądający (wiadomość `markGame`: jedna gra na raz, `must`, `skip` albo `any`, funkcja `mark`).
+  Lista jest wspólna i wygrywa ostatnie zaznaczenie; spory gracze rozstrzygają między sobą, aplikacja ich nie rozsądza.
+  Każda zmiana kasuje gotowość gości.
+  - `length`: liczba gier, od `MIN_LENGTH` (3) do liczby niewykluczonych mini-gier, domyślnie `DEFAULT_LENGTH` (8); wartość spoza zakresu jest przycinana,
+  - `must`: gry, które będą na pewno; gdy jest ich więcej niż `length`, długość rośnie do ich liczby,
+  - `skip`: gry wykluczone; po wykluczeniu muszą zostać co najmniej 3 gry,
+  - nieznane `id`, gra jednocześnie w `must` i `skip` albo niecałkowita długość: konfiguracja odrzucona.
+- Losowanie na starcie (`draw`): wszystkie `must` i losowe z reszty puli, bez powtórzeń, w potasowanej kolejności.
+- Punkty za grę (`gamePoints`): liczba graczy ze ściśle gorszym miejscem. Przy 4 graczach bez remisów 3/2/1/0, remisujący dostają tyle samo.
+  Miejsca z remisami podaje `places` mini-gry (`rankPlaces` w core.ts). Gra przerwana (ktoś wyszedł, błąd) daje wszystkim 0.
+- Tabela (`standings`): suma punktów malejąco, potem liczba wygranych gier. Wygrana gra to samodzielne 1. miejsce przy 2+ graczach.
+- Między grami: wyniki gry i tabela; następna gra rusza, gdy wszyscy grający klikną „Dalej”, najpóźniej po `NEXT_SECONDS` (15 s).
+- Koniec po ostatniej grze. Zwycięzcą jest samodzielny lider tabeli (punkty, potem wygrane gry). Przy remisie na szczycie dolosowywana jest
+  jedna gra dogrywki: spoza rozegranych i wykluczonych, a gdy takich nie ma, dowolna niewykluczona. Po dogrywce remis zostaje bez zwycięzcy.
+  Turniej solo nie ma zwycięzcy ani dogrywki.
+- Wyjście gracza: bieżąca gra kończy się bez punktów, gracz znika z tabeli, turniej trwa dalej z pozostałymi.
+- Zakończyć turniej przed czasem może tylko gospodarz. Rewanż po turnieju losuje gry od nowa z tą samą konfiguracją.
+- Ranking w SQLite: pojedyncze gry zapisują się jak poza turniejem, zwycięzca turnieju dodatkowo pod `id` `turniej`.

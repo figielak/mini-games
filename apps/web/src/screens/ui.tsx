@@ -1,4 +1,4 @@
-import { HandTap, Timer, Trophy, WifiSlash } from "@phosphor-icons/react";
+import { ArrowLeft, Check, HandTap, ShareNetwork, SignOut, Timer, Trophy, WifiSlash } from "@phosphor-icons/react";
 import type { RoomView } from "@mini-games/games";
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useRef, useState } from "react";
 
@@ -16,6 +16,37 @@ export function Screen({ dropped, children }: { dropped: boolean; children: Reac
       )}
       {children}
     </main>
+  );
+}
+
+/** Górny wiersz ekranów przed partią: gospodarz wraca do listy gier, gość wychodzi z pokoju; po prawej kod pokoju z udostępnianiem. */
+export function TopBar({ code, onBack, onLeave }: { code: string; onBack?: () => void; onLeave: () => void }) {
+  const [copied, setCopied] = useState(false);
+
+  async function share() {
+    const url = `${location.origin}/?kod=${code}`;
+    if (navigator.share) {
+      // Anulowanie arkusza udostępniania to nie błąd.
+      await navigator.share({ title: "Gry", text: `Dołącz do pokoju ${code}`, url }).catch(() => {});
+      return;
+    }
+    await navigator.clipboard.writeText(url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  return (
+    <div className="flex items-center justify-between">
+      <button type="button" className="-ml-2 flex min-h-12 items-center gap-1.5 px-2 text-sm text-fg-muted" onClick={onBack ?? onLeave}>
+        {onBack ? <ArrowLeft size={16} aria-hidden /> : <SignOut size={16} aria-hidden />}
+        {onBack ? "Gry" : "Wyjdź"}
+      </button>
+      <button type="button" className="-mr-2 flex min-h-12 items-center gap-2 px-2" onClick={share} aria-label={`Kod pokoju ${code}, udostępnij link`}>
+        <span className="text-sm text-fg-muted">{copied ? "Skopiowano!" : "Kod"}</span>
+        <span className="font-mono text-lg font-medium tracking-[0.12em]">{code}</span>
+        {copied ? <Check size={16} weight="bold" aria-hidden /> : <ShareNetwork size={16} weight="bold" aria-hidden />}
+      </button>
+    </div>
   );
 }
 

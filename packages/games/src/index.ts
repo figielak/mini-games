@@ -2,11 +2,14 @@ import type { GameDefinition } from "./core.ts";
 import { chinczyk } from "./chinczyk.ts";
 import { inny } from "./inny.ts";
 import { kampusTour } from "./kampus-tour.ts";
+import { kat } from "./kat.ts";
 import { kolo } from "./kolo.ts";
 import { kolor } from "./kolor.ts";
 import { kropki } from "./kropki.ts";
 import { liczenie } from "./liczenie.ts";
+import { mapa } from "./mapa.ts";
 import { memory } from "./memory.ts";
+import { obrot } from "./obrot.ts";
 import { panstwaMiasta } from "./panstwa-miasta.ts";
 import { piecWRzedzie } from "./piec-w-rzedzie.ts";
 import { refleks } from "./refleks.ts";
@@ -24,6 +27,7 @@ import { wieza } from "./wieza.ts";
 
 export * from "./core.ts";
 export * from "./lobby.ts";
+export * from "./turniej.ts";
 export { TRACK as CHINCZYK_TRACK, type View as ChinczykView } from "./chinczyk.ts";
 export {
   ALLOWANCE as KAMPUS_ALLOWANCE,
@@ -62,13 +66,17 @@ export { VISIBLE_MS as STOPER_VISIBLE_MS, type View as StoperView } from "./stop
 export { COLORS as STROOP_COLORS, type View as StroopView } from "./stroop.ts";
 export type { View as LiczenieView } from "./liczenie.ts";
 export type { Symbol as InnySymbol, View as InnyView } from "./inny.ts";
+export { type Cells as ObrotCells, score as obrotScore, type View as ObrotView } from "./obrot.ts";
 export { ATTEMPTS as KOLO_ATTEMPTS, judge as koloJudge, MAX_POINTS as KOLO_MAX_POINTS, type Point as KoloPoint, type View as KoloView } from "./kolo.ts";
 export { COUNT as KOLOR_COUNT, distance as kolorDistance, type Hsb, hints as kolorHints, hsbToRgb as kolorHsbToRgb, SHOW_MS as KOLOR_SHOW_MS, type View as KolorView } from "./kolor.ts";
+export { MAX_ANSWER as KAT_MAX_ANSWER, type Round as KatRound, SHOW_MS as KAT_SHOW_MS, type View as KatView } from "./kat.ts";
 export { ROUNDS as KROPKI_ROUNDS, SHOW_MS as KROPKI_SHOW_MS, type View as KropkiView } from "./kropki.ts";
 export { MAX_YEAR as ROK_MAX_YEAR, MIN_YEAR as ROK_MIN_YEAR, REVEAL_MS as ROK_REVEAL_MS, ROUND_MS as ROK_ROUND_MS, ROUNDS as ROK_ROUNDS, type Event as RokEvent, type View as RokView } from "./rok.ts";
 export { BALLS, MOVE_MS, RADIUS, ROUNDS, SHOW_MS, SPEED_START, SPEED_STEP, TARGETS, position as sledzeniePosition, type Ball as SledzenieBall, type Move as SledzenieMove, type Result as SledzenieResult, type State as SledzenieState, type View as SledzenieView } from "./sledzenie.ts";
 export { BASE as WIEZA_BASE, build as wiezaBuild, left as wiezaLeft, LEVELS as WIEZA_LEVELS, MAX_STOP_MS as WIEZA_MAX_STOP_MS, START_WIDTH as WIEZA_START_WIDTH, type View as WiezaView } from "./wieza.ts";
 export { ACCEPT_PX as SRODEK_ACCEPT_PX, error as srodekError, offset as srodekOffset, type Point as SrodekPoint, project as srodekProject, ROUNDS as SRODEK_ROUNDS, type View as SrodekView } from "./srodek.ts";
+export { ASPECT as MAPA_ASPECT, distance as mapaDistance, error as mapaError, locate as mapaLocate, place as mapaPlace, type Point as MapaPoint, ROUNDS as MAPA_ROUNDS, type View as MapaView } from "./mapa.ts";
+export { OUTLINE as MAPA_OUTLINE } from "./mapa-dane.ts";
 export { DURATION_MS as STOJ_DURATION_MS, SCHEDULE as STOJ_SCHEDULE, score as stojScore, VISIBLE as STOJ_VISIBLE, type View as StojView } from "./stoj.ts";
 export { BEATS as RYTM_BEATS, MAX_TAPS as RYTM_MAX_TAPS, TAP_MS as RYTM_TAP_MS, type View as RytmView } from "./rytm.ts";
 export { DURATION_MS as QUIZ_DURATION_MS, type QuizMove } from "./quiz.ts";
@@ -98,5 +106,11 @@ export const GAMES: Record<string, GameDefinition<any, any>> = Object.assign(Obj
   [wieza.id]: wieza,
   [rytm.id]: rytm,
   [inny.id]: inny,
+  [obrot.id]: obrot,
+  [mapa.id]: mapa,
+  [kat.id]: kat,
   [panstwaMiasta.id]: panstwaMiasta,
 });
+
+/** Id mini-gier (gry solo, minPlayers 1): pula turnieju i lista na ekranie mini-gier. */
+export const MINI_GAME_IDS = Object.keys(GAMES).filter((id) => GAMES[id].minPlayers === 1);

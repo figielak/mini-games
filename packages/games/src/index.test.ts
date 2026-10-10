@@ -1,11 +1,12 @@
 import { describe, expect, test } from "vitest";
-import { createRng, GAMES } from "./index.ts";
+import { createRng, GAMES, ROOM_MESSAGES } from "./index.ts";
 
 // Kontrakt wspólny dla każdej gry z rejestru, sprawdzany na losowych partiach granych ruchami po limicie czasu:
 // - ruch po limicie czasu każdego gracza, na którego czekamy, przechodzi przez moveSchema i validateMove,
 // - ten sam ruch od kogoś spoza gry albo od gracza, na którego nie czekamy, jest odrzucany,
 // - partia się kończy, po końcu nikt nie może już nic zrobić, a wynik wskazuje tylko graczy tej partii,
-// - widok każdego gracza i obserwatora ("") da się wysłać jako JSON na każdym etapie.
+// - widok każdego gracza i obserwatora ("") da się wysłać jako JSON na każdym etapie,
+// - mini-gra podaje po końcu miejsca z remisami (`places`), zgodne z rankingiem i zwycięzcą.
 
 const STRANGER = "obcy";
 const SEEDS = [1, 2, 3];
@@ -20,8 +21,29 @@ const EAGER: Record<string, (rng: () => number) => unknown[]> = {
 
 test("rejestr: id z sieci nie trafia w pola prototypu obiektu, a klucz to id gry", () => {
   for (const id of ["constructor", "toString", "__proto__", "hasOwnProperty", "nie-ma-takiej"]) expect(GAMES[id], id).toBeUndefined();
-  expect(Object.keys(GAMES)).toHaveLength(22);
+  expect(Object.keys(GAMES)).toHaveLength(25);
   for (const [id, game] of Object.entries(GAMES)) expect(game.id).toBe(id);
+});
+
+test("mini-gry mają zasady narzucone z góry: tryby tylko w grach głównych", () => {
+  for (const game of Object.values(GAMES)) if (game.minPlayers === 1) expect(game.modes, game.id).toBeUndefined();
+});
+
+test("pickGame: id gry albo null (powrót do listy gier)", () => {
+  expect(ROOM_MESSAGES.pickGame.safeParse({ gameId: "statki" }).success).toBe(true);
+  expect(ROOM_MESSAGES.pickGame.safeParse({ gameId: null }).success).toBe(true);
+  expect(ROOM_MESSAGES.pickGame.safeParse({ gameId: 1 }).success).toBe(false);
+  expect(ROOM_MESSAGES.pickGame.safeParse({}).success).toBe(false);
+});
+
+test("turniej: gospodarz ustawia długość, grę zaznacza każdy (jedna gra na wiadomość)", () => {
+  expect(ROOM_MESSAGES.pickTournament.safeParse({ length: 8 }).success).toBe(true);
+  expect(ROOM_MESSAGES.pickTournament.safeParse({ length: "8" }).success).toBe(false);
+  expect(ROOM_MESSAGES.markGame.safeParse({ id: "stoper", mark: "must" }).success).toBe(true);
+  expect(ROOM_MESSAGES.markGame.safeParse({ id: "stoper", mark: "skip" }).success).toBe(true);
+  expect(ROOM_MESSAGES.markGame.safeParse({ id: "stoper", mark: "any" }).success).toBe(true);
+  expect(ROOM_MESSAGES.markGame.safeParse({ id: "stoper", mark: "moze" }).success).toBe(false);
+  expect(ROOM_MESSAGES.markGame.safeParse({ id: 1, mark: "must" }).success).toBe(false);
 });
 
 // Gra z trybami przechodzi kontrakt w każdym trybie.
@@ -73,6 +95,14 @@ describe.each(CASES)("$name: kontrakt", ({ game, mode }) => {
       if (ranking) {
         expect([...ranking].sort(), `seed ${seed}: ranking to wszyscy gracze, każdy raz`).toEqual([...players].sort());
         if (winner !== undefined) expect(ranking[0]).toBe(winner);
+      }
+      if (game.minPlayers === 1) {
+        const places = game.places!(s);
+        expect(Object.keys(places).sort(), `seed ${seed}: miejsca wszystkich graczy`).toEqual([...players].sort());
+        const order = ranking!.map((p) => places[p]);
+        expect(order, `seed ${seed}: miejsca rosną wzdłuż rankingu`).toEqual([...order].sort((a, b) => a - b));
+        expect(order[0]).toBe(1);
+        expect(winner !== undefined, `seed ${seed}: zwycięzca tylko przy samodzielnym 1. miejscu`).toBe(n > 1 && order.filter((x) => x === 1).length === 1);
       }
       for (const move of seen.values()) {
         for (const player of [...players, STRANGER]) {

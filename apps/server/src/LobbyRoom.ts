@@ -2,20 +2,31 @@ import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { type AuthContext, type Client, CloseCode, matchMaker, Room, ServerError } from "@colyseus/core";
 import {
+  advance,
+  begin,
+  cleanConfig,
   cleanNick,
+  create,
   createRng,
   GAMES,
   INTRO_SECONDS,
+  isDone,
   type GameDefinition,
   type GameResult,
   type LobbyPlayer,
+  mark,
   MAX_PLAYERS,
+  MINI_GAME_IDS,
+  NEXT_SECONDS,
   type Phase,
   PLAYER_COLORS,
   type Rng,
   ROOM_MESSAGES,
   roomCode,
   type RoomView,
+  TOURNAMENT_ID,
+  type Tournament,
+  winner,
 } from "@mini-games/games";
 import { openStats } from "./stats.ts";
 
@@ -32,6 +43,8 @@ mkdirSync(dirname(dbPath), { recursive: true });
 export const stats = openStats(dbPath);
 
 type Timer = { clear(): void };
+
+const newRng = () => createRng(crypto.getRandomValues(new Uint32Array(1))[0]);
 
 interface Match {
   def: GameDefinition<unknown, unknown>;
@@ -51,6 +64,8 @@ export class LobbyRoom extends Room {
   private gameId: string | null = null;
   private mode: string | null = null;
   private seats: string[] = [];
+  /** Wybrany albo trwający turniej. W trakcie `gameId` wskazuje bieżącą grę, w lobby jest puste. */
+  private tournament: Tournament | null = null;
   private scores: Record<string, number> = {};
   private match: Match | null = null;
   private turnTimer?: Timer;
@@ -66,12 +81,36 @@ export class LobbyRoom extends Room {
     this.roomId = code;
     this.touch();
 
+    // gameId null: powrót z ekranu gry do listy gier.
     this.on("pickGame", (client, { gameId }) => {
-      const def = GAMES[gameId];
-      if (!this.isHost(client) || this.phase !== "lobby" || !def) return;
+      const def = gameId === null ? undefined : GAMES[gameId];
+      if (!this.isHost(client) || this.phase !== "lobby" || (gameId !== null && !def)) return;
       this.gameId = gameId;
-      this.mode = (def.modes?.find((m) => m.default) ?? def.modes?.[0])?.id ?? null;
-      this.seats = [...this.players.keys()].slice(0, def.maxPlayers);
+      this.tournament = null;
+      this.mode = (def?.modes?.find((m) => m.default) ?? def?.modes?.[0])?.id ?? null;
+      this.seats = def ? [...this.players.keys()].slice(0, def.maxPlayers) : [];
+      this.resetReady();
+    });
+
+    // Wybór turnieju albo zmiana liczby gier; jak zmiana trybu, kasuje gotowość gości. Zaznaczone gry zostają.
+    this.on("pickTournament", (client, { length }) => {
+      const { must = [], skip = [] } = this.tournament?.config ?? {};
+      const config = cleanConfig({ length, must, skip }, MINI_GAME_IDS);
+      if (!this.isHost(client) || this.phase !== "lobby" || !config) return;
+      // Miejsca dostają wszyscy tylko przy wyborze turnieju; zmiana ustawień nie rusza tych, których gospodarz przesadził.
+      if (!this.tournament) this.seats = [...this.players.keys()];
+      this.tournament = create(config);
+      this.gameId = null;
+      this.mode = null;
+      this.resetReady();
+    });
+
+    // Gry turnieju zaznacza każdy w pokoju; spory rozstrzygają gracze między sobą, nie aplikacja.
+    this.on("markGame", (client, { id, mark: state }) => {
+      if (!this.players.has(client.sessionId) || this.phase !== "lobby" || !this.tournament) return;
+      const config = mark(this.tournament.config, id, state, MINI_GAME_IDS);
+      if (!config) return;
+      this.tournament = create(config);
       this.resetReady();
     });
 
@@ -85,14 +124,14 @@ export class LobbyRoom extends Room {
 
     this.on("ready", (client, { ready }) => {
       const player = this.players.get(client.sessionId);
-      if (player && this.phase === "lobby" && this.gameId) player.ready = ready;
+      if (player && this.phase === "lobby" && (this.gameId || this.tournament)) player.ready = ready;
     });
 
     this.on("toggleSeat", (client, { id }) => {
-      const def = this.gameId ? GAMES[this.gameId] : undefined;
-      if (!this.isHost(client) || this.phase !== "lobby" || !def || !this.players.has(id)) return;
+      const max = this.maxSeats();
+      if (!this.isHost(client) || this.phase !== "lobby" || !max || !this.players.has(id)) return;
       if (this.seats.includes(id)) this.seats = this.seats.filter((s) => s !== id);
-      else if (this.seats.length < def.maxPlayers) this.seats = [...this.seats, id];
+      else if (this.seats.length < max) this.seats = [...this.seats, id];
     });
 
     // Kolor zmienia się poza partią; zajętego przez kogoś innego nie da się wziąć.
@@ -105,10 +144,12 @@ export class LobbyRoom extends Room {
 
     this.on("start", (client) => {
       const def = this.gameId ? GAMES[this.gameId] : undefined;
-      if (!this.isHost(client) || this.phase !== "lobby" || !def) return;
-      if (this.seats.length < def.minPlayers || this.seats.length > def.maxPlayers) return;
+      if (!this.isHost(client) || this.phase !== "lobby" || (!def && !this.tournament)) return;
+      if (this.seats.length < (def?.minPlayers ?? 1) || this.seats.length > this.maxSeats()) return;
       if (this.seats.some((id) => id !== this.hostId && !this.players.get(id)?.ready)) return;
-      this.startMatch(def);
+      if (def) return this.startMatch(def);
+      this.tournament = begin(this.tournament!, MINI_GAME_IDS, newRng());
+      this.startTournamentGame();
     });
 
     this.on("begin", (client) => {
@@ -131,12 +172,11 @@ export class LobbyRoom extends Room {
       this.maybeRematch();
     });
 
-    // Każdy może zakończyć serię i zabrać wszystkich do lobby.
+    // Każdy może zakończyć serię i zabrać wszystkich do lobby; trwający turniej przerywa tylko gospodarz.
     this.on("toLobby", (client) => {
       if (!this.players.has(client.sessionId) || this.phase !== "over") return;
-      this.phase = "lobby";
-      this.match = null;
-      this.resetReady();
+      if (this.tournament && !isDone(this.tournament) && !this.isHost(client)) return;
+      this.toLobby();
     });
   }
 
@@ -161,8 +201,7 @@ export class LobbyRoom extends Room {
     this.players.set(client.sessionId, { id: client.sessionId, nick: auth.nick, color, connected: true, ready: false });
     if (!this.hostId) this.hostId = client.sessionId;
     // Gra już wybrana i jest wolne miejsce: nowy gracz od razu gra, gospodarz nie musi go zaznaczać.
-    const def = this.gameId ? GAMES[this.gameId] : undefined;
-    if (this.phase === "lobby" && def && this.seats.length < def.maxPlayers) this.seats = [...this.seats, client.sessionId];
+    if (this.phase === "lobby" && this.seats.length < this.maxSeats()) this.seats = [...this.seats, client.sessionId];
     this.update();
   }
 
@@ -186,8 +225,8 @@ export class LobbyRoom extends Room {
     if (this.hostId === client.sessionId) this.hostId = this.players.keys().next().value ?? "";
     if (this.seats.includes(client.sessionId)) {
       this.seats = this.seats.filter((s) => s !== client.sessionId);
-      // Walkower: w grze 1v1 wygrywa ten, kto został.
-      if (this.phase === "playing") this.finish(this.seats.length === 1 ? { winner: this.seats[0] } : {});
+      // Walkower: w grze 1v1 wygrywa ten, kto został. W turnieju gra przepada bez punktów, a turniej trwa.
+      if (this.phase === "playing") this.finish(this.seats.length === 1 && !this.tournament ? { winner: this.seats[0] } : {});
       else this.maybeRematch();
     }
     this.update();
@@ -242,10 +281,39 @@ export class LobbyRoom extends Room {
     for (const p of this.players.values()) p.ready = false;
   }
 
+  /** Ile osób może grać w tym, co wybrane (gra albo turniej); 0, gdy nic nie wybrano. */
+  private maxSeats() {
+    return this.tournament ? MAX_PLAYERS : this.gameId ? GAMES[this.gameId].maxPlayers : 0;
+  }
+
+  private toLobby() {
+    this.phase = "lobby";
+    this.match = null;
+    this.resetReady();
+    this.turnTimer?.clear();
+    this.turnEndsAt = null;
+    if (!this.tournament) return;
+    // Powrót na ekran turnieju: ustawienia zostają, tabela i lista gier nie.
+    this.tournament = create(this.tournament.config);
+    this.gameId = null;
+  }
+
+  /** Następna gra turnieju: po „Dalej” od wszystkich albo po NEXT_SECONDS. Po końcu turnieju to rewanż z nowym losowaniem. */
+  private startTournamentGame() {
+    // Zostali sami oglądający: nie ma komu grać.
+    if (this.seats.length === 0) return this.toLobby();
+    if (isDone(this.tournament!)) this.tournament = begin(this.tournament!, MINI_GAME_IDS, newRng());
+    this.gameId = this.tournament!.games[this.tournament!.index];
+    this.mode = null;
+    this.resetReady();
+    this.startMatch(GAMES[this.gameId]);
+  }
+
   private maybeRematch() {
     const def = this.gameId ? GAMES[this.gameId] : undefined;
     if (this.phase !== "over" || !def || this.seats.length < def.minPlayers) return;
     if (!this.seats.every((id) => this.players.get(id)?.ready)) return;
+    if (this.tournament) return this.startTournamentGame();
     // Na zmianę: kto zaczynał, w rewanżu rusza się ostatni. W mini-grach (minPlayers 1) wszyscy grają naraz,
     // więc rotacja nic nie daje, a tylko przestawia graczy w nagłówku i tabeli.
     if (def.minPlayers > 1) this.seats = [...this.seats.slice(1), this.seats[0]];
@@ -254,7 +322,7 @@ export class LobbyRoom extends Room {
   }
 
   private startMatch(def: GameDefinition<unknown, unknown>) {
-    const rng = createRng(crypto.getRandomValues(new Uint32Array(1))[0]);
+    const rng = newRng();
     this.match = { def, state: def.setup(this.seats, rng, this.mode ?? undefined), rng, result: null };
     this.phase = "playing";
     this.began.clear();
@@ -301,11 +369,35 @@ export class LobbyRoom extends Room {
     this.turnTimer?.clear();
     this.turnEndsAt = null;
     this.intro = false;
-    if (!result.winner) return;
-    this.scores[result.winner] = (this.scores[result.winner] ?? 0) + 1;
     // Kto wyszedł w trakcie, nie siedzi już w seats, więc nie dostaje porażki.
     const nick = (id: string) => this.players.get(id)?.nick ?? "?";
-    stats.record(this.gameId!, this.seats.map(nick), nick(result.winner));
+    const win = (gameId: string, winnerId: string) => stats.record(gameId, this.seats.map(nick), nick(winnerId));
+    if (result.winner) win(this.gameId!, result.winner);
+    if (!this.tournament) {
+      if (result.winner) this.scores[result.winner] = (this.scores[result.winner] ?? 0) + 1;
+      return;
+    }
+    // Turniej: punkty z miejsc (gra przerwana nie ma rankingu, więc nie daje punktów); wygrana w pokoju liczy się za cały turniej.
+    const { def, state, rng } = this.match;
+    const places = result.ranking ? (def.places?.(state) ?? null) : null;
+    this.tournament = advance(this.tournament, this.seats, places, MINI_GAME_IDS, rng);
+    if (isDone(this.tournament)) {
+      const champion = winner(this.tournament, this.seats);
+      if (!champion) return;
+      this.scores[champion] = (this.scores[champion] ?? 0) + 1;
+      return win(TOURNAMENT_ID, champion);
+    }
+    this.turnEndsAt = Date.now() + NEXT_SECONDS * 1000;
+    this.turnTimer = this.clock.setTimeout(() => {
+      try {
+        this.startTournamentGame();
+      } catch (error) {
+        // Jak w limicie tury: błąd w zasadach gry nie może zabić procesu, turniej wraca do lobby.
+        this.logError("następna gra turnieju", error);
+        this.toLobby();
+      }
+      this.update();
+    }, NEXT_SECONDS * 1000);
   }
 
   /** Po limicie czasu serwer wykonuje ruch za gracza, który nie zdążył. */
@@ -350,6 +442,7 @@ export class LobbyRoom extends Room {
       gameId: this.gameId,
       mode: this.mode,
       seats: this.seats,
+      tournament: this.tournament,
       scores: this.scores,
       game: match && {
         // Obserwator dostaje widok gracza "", czyli bez czyichkolwiek ukrytych informacji.

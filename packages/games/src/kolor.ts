@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { type GameDefinition, type PlayerId, rankResults } from "./core.ts";
+import { type GameDefinition, type PlayerId, ranked } from "./core.ts";
 
 export const COUNT = 5;
 /** Tyle ms widać kolor przed odtwarzaniem. */
@@ -105,7 +105,7 @@ export const kolor: GameDefinition<State, Move> = {
 
   playerView: (state): View => state,
 
-  isOver: (state) => rankResults(state.players, state.results, (a, b) => a - b),
+  ...ranked((state: State) => state.results, (a, b) => a - b),
 
   waitingFor: (state) => state.players.filter((p) => !(p in state.results)),
 

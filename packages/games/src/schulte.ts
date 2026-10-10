@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { type GameDefinition, type PlayerId, rankResults, shuffle } from "./core.ts";
+import { type GameDefinition, type PlayerId, ranked, shuffle } from "./core.ts";
 
 export const SIZE = 5;
 /** Kara za dotknięcie złej liczby. */
@@ -11,18 +11,11 @@ const MIN_MS = SIZE * SIZE * 150;
 export type Result = { ms: number; mistakes: number; splits: number[] };
 export type Move = ({ type: "result" } & Result) | { type: "progress"; found: number };
 
-/** Tryb zmienia tylko wygląd: w Łatwej znalezione liczby gasną. */
-const MODES = [
-  { id: "klasyczna", name: "Klasyczna", hint: "Znalezione liczby zostają widoczne", default: true },
-  { id: "latwa", name: "Łatwa", hint: "Znalezione liczby gasną" },
-];
-
 export interface State {
   players: PlayerId[];
   /** Liczby 1-25 w kolejności pól (wiersz po wierszu), ta sama dla wszystkich. */
   grid: number[];
   results: Record<PlayerId, Result>;
-  mode: string;
   /** Ile liczb gracz już znalazł (1-24), zgłaszane przez klienta; tylko do podglądu u rywali. */
   progress: Record<PlayerId, number>;
 }
@@ -42,17 +35,15 @@ export const schulte: GameDefinition<State, Move> = {
   turnSeconds: TURN_SECONDS,
   // Stały klucz: ruch progress nie odnawia limitu, nawet gdy gra już tylko jedna osoba.
   turn: () => ({ key: "run", seconds: TURN_SECONDS }),
-  modes: MODES,
   moveSchema: z.discriminatedUnion("type", [
     z.object({ type: z.literal("result"), ms: z.number(), mistakes: z.number(), splits: z.array(z.number()).max(SIZE * SIZE) }),
     z.object({ type: z.literal("progress"), found: z.number() }),
   ]),
 
-  setup: (players, rng, mode) => ({
+  setup: (players, rng) => ({
     players,
     grid: shuffle(Array.from({ length: SIZE * SIZE }, (_, i) => i + 1), rng),
     results: {},
-    mode: MODES.some((m) => m.id === mode) ? mode! : MODES[0].id,
     progress: {},
   }),
 
@@ -77,7 +68,7 @@ export const schulte: GameDefinition<State, Move> = {
 
   playerView: (state): View => state,
 
-  isOver: (state) => rankResults(state.players, state.results, (a, b) => total(a) - total(b)),
+  ...ranked((state: State) => state.results, (a, b) => total(a) - total(b)),
 
   waitingFor: (state) => state.players.filter((p) => !(p in state.results)),
 

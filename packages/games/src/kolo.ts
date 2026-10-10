@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { type GameDefinition, type PlayerId, rankResults } from "./core.ts";
+import { type GameDefinition, type PlayerId, rankPlaces, rankResults } from "./core.ts";
 
 /** Współrzędne 0-1 względem kwadratowego płótna, więc rysunki wszystkich są w jednej skali. */
 export type Point = [number, number];
@@ -99,6 +99,8 @@ export function judge(points: Point[]): Result & { status: "ok" | "unfinished" |
 
 const inCanvas = (v: number) => v >= 0 && v <= 1;
 
+const byScore = (a: { score: number }, b: { score: number }) => b.score - a.score;
+
 // ponytail: klient może wysłać okrąg wygenerowany kodem; między znajomymi wystarczy.
 export const kolo: GameDefinition<State, Move> = {
   id: "kolo",
@@ -139,7 +141,8 @@ export const kolo: GameDefinition<State, Move> = {
 
   playerView: (state): View => state,
 
-  isOver: (state) => (kolo.waitingFor(state).length ? null : rankResults(state.players, state.best, (a, b) => b.score - a.score)),
+  isOver: (state) => (kolo.waitingFor(state).length ? null : rankResults(state.players, state.best, byScore)),
+  places: (state) => rankPlaces(state.players, state.best, byScore),
 
   waitingFor: (state) => state.players.filter((p) => (state.attempts[p] ?? 0) < ATTEMPTS),
 

@@ -1,4 +1,6 @@
 import {
+  Angle,
+  ArrowsClockwise,
   Boat,
   Buildings,
   CalendarBlank,
@@ -10,6 +12,7 @@ import {
   Crown,
   DiceFive,
   DotsNine,
+  GameController,
   Eyedropper,
   GlobeHemisphereEast,
   GridNine,
@@ -19,6 +22,7 @@ import {
   Lightning,
   LineSegment,
   MagnifyingGlass,
+  MapTrifold,
   Metronome,
   NumberSquareOne,
   Palette,
@@ -28,10 +32,12 @@ import {
   SquaresFour,
   Stack,
   Timer,
+  Trophy,
 } from "@phosphor-icons/react";
-import { GAMES, type LobbyPlayer, MAX_PLAYERS, PLAYER_COLORS, type RoomView } from "@mini-games/games";
-import { Fragment, useState } from "react";
+import { DEFAULT_LENGTH, GAMES, type LobbyPlayer, MAX_PLAYERS, PLAYER_COLORS, type RoomView } from "@mini-games/games";
+import { useState } from "react";
 import { Screen, type Send, StickyBar } from "./ui.tsx";
+
 
 interface Props {
   view: RoomView | null;
@@ -39,21 +45,145 @@ interface Props {
   dropped: boolean;
   send: Send;
   onLeave: () => void;
+  onMini: () => void;
 }
 
-export function Lobby({ view, me, dropped, send, onLeave }: Props) {
-  const isHost = view?.hostId === me;
-  const def = view?.gameId ? GAMES[view.gameId] : undefined;
-  const hostNick = view?.players.find((p) => p.id === view.hostId)?.nick ?? "gospodarz";
-  const guests = view?.seats.filter((id) => id !== view.hostId) ?? [];
-  const unready = view?.players.filter((p) => guests.includes(p.id) && !p.ready) ?? [];
-  const DefIcon = (def && ICONS[def.id]) || Play;
-  const mode = def?.modes?.find((m) => m.id === view!.mode);
-  const meSeated = !!view?.seats.includes(me);
-  const meReady = !!view?.players.find((p) => p.id === me)?.ready;
+export function Lobby({ view, me, dropped, send, onLeave, onMini }: Props) {
+  if (!view) {
+    return (
+      <Screen dropped={dropped}>
+        <div className="tile h-36 animate-pulse" aria-label="Wczytywanie" />
+        <div className="tile h-24 animate-pulse" />
+      </Screen>
+    );
+  }
+  const isHost = view.hostId === me;
+
+  return (
+    <Screen dropped={dropped}>
+      <Code code={view.code} onLeave={onLeave} />
+      <Players view={view} me={me} send={send} />
+
+      {/* Gospodarz: gry główne otwierają ekran gry (Setup.tsx), dwa ostatnie kafle prowadzą do turnieju i listy mini-gier. */}
+      {isHost && (
+        <section>
+          <h2 className="label mb-2 px-1">Gry</h2>
+          <div className="grid grid-cols-2 gap-2">
+            {Object.values(GAMES)
+              .filter((g) => g.minPlayers > 1)
+              .map((g) => (
+                <GameTile key={g.id} game={g} players={view.players.length} onClick={() => send("pickGame", { gameId: g.id })} />
+              ))}
+            <Tile icon={Trophy} name="Turniej" hint={`1-${MAX_PLAYERS} os.`} onClick={() => send("pickTournament", { length: DEFAULT_LENGTH })} />
+            <Tile icon={GameController} name="Mini-gry" hint={`${MINI_GAMES.length} gier`} onClick={onMini} />
+          </div>
+        </section>
+      )}
+
+      <StartBar view={view} me={me} send={send} />
+    </Screen>
+  );
+}
+
+/** Lista graczy z miejscami, gotowością i wyborem koloru; wspólna dla lobby i ekranu gry. */
+export function Players({ view, me, send }: { view: RoomView; me: string; send: Send }) {
+  const isHost = view.hostId === me;
+  const def = picked(view);
+  return (
+    <section className="tile">
+      <div className="mb-3 flex items-baseline justify-between">
+        <h2 className="label">Gracze</h2>
+        <span className="font-mono text-sm text-fg-muted">
+          W pokoju {view.players.length}/{MAX_PLAYERS}
+        </span>
+      </div>
+      {(
+        (def
+          ? [
+              [`Grają ${view.seats.length}/${def.maxPlayers} (limit gry)`, view.seats.map((id) => view.players.find((p) => p.id === id)!)],
+              ["Oglądają", view.players.filter((p) => !view.seats.includes(p.id))],
+            ]
+          : [["", view.players]]
+        ) as [string, LobbyPlayer[]][]
+      )
+        .filter(([, players]) => players.length > 0)
+        .map(([title, players]) => (
+          <div key={title} className="mt-2 first:mt-0">
+            {title && <h3 className="mb-1 px-1 text-sm text-fg-muted">{title}</h3>}
+            <ul className="flex flex-col gap-1">
+              {players.map((p) => {
+                const seated = view.seats.includes(p.id);
+                const row = (
+                  <>
+                    <span className="size-3 shrink-0 rounded-full" style={{ backgroundColor: p.color }} aria-hidden />
+                    <span className="truncate">
+                      {p.nick}
+                      {p.id === me && <span className="text-fg-muted"> (ty)</span>}
+                    </span>
+                    <span className="ml-auto flex items-center gap-2 text-sm text-fg-muted">
+                      {!p.connected && "rozłączony"}
+                      {def &&
+                        seated &&
+                        (p.ready || p.id === view.hostId ? (
+                          <span className="flex items-center gap-1 text-fg">
+                            <Check size={14} weight="bold" aria-hidden />
+                            gotowe
+                          </span>
+                        ) : (
+                          "czeka"
+                        ))}
+                      {p.id === view.hostId && <Crown size={18} weight="fill" aria-label="Gospodarz" />}
+                    </span>
+                  </>
+                );
+                const className = `flex w-full min-h-11 items-center gap-3 rounded-inset px-3 text-left transition-opacity ${p.connected ? "" : "opacity-50"}`;
+                const style = { backgroundColor: `color-mix(in srgb, ${p.color} ${seated || !def ? 10 : 4}%, transparent)` };
+                return (
+                  <li key={p.id}>
+                    {isHost && def ? (
+                      <button
+                        type="button"
+                        className={className}
+                        style={style}
+                        aria-pressed={seated}
+                        onClick={() => send("toggleSeat", { id: p.id })}
+                      >
+                        {row}
+                      </button>
+                    ) : (
+                      <div className={className} style={style}>
+                        {row}
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
+      <ColorPicker view={view} me={me} send={send} />
+      {view.players.length === 1 && (
+        <p className="mt-3 text-sm text-fg-muted">Podaj znajomym kod pokoju, żeby dołączyli.</p>
+      )}
+      {isHost && def && view.players.length > 1 && (
+        <p className="mt-3 text-sm text-fg-muted">Dotknij gracza, żeby przenieść go między grającymi a oglądającymi.</p>
+      )}
+    </section>
+  );
+}
+
+/** Dolny pasek: start u gospodarza, gotowość u gościa z miejscem, informacja u oglądających. */
+export function StartBar({ view, me, send }: { view: RoomView; me: string; send: Send }) {
+  const isHost = view.hostId === me;
+  const def = picked(view);
+  const hostNick = view.players.find((p) => p.id === view.hostId)?.nick ?? "gospodarz";
+  const guests = view.seats.filter((id) => id !== view.hostId);
+  const unready = view.players.filter((p) => guests.includes(p.id) && !p.ready);
+  const meSeated = view.seats.includes(me);
+  const meReady = !!view.players.find((p) => p.id === me)?.ready;
   const startBlocker = !def
     ? "Wybierz grę"
-    : view!.seats.length < def.minPlayers
+    : view.seats.length < def.minPlayers
       ? `Zaznacz ${def.minPlayers} graczy do gry`
       : unready.length === 1
         ? `Czekamy na: ${unready[0].nick}`
@@ -62,211 +192,75 @@ export function Lobby({ view, me, dropped, send, onLeave }: Props) {
           : null;
 
   return (
-    <Screen dropped={dropped}>
-      {view ? <Code code={view.code} onLeave={onLeave} /> : <div className="tile h-36 animate-pulse" aria-label="Wczytywanie" />}
-
-      <section className="tile">
-        <div className="mb-3 flex items-baseline justify-between">
-          <h2 className="label">Gracze</h2>
-          {view && (
-            <span className="font-mono text-sm text-fg-muted">
-              W pokoju {view.players.length}/{MAX_PLAYERS}
-            </span>
-          )}
-        </div>
-        {view ? (
-          ((def
-            ? [
-                [`Grają ${view.seats.length}/${def.maxPlayers} (limit gry)`, view.seats.map((id) => view.players.find((p) => p.id === id)!)],
-                ["Oglądają", view.players.filter((p) => !view.seats.includes(p.id))],
-              ]
-            : [["", view.players]]
-          ) as [string, LobbyPlayer[]][]
-          )
-            .filter(([, players]) => players.length > 0)
-            .map(([title, players]) => (
-              <div key={title} className="mt-2 first:mt-0">
-                {title && <h3 className="mb-1 px-1 text-sm text-fg-muted">{title}</h3>}
-                <ul className="flex flex-col gap-1">
-                  {players.map((p) => {
-                    const seated = view.seats.includes(p.id);
-                    const row = (
-                      <>
-                        <span className="size-3 shrink-0 rounded-full" style={{ backgroundColor: p.color }} aria-hidden />
-                        <span className="truncate">
-                          {p.nick}
-                          {p.id === me && <span className="text-fg-muted"> (ty)</span>}
-                        </span>
-                        <span className="ml-auto flex items-center gap-2 text-sm text-fg-muted">
-                          {!p.connected && "rozłączony"}
-                          {def &&
-                            seated &&
-                            (p.ready || p.id === view.hostId ? (
-                              <span className="flex items-center gap-1 text-fg">
-                                <Check size={14} weight="bold" aria-hidden />
-                                gotowe
-                              </span>
-                            ) : (
-                              "czeka"
-                            ))}
-                          {p.id === view.hostId && <Crown size={18} weight="fill" aria-label="Gospodarz" />}
-                        </span>
-                      </>
-                    );
-                    const className = `flex w-full min-h-11 items-center gap-3 rounded-inset px-3 text-left transition-opacity ${p.connected ? "" : "opacity-50"}`;
-                    const style = { backgroundColor: `color-mix(in srgb, ${p.color} ${seated || !def ? 10 : 4}%, transparent)` };
-                    return (
-                      <li key={p.id}>
-                        {isHost && def ? (
-                          <button
-                            type="button"
-                            className={className}
-                            style={style}
-                            aria-pressed={seated}
-                            onClick={() => send("toggleSeat", { id: p.id })}
-                          >
-                            {row}
-                          </button>
-                        ) : (
-                          <div className={className} style={style}>
-                            {row}
-                          </div>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            ))
-        ) : (
-          <div className="h-11 animate-pulse rounded-inset bg-surface-inset" />
-        )}
-        {view && <ColorPicker view={view} me={me} send={send} />}
-        {view?.players.length === 1 && (
-          <p className="mt-3 text-sm text-fg-muted">Podaj znajomym kod pokoju, żeby dołączyli.</p>
-        )}
-        {isHost && def && view!.players.length > 1 && (
-          <p className="mt-3 text-sm text-fg-muted">Dotknij gracza, żeby przenieść go między grającymi a oglądającymi.</p>
-        )}
-      </section>
-
-      {/* Gospodarz: siatka gier, tryby rozwijają się pod wybraną grą (grid-flow-dense domyka wiersz). */}
-      {view &&
-        isHost &&
-        GROUPS.map(([title, quick]) => (
-          <section key={title}>
-            <h2 className="label mb-2 px-1">{title}</h2>
-            <div className="grid grid-flow-dense grid-cols-2 gap-2" role="radiogroup" aria-label={title}>
-              {Object.values(GAMES)
-                .filter((g) => (g.minPlayers === 1) === quick)
-                .map((g) => {
-                  const Icon = ICONS[g.id] ?? Play;
-                  const tooMany = view.players.length > g.maxPlayers;
-                  const picked = view.gameId === g.id;
-                  return (
-                    <Fragment key={g.id}>
-                      <button
-                        type="button"
-                        role="radio"
-                        aria-checked={picked}
-                        disabled={tooMany}
-                        className={`flex min-h-20 flex-col items-start gap-1 rounded-inset border p-3 text-left transition-colors ${
-                          picked ? "border-accent bg-accent-soft" : "border-line enabled:hover:border-line-hover"
-                        } ${tooMany ? "opacity-40" : ""}`}
-                        onClick={() => send("pickGame", { gameId: g.id })}
-                      >
-                        <Icon size={22} weight={picked ? "fill" : "regular"} aria-hidden />
-                        <span className="leading-tight">{g.name}</span>
-                        <span className="font-mono text-xs text-fg-muted">
-                          {tooMany ? (g.minPlayers === g.maxPlayers ? "tylko " : "max ") + `${g.maxPlayers} os.` : seats(g)}
-                        </span>
-                      </button>
-                      {picked && g.modes && (
-                        <div className="col-span-2 flex flex-col gap-2" role="radiogroup" aria-label={`Tryb: ${g.name}`}>
-                          <h3 className="px-1 text-sm text-fg-muted">Tryb: {g.name}</h3>
-                          {g.modes.map((m) => {
-                            const on = view.mode === m.id;
-                            return (
-                              <button
-                                key={m.id}
-                                type="button"
-                                role="radio"
-                                aria-checked={on}
-                                className={`flex min-h-12 flex-col items-start justify-center rounded-inset border px-3 py-2 text-left transition-colors ${
-                                  on ? "border-accent bg-accent-soft" : "border-line hover:border-line-hover"
-                                }`}
-                                onClick={() => send("pickMode", { mode: m.id })}
-                              >
-                                <span className="leading-tight">{m.name}</span>
-                                <span className="font-mono text-xs text-fg-muted">{m.hint}</span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </Fragment>
-                  );
-                })}
-            </div>
-          </section>
-        ))}
-
-      {/* Gość: jedna karta na całą szerokość z opisem gry i wybranym trybem. */}
-      {view && !isHost && def && (
-        <section className="tile">
-          <h2 className="label mb-3">Wybrana gra</h2>
-          <div className="flex items-center gap-3">
-            <DefIcon size={28} weight="fill" className="shrink-0" aria-hidden />
-            <div className="min-w-0">
-              <p className="leading-tight">{def.name}</p>
-              <p className="font-mono text-xs text-fg-muted">{seats(def)}</p>
-            </div>
-          </div>
-          <p className="mt-3 text-sm text-fg-muted">{BLURBS[def.id]}</p>
-          {mode && (
-            <p className="mt-3 rounded-inset border border-line px-3 py-2">
-              <span className="block leading-tight">Tryb: {mode.name}</span>
-              <span className="font-mono text-xs text-fg-muted">{mode.hint}</span>
-            </p>
-          )}
-        </section>
+    <StickyBar>
+      {isHost ? (
+        <button type="button" className={`btn w-full ${startBlocker ? "btn-ghost" : "btn-primary"}`} disabled={!!startBlocker} onClick={() => send("start")}>
+          {!startBlocker && <Play size={18} weight="fill" aria-hidden />}
+          <span className="truncate">{startBlocker ?? `Zagraj: ${def!.name}`}</span>
+        </button>
+      ) : def && meSeated ? (
+        <button
+          type="button"
+          className={`btn w-full ${meReady ? "btn-ghost" : "btn-primary"}`}
+          aria-pressed={meReady}
+          onClick={() => send("ready", { ready: !meReady })}
+        >
+          {meReady ? <Check size={18} weight="bold" aria-hidden /> : <HandWaving size={18} weight="fill" aria-hidden />}
+          <span className="truncate">{meReady ? `Gotowe, czekamy na ${hostNick}` : `Zgłaszam gotowość: ${def.name}`}</span>
+        </button>
+      ) : (
+        <p className="flex min-h-12 w-full items-center justify-center text-center text-sm text-fg-muted">
+          {def ? `Oglądasz. Czekamy, aż ${hostNick} zacznie` : `Czekamy, aż ${hostNick} wybierze grę`}
+        </p>
       )}
-
-      {view && (
-        <StickyBar>
-          {isHost ? (
-            <button type="button" className={`btn w-full ${startBlocker ? "btn-ghost" : "btn-primary"}`} disabled={!!startBlocker} onClick={() => send("start")}>
-              {!startBlocker && <Play size={18} weight="fill" aria-hidden />}
-              <span className="truncate">{startBlocker ?? `Zagraj: ${def!.name}`}</span>
-            </button>
-          ) : def && meSeated ? (
-            <button
-              type="button"
-              className={`btn w-full ${meReady ? "btn-ghost" : "btn-primary"}`}
-              aria-pressed={meReady}
-              onClick={() => send("ready", { ready: !meReady })}
-            >
-              {meReady ? <Check size={18} weight="bold" aria-hidden /> : <HandWaving size={18} weight="fill" aria-hidden />}
-              <span className="truncate">{meReady ? `Gotowe, czekamy na ${hostNick}` : `Zgłaszam gotowość: ${def.name}`}</span>
-            </button>
-          ) : (
-            <p className="flex min-h-12 w-full items-center justify-center text-center text-sm text-fg-muted">
-              {def ? `Oglądasz. Czekamy, aż ${hostNick} zacznie` : `Czekamy, aż ${hostNick} wybierze grę`}
-            </p>
-          )}
-        </StickyBar>
-      )}
-    </Screen>
+    </StickyBar>
   );
 }
 
-/** Szybkie gry to te, w które da się grać solo (minPlayers 1); reszta to planszowe i turowe. */
-const GROUPS: [string, boolean][] = [
-  ["Planszowe i turowe", false],
-  ["Szybkie i refleksowe", true],
-];
+/** To, co gospodarz wybrał do grania: gra albo turniej (wszyscy w pokoju, także solo). */
+export function picked(view: RoomView): { name: string; minPlayers: number; maxPlayers: number } | undefined {
+  if (view.tournament) return { name: "Turniej", minPlayers: 1, maxPlayers: MAX_PLAYERS };
+  return view.gameId ? GAMES[view.gameId] : undefined;
+}
 
-const ICONS: Record<string, Icon> = {
+/** Mini-gry to gry, w które da się grać solo (minPlayers 1); reszta to gry główne. */
+export const MINI_GAMES = Object.values(GAMES).filter((g) => g.minPlayers === 1);
+
+/** Kafel w siatce gier: ikona, nazwa i jedna linijka pod spodem. */
+export function Tile({ icon: TileIcon, name, hint, picked, disabled, onClick }: { icon: Icon; name: string; hint: string; picked?: boolean; disabled?: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={picked}
+      disabled={disabled}
+      className={`flex min-h-20 flex-col items-start gap-1 rounded-inset border p-3 text-left transition-colors ${
+        picked ? "border-accent bg-accent-soft" : "border-line enabled:hover:border-line-hover"
+      } ${disabled ? "opacity-40" : ""}`}
+      onClick={onClick}
+    >
+      <TileIcon size={22} weight={picked ? "fill" : "regular"} aria-hidden />
+      <span className="leading-tight">{name}</span>
+      <span className="font-mono text-xs text-fg-muted">{hint}</span>
+    </button>
+  );
+}
+
+/** Kafel gry; nieaktywny, gdy w pokoju jest więcej osób, niż gra ma miejsc. */
+export function GameTile({ game: g, players, picked, onClick }: { game: { id: string; name: string; minPlayers: number; maxPlayers: number }; players: number; picked?: boolean; onClick: () => void }) {
+  const tooMany = players > g.maxPlayers;
+  return (
+    <Tile
+      icon={ICONS[g.id] ?? Play}
+      name={g.name}
+      hint={tooMany ? (g.minPlayers === g.maxPlayers ? "tylko " : "max ") + `${g.maxPlayers} os.` : seats(g)}
+      picked={picked}
+      disabled={tooMany}
+      onClick={onClick}
+    />
+  );
+}
+
+export const ICONS: Record<string, Icon> = {
   "piec-w-rzedzie": GridNine,
   statki: Boat,
   chinczyk: DiceFive,
@@ -289,14 +283,17 @@ const ICONS: Record<string, Icon> = {
   wieza: Stack,
   rytm: Metronome,
   inny: MagnifyingGlass,
+  obrot: ArrowsClockwise,
+  mapa: MapTrifold,
+  kat: Angle,
 };
 
-function seats(g: { minPlayers: number; maxPlayers: number }) {
+export function seats(g: { minPlayers: number; maxPlayers: number }) {
   return g.minPlayers === g.maxPlayers ? `${g.minPlayers} os.` : `${g.minPlayers}-${g.maxPlayers} os.`;
 }
 
 /** Jedno zdanie o grze dla gościa, zanim zgłosi gotowość. */
-const BLURBS: Record<string, string> = {
+export const BLURBS: Record<string, string> = {
   "piec-w-rzedzie": "Na zmianę stawiacie kamienie na planszy 15×15. Wygrywa pięć lub więcej w linii.",
   statki: "Rozstawiasz flotę, potem strzelacie na zmianę. Trafienie daje kolejny strzał, wygrywa ten, kto zatopi wszystko.",
   chinczyk: "Rzucasz kostką i prowadzisz pionki dookoła planszy do domku. Stając na pionku rywala, odsyłasz go na start.",
@@ -318,6 +315,9 @@ const BLURBS: Record<string, string> = {
   sledzenie: "Kulki lecą po polu, trzy z nich są celami. Widzisz je krótko, potem śledzisz ruch i wskazujesz te trzy.",
   rytm: "Metronom gra 8 uderzeń i cichnie, a ty stukasz dalej w tym samym tempie przez 10 s. Wygrywa najmniejsza odchyłka.",
   inny: "Siatka identycznych symboli, jeden różni się obrotem, odcieniem, rozmiarem albo kształtem. 30 s, siatka rośnie po każdym trafieniu.",
+  obrot: "Dwie figury z klocków: ta sama obrócona czy lustrzane odbicie? 30 s, pomyłka zabiera punkt.",
+  mapa: "Nazwa miasta, wskazujesz je na konturze Polski. 10 rund, wygrywa najmniejsza suma kilometrów.",
+  kat: "Kąt miga przez 1,5 s, wpisujesz jego miarę w stopniach. 10 rund, wygrywa najmniejsza suma błędów.",
   wieza: "Klocek jeździ w poziomie, zatrzymujesz go nad poprzednim. To, co wystaje, zostaje ucięte. Liczy się wysokość wieży.",
 };
 
