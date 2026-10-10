@@ -57,8 +57,12 @@ Po partii ekran podsumowania (`KampusSummary.tsx`): wykres majątku, zapłacone 
 - Proste gry 1v1, zbudowane jako pierwsze, żeby przetestować cały przepływ platformy.
 - Gomoku: plansza 15×15, wygrywa 5 lub więcej w linii; `id` gry to nadal `piec-w-rzedzie`.
 - Statki również wymagają ukrywania stanu (plansza przeciwnika).
-- Statki: 10×10 (A-J, 1-10), flota 1×4, 2×3, 3×2, 4×1 bez stykania (także rogami), losowe ustawienie
-  na start z przenoszeniem i obracaniem, trafienie = kolejny strzał, X wokół zatopionego.
+- Statki: cztery tryby do wyboru w lobby: Klasyczny (10×10, flota 1×4, 2×3, 3×2, 4×1 bez stykania, także rogami),
+  Szybki (8×8, flota 4-3-2-2, partia na kilka minut),
+  Hasbro (10×10, flota 5-4-3-3-2, statki mogą się stykać, bez X wokół zatopionego) i Flota wojenna (12×12, flota 6-5-4-4-3-3-2-2).
+- Statki: losowe ustawienie
+  na start z przenoszeniem (przeciąganie albo dotknięcie) i obracaniem, trafienie = kolejny strzał, X wokół zatopionego.
+  Gotowość w rozstawianiu można cofnąć; całe rozstawianie ma jeden limit 90 s.
 
 ### 2.3a Chińczyk (spoza pierwotnego planu)
 
@@ -115,7 +119,8 @@ interface GameDefinition<State, Move> {
   minPlayers: number;
   maxPlayers: number;
   moveSchema: z.ZodType<Move>;          // kształt ruchu z sieci; reguły sprawdza validateMove
-  setup(players: PlayerId[], rng: Rng): State;
+  modes?: { id: string; name: string; hint: string; default?: boolean }[]; // tryby do wyboru w lobby
+  setup(players: PlayerId[], rng: Rng, mode?: string): State;
   validateMove(state: State, player: PlayerId, move: Move): boolean;
   applyMove(state: State, player: PlayerId, move: Move, rng: Rng): State;
   playerView(state: State, player: PlayerId): unknown; // ukrywanie informacji; obserwator dostaje ""
@@ -137,10 +142,10 @@ Wspólne pomocnicze w `core.ts`: `createRng` (mulberry32), `roomCode`, `rankResu
 - Gracze bez miejsca oglądają partię. Nowy gracz dostaje miejsce sam, jeśli gra wybrana i jest wolne.
 - Rewanż po zgodzie wszystkich grających, kolejność miejsc rotuje; do lobby może wrócić każdy.
 - Limit tury: 60 s w większości gier; dłużej w Sekwencji (300 s), Tabeli Schultego i Odcieniu (180 s),
-  Narysuj koło i Policz kropki (120 s); Państwa-miasta mają limit per faza.
+  Narysuj koło i Policz kropki (120 s); Państwa-miasta mają limit per faza, Statki 90 s na całe rozstawianie.
 - Gdy gracz z miejscem zniknie z pokoju w trakcie partii (wyjdzie sam albo nie wróci w 10 minut), partia się kończy:
   jeśli został jeden gracz, wygrywa walkowerem; przy większej liczbie kończy się bez zwycięzcy.
-- Lobby: gospodarz wybiera grę i daje start, goście potwierdzają gotowość; każdy może zmienić swój kolor
+- Lobby: gospodarz wybiera grę (i tryb, jeśli gra ma `modes`; zmiana trybu kasuje gotowość gości) i daje start, goście potwierdzają gotowość; każdy może zmienić swój kolor
   (poza partią); link `/?kod=ABCD` z przyciskiem udostępniania.
 - Limit 3 pokoi na IP, rate limit 10 wiadomości/s na klienta.
 
@@ -189,6 +194,8 @@ mini-games/
 ```
 
 Dokładne zasady gier: `ZASADY-GIER.md` (przeczytaj sekcję gry przed zmianą, popraw po zmianie zasad).
+
+Proces wprowadzania nowej gry (ustalenia, testy przed kodem, spójność zasad, wyglądu i animacji): `ZASADY.md`.
 
 Nowa gra = sekcja w `ZASADY-GIER.md`, plik zasad z testami w `packages/games/src`, wpis w `GAMES`, komponent w `apps/web/src/games`,
 podpięcie w `screens/Game.tsx` i ikona w `screens/Lobby.tsx`.

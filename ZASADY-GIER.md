@@ -8,7 +8,7 @@ Reguły platformy (limit tury, rewanż, walkower, obserwatorzy) są w `KONCEPT.m
 |---|---|---|---|---|
 | Kampus Tour | `kampus-tour` | 2-4 | 60 s | planszowa, po kolei |
 | Chińczyk | `chinczyk` | 2-4 | 60 s | planszowa, po kolei |
-| Statki | `statki` | 2 | 60 s | ukryty stan |
+| Statki | `statki` | 2 | 90 s rozstawianie, 60 s strzał | ukryty stan |
 | Gomoku | `piec-w-rzedzie` | 2 | 60 s | po kolei |
 | Państwa-miasta | `panstwa-miasta` | 2-6 | zależny od fazy | równoczesna |
 | Refleks | `refleks` | 1-6 | 60 s | mini-gra |
@@ -70,6 +70,7 @@ Wspólne zasady w `quiz.ts`, wspólny ekran `Quiz.tsx`.
   (±1, ±2, ±10, przy mnożeniu także ±a, ±b), nieujemne i bez powtórek.
 
 ### Narysuj koło (`kolo`)
+- Limit przez `turn(state)`: 120 s na wszystkie próby gracza (także solo); licznik rusza od nowa tylko, gdy ktoś skończy próby.
 - Do 10 prób palcem, liczy się najlepsza. Punkty rysunku w układzie 0-1 względem kwadratowego płótna.
 - Każda próba to osobny ruch `result` z `points` (20-1000 punktów, wszystkie w 0-1). Pusta lista kończy pozostałe próby
   (zostaje dotychczasowa najlepsza); to też ruch po limicie czasu.
@@ -103,13 +104,27 @@ Wspólne zasady w `quiz.ts`, wspólny ekran `Quiz.tsx`.
 
 ## 3. Statki (`statki`)
 
-- Plansza 10×10. Flota: 1×4, 2×3, 3×2, 4×1. Statki proste, nie mogą się stykać, także rogami.
+- Tryb wybiera gospodarz w lobby (`modes` w definicji gry, `MODES` w `statki.ts`); nieznany albo brak = `klasyczny` (domyślny).
+  Lista jest ułożona od najkrótszej partii do najdłuższej.
+  Rewanż gra w tym samym trybie, ranking liczy wszystkie tryby razem.
+
+  | Tryb | Plansza | Flota | Stykanie |
+  |---|---|---|---|
+  | `szybki` | 8×8 | 4, 3, 2, 2 | nie |
+  | `hasbro` | 10×10 | 5, 4, 3, 3, 2 | tak |
+  | `klasyczny` | 10×10 | 4, 3, 3, 2, 2, 2, 1, 1, 1, 1 | nie |
+  | `flota` (Flota wojenna) | 12×12 | 6, 5, 4, 4, 3, 3, 2, 2 | nie |
+
+- Statki proste. Bez stykania: nie mogą się dotykać, także rogami. Ze stykaniem: nie mogą się tylko nakładać.
 - **Faza `placing`** (obaj naraz): serwer losuje każdemu poprawną flotę. `place` podmienia całą flotę (walidacja `isValidFleet`),
-  `ready` zamyka ustawianie. Gdy obaj gotowi, zaczyna się bitwa. Limit czasu: `ready` z aktualnym ustawieniem.
+  `ready` zamyka ustawianie, `unready` je otwiera z powrotem (dopóki drugi gracz nie jest gotowy). Gdy obaj gotowi, zaczyna się bitwa.
+  Limit czasu: `ready` z aktualnym ustawieniem.
 - **Faza `battle`**: zaczyna `players[0]`. Pudło oddaje turę, trafienie daje kolejny strzał.
 - Zatopienie: pola statku dostają wynik `sunk`, a wszystkie pola dookoła (także po skosie) są oznaczane `around`
-  i nie da się już w nie strzelić.
+  i nie da się już w nie strzelić. W trybie ze stykaniem pól dookoła się nie oznacza (może tam stać inny statek).
 - Wygrywa ten, kto zatopi całą flotę przeciwnika. Limit czasu: strzał w losowe nieostrzelane pole.
+- Limit przez `turn(state)`: całe rozstawianie ma jeden licznik 90 s (`PLACING_SECONDS`), którego nie odnawia ani `place`,
+  ani `ready`, ani `unready` (inaczej dałoby się przeciągać rozstawianie bez końca). W bitwie 60 s od nowa po każdym strzale.
 - **Ukrywanie stanu**: `playerView` pokazuje właścicielowi wszystkie jego statki, pozostałym (przeciwnik, obserwator) tylko zatopione.
 
 ## 4. Chińczyk (`chinczyk`)
@@ -131,6 +146,7 @@ Wspólne zasady w `quiz.ts`, wspólny ekran `Quiz.tsx`.
 ## 5. Państwa-miasta (`panstwa-miasta`)
 
 - 2-6 graczy, 5 rund. Każda runda na inną literę z `ABCDEFGHIJKLŁMNOPRSTUWZ` (bez powtórek w partii).
+  `playerView` wysyła litery przyszłych rund jako puste; `nonce` w stanie służy tylko do montowania komponentu od nowa przy rewanżu.
 - Kategorie: Państwo, Miasto, Zwierzę, Roślina, Rzecz, Imię. Odpowiedź do 30 znaków.
 - **Pisanie (`write`, 90 s)**: wszyscy naraz. Ruch `write` z `done: false` to szkic zapisywany w tle; `done: true` oddaje kartkę.
   Pierwsze oddanie kartki (z kompletem albo bez) to STOP: licznik reszty startuje od nowa na 7 s.
@@ -232,7 +248,7 @@ Wspólne zasady w `quiz.ts`, wspólny ekran `Quiz.tsx`.
 ### Koniec gry
 - **Bankructwo**: zostaje jeden gracz.
 - **Monopol**: 3 pełne grupy kolorów (Ksero i Stołówka się nie liczą) kończą grę od razu; monopolista wygrywa niezależnie od majątku.
-- **Limit**: po 20 rundach wygrywa największy majątek (gotówka + wartość pól z budynkami).
+- **Limit**: po 20 rundach wygrywa największy majątek (gotówka + wartość pól z budynkami); przy równym majątku na górze remis bez zwycięzcy.
 - Ranking: żyjący według majątku (monopolista pierwszy), potem bankruci od ostatniego do pierwszego.
 
 ### Limit tury i widok
