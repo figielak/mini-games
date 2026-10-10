@@ -20,6 +20,7 @@ Reguły platformy (limit tury, rewanż, walkower, obserwatorzy) są w `KONCEPT.m
 | Narysuj koło | `kolo` | 1-6 | 120 s | mini-gra |
 | Odcień | `kolor` | 1-6 | 180 s | mini-gra |
 | Policz kropki | `kropki` | 1-6 | 120 s | mini-gra |
+| Środek | `srodek` | 1-6 | 60 s | mini-gra |
 
 Nazwy w UI zmieniały się (2026-10-10), `id`, nazwy plików i typów zostały stare: Sekwencja = `simon`, Kolor liter = `stroop`,
 Odcień = `kolor`, Gomoku = `piec-w-rzedzie`. Ranking w SQLite jest po `id`, więc `id` nie wolno zmieniać.
@@ -30,7 +31,7 @@ Odcień = `kolor`, Gomoku = `piec-w-rzedzie`. Ranking w SQLite jest po `id`, wi�
   więc nic nie jest ukryte (da się podejrzeć; świadoma decyzja, komentarze `ponytail:`).
 - Partia toczy się na kliencie. Każdy gracz wysyła jeden ruch `{ type: "result", ... }`; drugi ruch tego samego gracza jest odrzucany.
   Wyjątki: Narysuj koło (do 10 ruchów na gracza) oraz Tabela Schultego i Policz kropki (dodatkowy ruch `progress` po każdym trafieniu albo rundzie).
-- Serwer odrzuca tylko nierealne wartości. Wynik liczy serwer tam, gdzie się da (Narysuj koło, Odcień, Policz kropki),
+- Serwer odrzuca tylko nierealne wartości. Wynik liczy serwer tam, gdzie się da (Narysuj koło, Odcień, Policz kropki, Środek),
   w reszcie ufa klientowi.
 - Partia zaczyna się ekranem instrukcji (platforma, nie zasady gry): każdy klika „Start” osobno (wiadomość pokoju `begin`) i gra od razu,
   po `INTRO_SECONDS` (15 s) gra rusza sama. Limit tury startuje, gdy wystartują wszyscy albo minie 15 s; wynik oddany wcześniej go nie uruchamia.
@@ -128,6 +129,17 @@ Wspólne zasady w `quiz.ts`, wspólny ekran `Quiz.tsx`.
 - Ekran: kwadratowy kafel stoi w tym samym miejscu we wszystkich fazach (kropki, pole odpowiedzi, porównanie).
   Po każdej odpowiedzi kropki wracają na ekran razem z „Było 42, wpisałeś 38”, różnicą ze znakiem i sumą błędów;
   wynik idzie na serwer dopiero po „Wyniki” na ostatnim porównaniu.
+
+### Środek (`srodek`)
+- 10 rund, w każdej odcinek pod losowym kątem na kwadratowym polu; gracz dotyka jego środka.
+- Odcinki losowane: długość 0,25-0,7 boku pola, oba końce co najmniej 0,1 od krawędzi, środek w losowym miejscu
+  (nie pokrywa się ze środkiem pola).
+- Jeden ruch z 10 punktami dotknięcia (`x`, `y` w 0-1, ułamki pola). Wynik liczy serwer w umownych px: pole ma bok 300 px
+  niezależnie od telefonu, odległość dotknięcia od środka w każdej rundzie ucięta do 150 px, suma zapisana w dziesiątych częściach (int).
+  Mniej lepiej.
+- Pusta lista = limit czasu = 10 × 150 px.
+- Ekran: kwadratowy kafel z odcinkiem. Po dotknięciu przez 1 s widać prawdziwy środek, własny punkt (kolor gracza) i odległość,
+  potem sama wskakuje następna runda; po dziesiątej wynik idzie na serwer. Na końcu odległości z każdej rundy u wszystkich graczy.
 
 ## 2. Gomoku (`piec-w-rzedzie`)
 
