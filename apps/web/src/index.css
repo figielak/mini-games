@@ -271,6 +271,33 @@ body::before {
   }
 }
 
+/* Tabela Schultego: zielony błysk trafionego kafelka, czerwony z potrząśnięciem przy pomyłce. */
+@keyframes tile-hit {
+  from {
+    background-color: var(--color-success);
+    color: var(--color-bg);
+  }
+}
+
+@keyframes tile-miss {
+  0% {
+    background-color: var(--color-warning);
+    color: var(--color-bg);
+  }
+  20% {
+    transform: translateX(-5px);
+  }
+  40% {
+    transform: translateX(5px);
+  }
+  60% {
+    transform: translateX(-3px);
+  }
+  80% {
+    transform: translateX(3px);
+  }
+}
+
 /* Statki: zamiana plansz między turami, duża i mała przelatują na swoje miejsca. */
 ::view-transition-group(statki-own),
 ::view-transition-group(statki-enemy) {

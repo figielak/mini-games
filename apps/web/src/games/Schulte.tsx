@@ -7,7 +7,7 @@ interface Props {
   me: string;
   players: LobbyPlayer[];
   ranking?: string[];
-  onMove: (move: { type: "result"; ms: number; mistakes: number }) => void;
+  onMove: (move: { type: "result"; ms: number; mistakes: number } | { type: "progress"; found: number }) => void;
 }
 
 const LAST = SCHULTE_SIZE * SCHULTE_SIZE;
@@ -20,7 +20,8 @@ export function Schulte({ view, me, players, ranking, onMove }: Props) {
   const [phase, setPhase] = useState<Phase>("intro");
   const [target, setTarget] = useState(1);
   const [mistakes, setMistakes] = useState(0);
-  const [wrong, setWrong] = useState<number | null>(null);
+  // Ostatnio dotknięty kafelek; `id` rośnie, żeby błysk ruszył od nowa także przy tej samej liczbie.
+  const [flash, setFlash] = useState<{ n: number; ok: boolean; id: number } | null>(null);
   const [now, setNow] = useState(0);
   const start = useRef(0);
 
@@ -32,14 +33,16 @@ export function Schulte({ view, me, players, ranking, onMove }: Props) {
 
   function press(n: number) {
     if (n < target) return;
+    setFlash((f) => ({ n, ok: n === target, id: (f?.id ?? 0) + 1 }));
     if (n !== target) {
       setMistakes((m) => m + 1);
-      setWrong(n);
       navigator.vibrate?.(60);
       return;
     }
-    setWrong(null);
-    if (n < LAST) return setTarget(n + 1);
+    if (n < LAST) {
+      onMove({ type: "progress", found: n });
+      return setTarget(n + 1);
+    }
     setPhase("sent");
     onMove({ type: "result", ms: Math.round(performance.now() - start.current), mistakes });
   }
@@ -85,22 +88,19 @@ export function Schulte({ view, me, players, ranking, onMove }: Props) {
         <span>Szukaj: {target}</span>
         <span>
           {mistakes > 0 && <span className="text-warning">+{(mistakes * SCHULTE_PENALTY_MS) / 1000} s · </span>}
-          {seconds(now - start.current)} s
+          Twój czas: {seconds(now - start.current)} s
         </span>
       </div>
       <div className="grid aspect-square grid-cols-5 gap-2">
         {view.grid.map((n) => (
           <button
-            key={n}
+            // Klucz z błysku: kafelek montuje się od nowa i animacja startuje jeszcze raz.
+            key={n === flash?.n ? `${n}-${flash.id}` : n}
             type="button"
             onPointerDown={() => press(n)}
-            className={`touch-none select-none rounded-inset border font-mono text-2xl font-semibold transition-colors duration-100 ${
-              n < target
-                ? "border-transparent bg-surface-inset text-fg-subtle"
-                : n === wrong
-                  ? "border-warning bg-surface text-warning"
-                  : "border-line bg-surface"
-            }`}
+            className={`touch-none select-none rounded-inset border font-mono text-2xl font-semibold ${
+              n < target && view.mode === "latwa" ? "border-transparent bg-surface-inset text-fg-subtle" : "border-line bg-surface"
+            } ${n === flash?.n ? (flash.ok ? "animate-[tile-hit_0.35s_ease-out]" : "animate-[tile-miss_0.35s_ease-out]") : ""}`}
           >
             {n}
           </button>
