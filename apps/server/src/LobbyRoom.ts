@@ -246,8 +246,9 @@ export class LobbyRoom extends Room {
     const def = this.gameId ? GAMES[this.gameId] : undefined;
     if (this.phase !== "over" || !def || this.seats.length < def.minPlayers) return;
     if (!this.seats.every((id) => this.players.get(id)?.ready)) return;
-    // Na zmianę: kto zaczynał, w rewanżu rusza się ostatni.
-    this.seats = [...this.seats.slice(1), this.seats[0]];
+    // Na zmianę: kto zaczynał, w rewanżu rusza się ostatni. W mini-grach (minPlayers 1) wszyscy grają naraz,
+    // więc rotacja nic nie daje, a tylko przestawia graczy w nagłówku i tabeli.
+    if (def.minPlayers > 1) this.seats = [...this.seats.slice(1), this.seats[0]];
     this.resetReady();
     this.startMatch(def);
   }

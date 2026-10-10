@@ -20,6 +20,10 @@ Reguły platformy (limit tury, rewanż, walkower, obserwatorzy) są w `KONCEPT.m
 | Narysuj koło | `kolo` | 1-6 | 120 s | mini-gra |
 | Odcień | `kolor` | 1-6 | 180 s | mini-gra |
 | Policz kropki | `kropki` | 1-6 | 120 s | mini-gra |
+| Który rok? | `rok` | 1-6 | 240 s | mini-gra |
+| Środek | `srodek` | 1-6 | 60 s | mini-gra |
+| Stój! | `stoj` | 1-6 | 60 s | mini-gra |
+| Śledzenie | `sledzenie` | 1-6 | 300 s | mini-gra |
 
 Nazwy w UI zmieniały się (2026-10-10), `id`, nazwy plików i typów zostały stare: Sekwencja = `simon`, Kolor liter = `stroop`,
 Odcień = `kolor`, Gomoku = `piec-w-rzedzie`. Ranking w SQLite jest po `id`, więc `id` nie wolno zmieniać.
@@ -29,8 +33,8 @@ Odcień = `kolor`, Gomoku = `piec-w-rzedzie`. Ranking w SQLite jest po `id`, wi�
 - Wyzwanie losuje serwer w `setup` (to samo dla wszystkich) i od razu wysyła w widoku. `playerView` zwraca cały stan,
   więc nic nie jest ukryte (da się podejrzeć; świadoma decyzja, komentarze `ponytail:`).
 - Partia toczy się na kliencie. Każdy gracz wysyła jeden ruch `{ type: "result", ... }`; drugi ruch tego samego gracza jest odrzucany.
-  Wyjątki: Narysuj koło (do 10 ruchów na gracza) oraz Tabela Schultego i Policz kropki (dodatkowy ruch `progress` po każdym trafieniu albo rundzie).
-- Serwer odrzuca tylko nierealne wartości. Wynik liczy serwer tam, gdzie się da (Narysuj koło, Odcień, Policz kropki),
+  Wyjątki: Narysuj koło (do 10 ruchów na gracza), Tabela Schultego, Policz kropki i Który rok? (dodatkowy ruch `progress` po każdym trafieniu albo rundzie).
+- Serwer odrzuca tylko nierealne wartości. Wynik liczy serwer tam, gdzie się da (Narysuj koło, Odcień, Policz kropki, Środek, Stój!, Śledzenie),
   w reszcie ufa klientowi.
 - Partia zaczyna się ekranem instrukcji (platforma, nie zasady gry): każdy klika „Start” osobno (wiadomość pokoju `begin`) i gra od razu,
   po `INTRO_SECONDS` (15 s) gra rusza sama. Limit tury startuje, gdy wystartują wszyscy albo minie 15 s; wynik oddany wcześniej go nie uruchamia.
@@ -128,6 +132,79 @@ Wspólne zasady w `quiz.ts`, wspólny ekran `Quiz.tsx`.
 - Ekran: kwadratowy kafel stoi w tym samym miejscu we wszystkich fazach (kropki, pole odpowiedzi, porównanie).
   Po każdej odpowiedzi kropki wracają na ekran razem z „Było 42, wpisałeś 38”, różnicą ze znakiem i sumą błędów;
   wynik idzie na serwer dopiero po „Wyniki” na ostatnim porównaniu.
+
+### Który rok? (`rok`)
+- 10 rund, w każdej jeden event historyczny / wynalazek / premiera bez wskazania roku; gracz ustawia rok suwakiem.
+- Zasady: 1-6 graczy, mini-gra, limit partii 240 s, zakres lat 1900-2025, ta sama 10-elementowa pula dla wszystkich.
+- Jeden ruch z 10 odpowiedziami (int 1900-2025). Wynik liczy serwer: suma |odpowiedź − rok|, mniej lepiej.
+- Pusta lista = limit czasu, liczona jako najgorszy możliwy wynik rundy: `max(rok − MIN_YEAR, MAX_YEAR − rok)`.
+- Ruch `progress` (`done` = liczba odpowiedzianych rund, int 1-9) po każdej odpowiedzi poza ostatnią: tylko do podglądu u rywali,
+  nie odnawia limitu (`turn` ma stały klucz), może spaść po odświeżeniu strony.
+- Ekran: na środku duży „rok” z suwakami do ±1 i paskiem czasu; po zatwierdzeniu pojawia się prawdziwy rok i różnica ze znakiem,
+  a na końcu tabela z odpowiedziami i prawdziwym rokiem każdego wydarzenia.
+
+### Środek (`srodek`)
+- 10 rund, w każdej odcinek pod losowym kątem na kwadratowym polu; gracz dotyka jego środka.
+- Odcinki losowane: kąt dowolny, długość 0,5-0,9 boku pola, oba końce co najmniej 0,05 od krawędzi, środek w losowym miejscu,
+  na ile pozwala długość. Długie, bo niedokładność palca jest stała (kilka px), a pomyłka oka rośnie z długością:
+  na krótkim odcinku gra mierzyłaby palec, nie oko.
+- Jeden ruch z 10 punktami dotknięcia (`x`, `y` w ułamkach pola). Wynik liczy serwer, więc nie zależy od rozmiaru telefonu.
+- Dotknięcie jest rzutowane prostopadle na prostą odcinka i błąd rundy to odległość rzutu od środka, mierzona wzdłuż odcinka,
+  w procentach jego długości (koniec odcinka = 50%). Każda runda waży więc tyle samo, niezależnie od długości.
+  Odchylenie w bok nic nie kosztuje: liczy się tylko to, czy gracz dobrze ocenił połowę.
+- Strefa akceptacji: dotknięcie dalej niż 30 umownych px od odcinka (pole ma bok 300 px; strefa jest w px, bo dotyczy palca) (od najbliższego punktu, także za końcami) nie jest odpowiedzią.
+  Ekran je ignoruje bez kary, serwer odrzuca cały ruch z takim punktem. Dzięki temu przypadkowe stuknięcie w puste pole nie psuje rundy,
+  a rzutowania nie da się nadużyć, stukając daleko obok.
+- Wynik = suma błędów z 10 rund, zapisana w dziesiątych częściach procenta (int), mniej lepiej. Największy możliwy błąd rundy
+  to koniec odcinka plus strefa (50% + 20% na najkrótszym), więc jedna wpadka nie kosztuje więcej.
+- Pusta lista = limit czasu = 10 × 100% (więcej niż najgorsza uczciwa partia).
+- Ekran: kwadratowy kafel z odcinkiem (poprzeczne kreski na końcach). Liczy się miejsce podniesienia palca: punkt można przytrzymać
+  i przesunąć, a przy dotyku nad kaflem jest lupa ok. 1,7× (mysz jej nie ma). W trakcie celowania pierścień pokazuje rzut na odcinek
+  (tylko w strefie akceptacji). Puszczenie poza strefą: potrząśnięcie odcinka, wibracja 60 i „Dotknij na odcinku”, runda trwa dalej.
+  Po puszczeniu przez 1 s widać własny punkt na odcinku (kolor gracza), prawdziwy środek (pierścień), odcinek błędu między nimi
+  i błąd w %; kolor według celności: do 2% zielony z „Idealnie!”, do 8% zwykły, dalej ostrzegawczy.
+  Potem sama wskakuje następna runda; po dziesiątej wynik idzie na serwer.
+- Ekran końcowy: jedna tabela, rundy 1-10 w kolumnach, gracze w wierszach (kolejność rankingu). Liczby w kolorach celności,
+  najlepszy w rundzie (bez remisu) ma tło w kolorze gracza.
+
+### Stój! (`stoj`)
+- 30 s. Jedno duże pole zapala się na zielono (dotknij) albo czerwono (nie wolno), potem na chwilę gaśnie i przychodzi następny bodziec.
+- Tempo rośnie: odstęp między bodźcami maleje liniowo z czasem partii od 1000 ms do 500 ms. Bodziec widać przez 0,6 odstępu,
+  ale dotknięcie liczy się aż do pojawienia się następnego. Harmonogram (`SCHEDULE`) wynika ze stałych, jest ten sam w każdej partii.
+- Losowe jest tylko to, które bodźce są czerwone: dokładnie co trzeci (`round(N / 3)`), w kolejności potasowanej na serwerze.
+- Jedno dotknięcie na bodziec. Zielony = trafienie, czerwony = błąd. Dotknięcie szybciej niż 100 ms od pojawienia się to zgadywanie:
+  ekran je ignoruje. Przepuszczony zielony nic nie kosztuje (brak punktu).
+- Jeden ruch z `taps`: czas reakcji na każdy bodziec w ms (int) albo `null`, gdy nie było dotknięcia. Wynik liczy serwer:
+  `times` (reakcje na zielone) i `errors` (dotknięte czerwone).
+- Wynik = trafienia − 2 × błędy, nie mniej niż 0, więcej lepiej. Przy remisie niższa średnia reakcji; dwa wyniki bez trafień to remis,
+  a zero punktów z trafieniami jest wyżej niż zero bez trafień.
+- Kara jest punktowa, nie blokadą 1 s jak w innych grach na czas: blokada zjadałaby kolejne bodźce, a −2 przy 1/3 czerwonych
+  i tak zeruje klepanie na oślep (N − 3 × czerwone ≈ 0).
+- Walidacja: najwyżej tyle czasów, ile bodźców, każdy od 100 ms do odstępu swojego bodźca. Pusta lista = limit czasu = 0 pkt.
+- Ekran: zielony z napisem „Dotknij”, czerwony z dłonią i „Stój!” (kolor nie jest jedynym sygnałem), bez przejścia. Trafienie gasi pole,
+  błąd to czerwony błysk z potrząśnięciem i wibracja 60. Ekran końcowy: tabela z punktami, średnim czasem i błędami (wspólna z `Quiz.tsx`).
+
+### Śledzenie (`sledzenie`)
+- Do 20 rund. W każdej 8 identycznych kulek na kwadratowym polu, 3 z nich (cele) są podświetlone przez 1,5 s, potem wszystkie
+  ruszają się przez 5 s i stają; gracz wskazuje 3 kulki.
+- Pierwsza pomyłka kończy partię (jak w Sekwencji): runda jest zaliczona tylko z kompletem 3 celów.
+- Tempo rośnie: prędkość kulek to 0,3 boku pola na sekundę w pierwszej rundzie i o 0,06 więcej w każdej następnej (w dwudziestej ok. 1,45).
+  Wszystkie kulki w rundzie mają tę samą prędkość.
+- Ruch: każda kulka leci po prostej i odbija się od krawędzi pola, kulki przenikają przez siebie (mijanie się jest tym trudnym momentem).
+  Pozycja to wzór od czasu (`position(ball, round, t)`, fala trójkątna na każdej osi), bez symulacji krokowej: ta sama funkcja
+  na serwerze i w ekranie, więc u wszystkich ruch jest identyczny.
+- Serwer losuje dla każdej rundy 8 kulek: start (`x`, `y`) i kierunek (`angle`). Celami są kulki o indeksach 0-2 (pozycje są losowe,
+  więc osobne losowanie indeksów nic by nie dało). Na starcie i po zatrzymaniu kulki się nie nakładają
+  (promień 0,06 boku, odstęp środków co najmniej 0,14), w trakcie ruchu mogą.
+- Jeden ruch z `picks`: wskazania z kolejnych rozegranych rund, w każdej dokładnie 3 różne indeksy kulek (int 0-7), kolejność bez znaczenia.
+  Wynik liczy serwer: `rounds` = liczba rund od początku z kompletem celów, `hits` = trafione cele (0-2) w pierwszej rundzie z błędem.
+  Wszystko po pierwszym błędzie jest ignorowane.
+- Ranking: więcej rund wyżej, przy równych więcej `hits` („prawie się udało” wygrywa z pudłem); równe oba to remis.
+- Walidacja: najwyżej 20 rund, każda to 3 różne liczby całkowite 0-7. Pusta lista = limit czasu = 0 rund i 0 trafionych.
+- Bez ruchu `progress`: rywale nie widzą numeru rundy (jak w Sekwencji).
+- Ekran: kwadratowy kafel z kulkami; cele podświetlone kolorem gracza, w ruchu wszystkie jednakowe. Po zatrzymaniu dotknięcie zaznacza kulkę
+  (ponowne odznacza), trzecie zatwierdza. Potem przez 1 s widać prawdziwe cele; pomyłka to wibracja 60.
+  Ruch kulek jest treścią gry, więc działa także przy `prefers-reduced-motion`.
 
 ## 2. Gomoku (`piec-w-rzedzie`)
 
