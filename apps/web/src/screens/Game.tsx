@@ -15,7 +15,7 @@ import { Simon } from "../games/Simon.tsx";
 import { FleetLeft, Statki } from "../games/Statki.tsx";
 import { Stoper } from "../games/Stoper.tsx";
 import { Stroop } from "../games/Stroop.tsx";
-import { Screen, type Send } from "./ui.tsx";
+import { IntroContext, Screen, type Send } from "./ui.tsx";
 
 interface Props {
   view: RoomView;
@@ -98,246 +98,253 @@ export function Game({ view, me, dropped, send }: Props) {
             : "Twój ruch!"
         : `Czekamy na: ${waitingNicks}`;
 
+  const intro = {
+    game,
+    others: view.seats.filter((id) => id !== me).map((id) => ({ id, nick: nick(id), color: view.players.find((p) => p.id === id)?.color ?? "", began: game.began.includes(id) })),
+    begin: () => send("begin"),
+  };
+
   return (
-    <Screen dropped={dropped}>
-      {!ownHeader && (
-        <header className="tile flex flex-col gap-3 p-4">
-          <div className="flex items-center justify-between gap-3">
-            {/* Koniec partii: tytuł w kolorze zwycięzcy; podbicie tylko u niego, przegrany dostaje spokojną wersję. */}
-            <h1
-              className={`origin-left text-xl font-semibold ${winner === me ? "animate-[title-pop_0.5s_cubic-bezier(0.2,0.8,0.4,1)]" : ""}`}
-              style={{ color: winner ? winnerColor : myTurn ? myColor : undefined }}
-            >
-              {status}
-            </h1>
+    <IntroContext.Provider value={intro}>
+      <Screen dropped={dropped}>
+        {!ownHeader && (
+          <header className="tile flex flex-col gap-3 p-4">
+            <div className="flex items-center justify-between gap-3">
+              {/* Koniec partii: tytuł w kolorze zwycięzcy; podbicie tylko u niego, przegrany dostaje spokojną wersję. */}
+              <h1
+                className={`origin-left text-xl font-semibold ${winner === me ? "animate-[title-pop_0.5s_cubic-bezier(0.2,0.8,0.4,1)]" : ""}`}
+                style={{ color: winner ? winnerColor : myTurn ? myColor : undefined }}
+              >
+                {status}
+              </h1>
+            </div>
+            {/* Na ekranie instrukcji limit jeszcze nie ruszył. Stoper: tykający limit zdradzałby upływ sekund, więc grający go nie widzi. */}
+            {view.phase === "playing" && !game.intro && !(def.id === "stoper" && myTurn) && !inRound && (
+              <Countdown game={game} total={def.turn?.(game.view).seconds ?? def.turnSeconds} color={myTurn ? myColor : undefined} label={MINI_GAMES.has(def.id) ? "Limit" : undefined} />
+            )}
+            <ul className="flex flex-wrap gap-2">
+              {view.seats.map((id) => {
+                const p = view.players.find((pl) => pl.id === id);
+                const active = id === winner || (view.phase === "playing" && game.waitingFor.includes(id));
+                return (
+                  <li
+                    key={id}
+                    className={`flex min-h-9 items-center gap-2 rounded-full border px-3 text-sm transition-colors ${fleet ? "w-full" : ""} ${
+                      active ? "" : "border-transparent text-fg-muted"
+                    }`}
+                    style={active ? { borderColor: p?.color, backgroundColor: `color-mix(in srgb, ${p?.color} 16%, transparent)` } : undefined}
+                  >
+                    <span className="size-2.5 rounded-full" style={{ backgroundColor: p?.color }} aria-hidden />
+                    {nick(id)}
+                    {id === me && " (ty)"}
+                    {fleet?.phase === "placing" && fleet.boards[id].ready && <Check size={14} weight="bold" aria-label="gotowy" />}
+                    {ludo ? (
+                      <span className="flex gap-1" aria-label={`W domu: ${ludo.pawns[id].filter((p) => p >= CHINCZYK_TRACK).length} z 4`}>
+                        {[...ludo.pawns[id]].sort((a, b) => b - a).map((pos, i) => (
+                          <span
+                            key={i}
+                            className="size-2.5 rounded-full border"
+                            style={{ borderColor: p?.color, backgroundColor: pos >= CHINCZYK_TRACK ? p?.color : undefined }}
+                            aria-hidden
+                          />
+                        ))}
+                      </span>
+                    ) : fleet ? (
+                      <FleetLeft board={fleet.boards[id]} lengths={fleet.lengths} color={p?.color ?? "#8b8b92"} />
+                    ) : schulte ? (
+                      <Progress done={id in schulte.results ? SCHULTE_LAST : (schulte.progress[id] ?? 0)} total={SCHULTE_LAST} color={p?.color} />
+                    ) : kropki ? (
+                      <Progress done={id in kropki.results ? KROPKI_ROUNDS : (kropki.progress[id] ?? 0)} total={KROPKI_ROUNDS} color={p?.color} />
+                    ) : (
+                      // Klucz z wyniku: po wygranej liczba montuje się od nowa i wskakuje.
+                      <span
+                        key={view.scores[id] ?? 0}
+                        className={`text-base font-semibold text-fg tabular-nums ${id === winner ? "animate-[stone-pop_0.5s_ease-out]" : ""}`}
+                      >
+                        {view.scores[id] ?? 0}
+                      </span>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+            {!seated && (
+              <p className="flex items-center gap-2 text-sm text-fg-muted">
+                <UsersThree size={16} aria-hidden />
+                Oglądasz
+              </p>
+            )}
+          </header>
+        )}
+
+        {def.id === "piec-w-rzedzie" && (
+          <PiecWRzedzie
+            view={game.view as PiecWRzedzieView}
+            players={view.players}
+            canMove={myTurn}
+            onMove={(move) => send("move", move)}
+          />
+        )}
+
+        {def.id === "statki" && (
+          <Statki
+            view={game.view as StatkiView}
+            me={me}
+            players={view.players}
+            canMove={myTurn}
+            onMove={(move) => send("move", move)}
+          />
+        )}
+
+        {def.id === "chinczyk" && (
+          <Chinczyk
+            view={game.view as ChinczykView}
+            me={me}
+            players={view.players}
+            canMove={myTurn}
+            onMove={(move) => send("move", move)}
+          />
+        )}
+
+        {/* Klucz z wylosowanego wyzwania: rewanż montuje grę od nowa, bez stanu poprzedniej partii. */}
+        {def.id === "refleks" && (
+          <Refleks
+            key={(game.view as RefleksView).delays.join()}
+            view={game.view as RefleksView}
+            me={me}
+            players={view.players}
+            ranking={game.result?.ranking}
+            winner={winner}
+            onMove={(move) => send("move", move)}
+          />
+        )}
+
+        {def.id === "stoper" && (
+          <Stoper
+            key={(game.view as StoperView).nonce}
+            view={game.view as StoperView}
+            me={me}
+            players={view.players}
+            ranking={game.result?.ranking}
+            onMove={(move) => send("move", move)}
+          />
+        )}
+
+        {def.id === "kolo" && (
+          <Kolo
+            key={(game.view as KoloView).nonce}
+            view={game.view as KoloView}
+            me={me}
+            players={view.players}
+            ranking={game.result?.ranking}
+            onMove={(move) => send("move", move)}
+          />
+        )}
+
+        {def.id === "kolor" && (
+          <Kolor
+            key={JSON.stringify((game.view as KolorView).targets)}
+            view={game.view as KolorView}
+            me={me}
+            players={view.players}
+            ranking={game.result?.ranking}
+            onMove={(move) => send("move", move)}
+          />
+        )}
+
+        {def.id === "kropki" && (
+          <Kropki
+            key={JSON.stringify((game.view as KropkiView).rounds)}
+            view={game.view as KropkiView}
+            me={me}
+            players={view.players}
+            ranking={game.result?.ranking}
+            onMove={(move) => send("move", move)}
+          />
+        )}
+
+        {def.id === "schulte" && (
+          <Schulte
+            key={(game.view as SchulteView).grid.join()}
+            view={game.view as SchulteView}
+            me={me}
+            players={view.players}
+            ranking={game.result?.ranking}
+            onMove={(move) => send("move", move)}
+          />
+        )}
+
+        {def.id === "stroop" && (
+          <Stroop
+            key={(game.view as StroopView).trials.map((t) => t.word * 4 + t.ink).join("")}
+            view={game.view as StroopView}
+            me={me}
+            players={view.players}
+            ranking={game.result?.ranking}
+            winner={winner}
+            onMove={(move) => send("move", move)}
+            onRound={setInRound}
+          />
+        )}
+
+        {def.id === "liczenie" && (
+          <Liczenie
+            key={(game.view as LiczenieView).problems.map((p) => p.text).join()}
+            view={game.view as LiczenieView}
+            me={me}
+            players={view.players}
+            ranking={game.result?.ranking}
+            winner={winner}
+            onMove={(move) => send("move", move)}
+            onRound={setInRound}
+          />
+        )}
+
+        {def.id === "simon" && (
+          <Simon
+            key={(game.view as SimonView).sequence.join("")}
+            view={game.view as SimonView}
+            me={me}
+            players={view.players}
+            ranking={game.result?.ranking}
+            onMove={(move) => send("move", move)}
+          />
+        )}
+
+        {def.id === "panstwa-miasta" && (
+          <PanstwaMiasta
+            key={(game.view as PanstwaMiastaView).nonce}
+            view={game.view as PanstwaMiastaView}
+            me={me}
+            players={view.players}
+            waitingFor={game.waitingFor}
+            ranking={game.result?.ranking}
+            timer={ownHeader && <Countdown game={game} total={def.turn?.(game.view).seconds} tense />}
+            onMove={(move) => send("move", move)}
+          />
+        )}
+
+        {/* Mini-gry pokazują ranking same, razem z wynikami. */}
+        {view.phase === "over" && !MINI_GAMES.has(def.id) && game.result?.ranking && game.result.ranking.length > 2 && (
+          <ol className="tile flex flex-col gap-1 p-4">
+            {game.result.ranking.map((id, i) => (
+              <li key={id} className="flex items-center gap-3">
+                <span className="w-5 font-mono text-fg-muted">{i + 1}.</span>
+                <span className="size-2.5 rounded-full" style={{ backgroundColor: view.players.find((p) => p.id === id)?.color }} aria-hidden />
+                {nick(id)}
+                {id === me && <span className="text-fg-muted"> (ty)</span>}
+              </li>
+            ))}
+          </ol>
+        )}
+
+        {view.phase === "over" && (
+          <div className="mt-auto flex flex-col gap-2 pt-4">
+            <OverActions view={view} me={me} send={send} />
           </div>
-          {/* Stoper: tykający limit tury zdradzałby upływ sekund, więc grający widzi go tylko przed startem. */}
-          {view.phase === "playing" && !(def.id === "stoper" && myTurn) && !inRound && (
-            <Countdown game={game} total={def.turn?.(game.view).seconds ?? def.turnSeconds} color={myTurn ? myColor : undefined} label={MINI_GAMES.has(def.id) ? "Limit" : undefined} />
-          )}
-          <ul className="flex flex-wrap gap-2">
-            {view.seats.map((id) => {
-              const p = view.players.find((pl) => pl.id === id);
-              const active = id === winner || (view.phase === "playing" && game.waitingFor.includes(id));
-              return (
-                <li
-                  key={id}
-                  className={`flex min-h-9 items-center gap-2 rounded-full border px-3 text-sm transition-colors ${fleet ? "w-full" : ""} ${
-                    active ? "" : "border-transparent text-fg-muted"
-                  }`}
-                  style={active ? { borderColor: p?.color, backgroundColor: `color-mix(in srgb, ${p?.color} 16%, transparent)` } : undefined}
-                >
-                  <span className="size-2.5 rounded-full" style={{ backgroundColor: p?.color }} aria-hidden />
-                  {nick(id)}
-                  {id === me && " (ty)"}
-                  {fleet?.phase === "placing" && fleet.boards[id].ready && <Check size={14} weight="bold" aria-label="gotowy" />}
-                  {ludo ? (
-                    <span className="flex gap-1" aria-label={`W domu: ${ludo.pawns[id].filter((p) => p >= CHINCZYK_TRACK).length} z 4`}>
-                      {[...ludo.pawns[id]].sort((a, b) => b - a).map((pos, i) => (
-                        <span
-                          key={i}
-                          className="size-2.5 rounded-full border"
-                          style={{ borderColor: p?.color, backgroundColor: pos >= CHINCZYK_TRACK ? p?.color : undefined }}
-                          aria-hidden
-                        />
-                      ))}
-                    </span>
-                  ) : fleet ? (
-                    <FleetLeft board={fleet.boards[id]} lengths={fleet.lengths} color={p?.color ?? "#8b8b92"} />
-                  ) : schulte ? (
-                    <Progress done={id in schulte.results ? SCHULTE_LAST : (schulte.progress[id] ?? 0)} total={SCHULTE_LAST} color={p?.color} />
-                  ) : kropki ? (
-                    <Progress done={id in kropki.results ? KROPKI_ROUNDS : (kropki.progress[id] ?? 0)} total={KROPKI_ROUNDS} color={p?.color} />
-                  ) : (
-                    // Klucz z wyniku: po wygranej liczba montuje się od nowa i wskakuje.
-                    <span
-                      key={view.scores[id] ?? 0}
-                      className={`text-base font-semibold text-fg tabular-nums ${id === winner ? "animate-[stone-pop_0.5s_ease-out]" : ""}`}
-                    >
-                      {view.scores[id] ?? 0}
-                    </span>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-          {!seated && (
-            <p className="flex items-center gap-2 text-sm text-fg-muted">
-              <UsersThree size={16} aria-hidden />
-              Oglądasz
-            </p>
-          )}
-        </header>
-      )}
-
-      {def.id === "piec-w-rzedzie" && (
-        <PiecWRzedzie
-          view={game.view as PiecWRzedzieView}
-          players={view.players}
-          canMove={myTurn}
-          onMove={(move) => send("move", move)}
-        />
-      )}
-
-      {def.id === "statki" && (
-        <Statki
-          view={game.view as StatkiView}
-          me={me}
-          players={view.players}
-          canMove={myTurn}
-          onMove={(move) => send("move", move)}
-        />
-      )}
-
-      {def.id === "chinczyk" && (
-        <Chinczyk
-          view={game.view as ChinczykView}
-          me={me}
-          players={view.players}
-          canMove={myTurn}
-          onMove={(move) => send("move", move)}
-        />
-      )}
-
-      {/* Klucz z wylosowanego wyzwania: rewanż montuje grę od nowa, bez stanu poprzedniej partii. */}
-      {def.id === "refleks" && (
-        <Refleks
-          key={(game.view as RefleksView).delays.join()}
-          view={game.view as RefleksView}
-          me={me}
-          players={view.players}
-          ranking={game.result?.ranking}
-          winner={winner}
-          onMove={(move) => send("move", move)}
-        />
-      )}
-
-      {def.id === "stoper" && (
-        <Stoper
-          key={(game.view as StoperView).nonce}
-          view={game.view as StoperView}
-          me={me}
-          players={view.players}
-          ranking={game.result?.ranking}
-          timer={<Countdown game={game} total={def.turnSeconds} color={myColor} />}
-          onMove={(move) => send("move", move)}
-        />
-      )}
-
-      {def.id === "kolo" && (
-        <Kolo
-          key={(game.view as KoloView).nonce}
-          view={game.view as KoloView}
-          me={me}
-          players={view.players}
-          ranking={game.result?.ranking}
-          onMove={(move) => send("move", move)}
-        />
-      )}
-
-      {def.id === "kolor" && (
-        <Kolor
-          key={JSON.stringify((game.view as KolorView).targets)}
-          view={game.view as KolorView}
-          me={me}
-          players={view.players}
-          ranking={game.result?.ranking}
-          onMove={(move) => send("move", move)}
-        />
-      )}
-
-      {def.id === "kropki" && (
-        <Kropki
-          key={JSON.stringify((game.view as KropkiView).rounds)}
-          view={game.view as KropkiView}
-          me={me}
-          players={view.players}
-          ranking={game.result?.ranking}
-          onMove={(move) => send("move", move)}
-        />
-      )}
-
-      {def.id === "schulte" && (
-        <Schulte
-          key={(game.view as SchulteView).grid.join()}
-          view={game.view as SchulteView}
-          me={me}
-          players={view.players}
-          ranking={game.result?.ranking}
-          onMove={(move) => send("move", move)}
-        />
-      )}
-
-      {def.id === "stroop" && (
-        <Stroop
-          key={(game.view as StroopView).trials.map((t) => t.word * 4 + t.ink).join("")}
-          view={game.view as StroopView}
-          me={me}
-          players={view.players}
-          ranking={game.result?.ranking}
-          winner={winner}
-          onMove={(move) => send("move", move)}
-          onRound={setInRound}
-        />
-      )}
-
-      {def.id === "liczenie" && (
-        <Liczenie
-          key={(game.view as LiczenieView).problems.map((p) => p.text).join()}
-          view={game.view as LiczenieView}
-          me={me}
-          players={view.players}
-          ranking={game.result?.ranking}
-          winner={winner}
-          onMove={(move) => send("move", move)}
-          onRound={setInRound}
-        />
-      )}
-
-      {def.id === "simon" && (
-        <Simon
-          key={(game.view as SimonView).sequence.join("")}
-          view={game.view as SimonView}
-          me={me}
-          players={view.players}
-          ranking={game.result?.ranking}
-          onMove={(move) => send("move", move)}
-        />
-      )}
-
-      {def.id === "panstwa-miasta" && (
-        <PanstwaMiasta
-          key={(game.view as PanstwaMiastaView).nonce}
-          view={game.view as PanstwaMiastaView}
-          me={me}
-          players={view.players}
-          waitingFor={game.waitingFor}
-          ranking={game.result?.ranking}
-          timer={ownHeader && <Countdown game={game} total={def.turn?.(game.view).seconds} tense />}
-          onMove={(move) => send("move", move)}
-        />
-      )}
-
-      {/* Mini-gry pokazują ranking same, razem z wynikami. */}
-      {view.phase === "over" && !MINI_GAMES.has(def.id) && game.result?.ranking && game.result.ranking.length > 2 && (
-        <ol className="tile flex flex-col gap-1 p-4">
-          {game.result.ranking.map((id, i) => (
-            <li key={id} className="flex items-center gap-3">
-              <span className="w-5 font-mono text-fg-muted">{i + 1}.</span>
-              <span className="size-2.5 rounded-full" style={{ backgroundColor: view.players.find((p) => p.id === id)?.color }} aria-hidden />
-              {nick(id)}
-              {id === me && <span className="text-fg-muted"> (ty)</span>}
-            </li>
-          ))}
-        </ol>
-      )}
-
-      {view.phase === "over" && (
-        <div className="mt-auto flex flex-col gap-2 pt-4">
-          <OverActions view={view} me={me} send={send} />
-        </div>
-      )}
-    </Screen>
+        )}
+      </Screen>
+    </IntroContext.Provider>
   );
 }
 

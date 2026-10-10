@@ -5,6 +5,7 @@ import {
   cleanNick,
   createRng,
   GAMES,
+  INTRO_SECONDS,
   type GameDefinition,
   type GameResult,
   type LobbyPlayer,
@@ -54,6 +55,9 @@ export class LobbyRoom extends Room {
   private match: Match | null = null;
   private turnTimer?: Timer;
   private turnEndsAt: number | null = null;
+  /** Ekran instrukcji mini-gry: limit rusza dopiero, gdy wystartują wszyscy albo minie INTRO_SECONDS. */
+  private intro = false;
+  private began = new Set<string>();
   private messageCounts = new Map<string, { second: number; count: number }>();
 
   async onCreate() {
@@ -105,6 +109,12 @@ export class LobbyRoom extends Room {
       if (this.seats.length < def.minPlayers || this.seats.length > def.maxPlayers) return;
       if (this.seats.some((id) => id !== this.hostId && !this.players.get(id)?.ready)) return;
       this.startMatch(def);
+    });
+
+    this.on("begin", (client) => {
+      if (this.phase !== "playing" || !this.intro || !this.seats.includes(client.sessionId)) return;
+      this.began.add(client.sessionId);
+      if (this.seats.every((id) => this.began.has(id))) this.endIntro();
     });
 
     this.on("move", (client, raw) => {
@@ -246,6 +256,21 @@ export class LobbyRoom extends Room {
     const rng = createRng(crypto.getRandomValues(new Uint32Array(1))[0]);
     this.match = { def, state: def.setup(this.seats, rng, this.mode ?? undefined), rng, result: null };
     this.phase = "playing";
+    this.began.clear();
+    // Ekran instrukcji mają gry solo (te same, które lobby pokazuje jako „Szybkie”).
+    this.intro = def.minPlayers === 1;
+    if (!this.intro) return this.startTurnTimer();
+    this.turnTimer?.clear();
+    this.turnEndsAt = Date.now() + INTRO_SECONDS * 1000;
+    this.turnTimer = this.clock.setTimeout(() => {
+      this.endIntro();
+      this.update();
+    }, INTRO_SECONDS * 1000);
+  }
+
+  private endIntro() {
+    this.intro = false;
+    this.began = new Set(this.seats);
     this.startTurnTimer();
   }
 
@@ -274,6 +299,7 @@ export class LobbyRoom extends Room {
     this.resetReady();
     this.turnTimer?.clear();
     this.turnEndsAt = null;
+    this.intro = false;
     if (!result.winner) return;
     this.scores[result.winner] = (this.scores[result.winner] ?? 0) + 1;
     // Kto wyszedł w trakcie, nie siedzi już w seats, więc nie dostaje porażki.
@@ -283,6 +309,8 @@ export class LobbyRoom extends Room {
 
   /** Po limicie czasu serwer wykonuje ruch za gracza, który nie zdążył. */
   private startTurnTimer() {
+    // Wynik oddany, gdy ktoś jeszcze czyta instrukcję, nie uruchamia limitu.
+    if (this.intro) return;
     this.turnTimer?.clear();
     this.turnEndsAt = null;
     const { def, state, rng } = this.match!;
@@ -327,6 +355,8 @@ export class LobbyRoom extends Room {
         view: match.def.playerView(match.state, this.seats.includes(id) ? id : ""),
         waitingFor: match.def.waitingFor(match.state),
         msLeft: this.turnEndsAt && Math.max(0, this.turnEndsAt - Date.now()),
+        intro: this.intro,
+        began: [...this.began],
         result: match.result,
       },
     };

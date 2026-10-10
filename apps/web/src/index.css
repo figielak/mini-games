@@ -226,6 +226,32 @@ body::before {
   }
 }
 
+/*
+ * Podglądy na ekranie instrukcji mini-gier, w pętli: element widać przez pierwszą połowę (albo ćwierć) cyklu.
+ * Kolejność ustawia ujemny animation-delay; element z późniejszej części cyklu ma bazowo opacity 0.
+ */
+@keyframes preview-half {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes preview-quarter {
+  0%,
+  20% {
+    opacity: 1;
+  }
+  25%,
+  100% {
+    opacity: 0;
+  }
+}
+
 /* Nagłówek gry: „Wygrywasz!” u zwycięzcy. */
 @keyframes title-pop {
   from {

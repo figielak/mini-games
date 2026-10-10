@@ -6,6 +6,8 @@ export const PLAYER_COLORS = ["#3b9eff", "#ffc53d", "#46a758", "#8e7cff", "#0ac5
 
 export const MAX_PLAYERS = PLAYER_COLORS.length;
 export const NICK_MAX = 16;
+/** Tyle trwa ekran instrukcji mini-gry; potem gra rusza sama, żeby nikt nie blokował pozostałych. */
+export const INTRO_SECONDS = 15;
 
 export interface LobbyPlayer {
   id: PlayerId;
@@ -36,6 +38,10 @@ export interface RoomView {
     waitingFor: PlayerId[];
     /** Ile zostało do końca tury; liczone od chwili odebrania wiadomości (zegary telefonu i serwera się różnią). */
     msLeft: number | null;
+    /** Trwa ekran instrukcji mini-gry: limit jeszcze nie ruszył, a msLeft liczy czas do automatycznego startu. */
+    intro: boolean;
+    /** Kto kliknął już „Start” na ekranie instrukcji. */
+    began: PlayerId[];
     result: GameResult | null;
   } | null;
 }
@@ -55,6 +61,8 @@ export const ROOM_MESSAGES = {
   pickColor: z.object({ color: z.enum(PLAYER_COLORS) }),
   ready: z.object({ ready: z.boolean() }),
   start: z.unknown(),
+  // „Start” na ekranie instrukcji mini-gry.
+  begin: z.unknown(),
   rematch: z.unknown(),
   toLobby: z.unknown(),
   // Kształt ruchu sprawdza moveSchema wybranej gry.

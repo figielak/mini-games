@@ -1,5 +1,6 @@
-import { WifiSlash } from "@phosphor-icons/react";
-import type { ReactNode } from "react";
+import { HandTap, Timer, Trophy, WifiSlash } from "@phosphor-icons/react";
+import type { RoomView } from "@mini-games/games";
+import { createContext, type ReactNode, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 export type Send = (type: string, payload?: unknown) => void;
 
@@ -53,4 +54,83 @@ export function Stats({ items }: { items: { label: string; value: ReactNode; war
 /** Przycisk przyklejony do dołu ekranu: przy otwartej klawiaturze i długiej liście zostaje pod kciukiem. */
 export function StickyBar({ children }: { children: ReactNode }) {
   return <div className="sticky bottom-0 -mx-4 flex items-center gap-3 bg-bg/90 px-4 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">{children}</div>;
+}
+
+/** To, czego ekran instrukcji potrzebuje z pokoju; podaje `Game.tsx`, żeby nie przeciągać tego przez propsy każdej gry. */
+export const IntroContext = createContext<{
+  game: NonNullable<RoomView["game"]>;
+  others: { id: string; nick: string; color: string; began: boolean }[];
+  begin: () => void;
+} | null>(null);
+
+/**
+ * Ekran instrukcji mini-gry: podgląd, trzy punkty (czas, co zrobić, jak liczone są punkty) i „Start”.
+ * Limit gry jeszcze nie tyka; gdy serwer zamknie instrukcję (wszyscy wystartowali albo minęło INTRO_SECONDS), gra rusza sama.
+ */
+export function Intro({ time, task, score, preview, onStart }: { time: ReactNode; task: ReactNode; score: ReactNode; preview: ReactNode; onStart: () => void }) {
+  const room = useContext(IntroContext);
+  const live = room?.game.intro ?? false;
+  // Termin od chwili odebrania wiadomości, jak w liczniku tury.
+  const deadline = useMemo(() => (live && room?.game.msLeft != null ? Date.now() + room.game.msLeft : null), [room?.game]);
+  const [now, setNow] = useState(Date.now);
+  const seen = useRef(live);
+  const started = useRef(false);
+
+  function start() {
+    if (started.current) return;
+    started.current = true;
+    room?.begin();
+    onStart();
+  }
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(id);
+  }, []);
+
+  // Po odświeżeniu w trakcie partii instrukcja jest już zamknięta: wtedy nic nie rusza samo, tyka zwykły limit.
+  useEffect(() => {
+    if (live) seen.current = true;
+    else if (seen.current) start();
+  }, [live]);
+
+  return (
+    <section className="tile my-auto flex flex-col gap-4 p-4">
+      <div className="relative flex h-32 items-center justify-center overflow-hidden rounded-inset border border-line bg-bg" aria-hidden>
+        {preview}
+      </div>
+      <ul className="flex flex-col gap-2">
+        {(
+          [
+            [Timer, time],
+            [HandTap, task],
+            [Trophy, score],
+          ] as const
+        ).map(([PointIcon, text], i) => (
+          <li key={i} className="flex items-start gap-3">
+            <PointIcon size={20} className="mt-0.5 shrink-0 text-fg-muted" aria-hidden />
+            <span>{text}</span>
+          </li>
+        ))}
+      </ul>
+      <div className="flex flex-col gap-2">
+        <button type="button" className="btn btn-primary w-full" onClick={start}>
+          Start
+        </button>
+        {deadline !== null && (
+          <p className="text-center text-sm text-fg-muted tabular-nums">Start automatycznie za {Math.max(0, Math.ceil((deadline - now) / 1000))} s</p>
+        )}
+      </div>
+      {room && room.others.length > 0 && (
+        <ul className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-sm text-fg-muted" role="status">
+          {room.others.map((p) => (
+            <li key={p.id} className="flex items-center gap-2">
+              <span className="size-2 rounded-full" style={{ backgroundColor: p.color }} />
+              {p.nick} {p.began ? "już gra" : "czyta zasady"}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
 }

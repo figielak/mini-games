@@ -1,6 +1,6 @@
 import { KROPKI_ROUNDS, KROPKI_SHOW_MS, type KropkiView, type LobbyPlayer } from "@mini-games/games";
 import { type FormEvent, useEffect, useState } from "react";
-import { Scores } from "../screens/ui.tsx";
+import { Intro, Scores } from "../screens/ui.tsx";
 
 interface Props {
   view: KropkiView;
@@ -30,6 +30,22 @@ function Answers({ counts, answers }: { counts: number[]; answers: number[] }) {
 
 /** Różnica ze znakiem: „−4”, „+3”. */
 const signed = (n: number) => (n < 0 ? `−${-n}` : `+${n}`);
+
+/** Podgląd na ekranie instrukcji: kropki migają, potem pytanie o liczbę. */
+const PREVIEW_DOTS = [
+  [12, 30], [22, 68], [30, 22], [38, 52], [44, 80], [52, 30], [58, 62], [66, 18], [72, 46], [78, 76], [86, 28], [90, 58],
+];
+
+function Preview() {
+  return (
+    <>
+      {PREVIEW_DOTS.map(([x, y]) => (
+        <span key={x} className="absolute size-2.5 animate-[preview-half_3s_linear_infinite] rounded-full bg-fg" style={{ left: `${x}%`, top: `${y}%` }} />
+      ))}
+      <span className="animate-[preview-half_3s_linear_infinite] font-mono text-3xl font-semibold opacity-0 [animation-delay:-1.5s]">Ile?</span>
+    </>
+  );
+}
 
 type Phase = "intro" | "wait" | "show" | "answer" | "reveal" | "sent";
 
@@ -92,15 +108,13 @@ export function Kropki({ view, me, players, ranking, onMove }: Props) {
 
   if (phase === "intro") {
     return (
-      <section className="tile flex flex-col gap-4 p-4">
-        <p>
-          {KROPKI_ROUNDS} rund. W każdej na półtorej sekundy pojawią się kropki, potem wpisz, ile ich było. Za każdą rundę dostajesz tyle punktów
-          karnych, o ile się pomylisz (było 42, wpisujesz 38: 4 punkty). Nie ma tolerancji, wygrywa najmniejsza suma.
-        </p>
-        <button type="button" className="btn btn-primary w-full" onClick={() => setPhase("wait")}>
-          Start
-        </button>
-      </section>
+      <Intro
+        preview={<Preview />}
+        time={`${KROPKI_ROUNDS} rund, kropki widać przez ${String(KROPKI_SHOW_MS / 1000).replace(".", ",")} s`}
+        task="Wpisz, ile ich było"
+        score="Liczy się suma pomyłek (było 42, wpisujesz 38: 4 punkty), mniej znaczy lepiej"
+        onStart={() => setPhase("wait")}
+      />
     );
   }
 
