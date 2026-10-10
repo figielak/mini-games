@@ -53,6 +53,21 @@ export function distance(a: Hsb, b: Hsb): number {
   return Math.min(MAX_DISTANCE, Math.hypot(l1 - l2, a1 - a2, b1 - b2));
 }
 
+const HUES = ["czerwieni", "żółci", "zieleni", "cyjanu", "niebieskiego", "magenty"];
+
+/** Co poszło nie tak w odpowiedzi („za ciemny”); pusta lista = blisko. Tylko do ekranu, nie wpływa na wynik. */
+export function hints(target: Hsb, guess: Hsb): string[] {
+  const out: string[] = [];
+  const db = guess.b - target.b;
+  const ds = guess.s - target.s;
+  const dh = ((guess.h - target.h + 540) % 360) - 180;
+  if (Math.abs(db) >= 8) out.push(db < 0 ? "za ciemny" : "za jasny");
+  if (Math.abs(ds) >= 10) out.push(ds < 0 ? "za mało nasycony" : "zbyt nasycony");
+  // Najbliższa barwa podstawowa w kierunku, w którym odjechała odpowiedź.
+  if (Math.abs(dh) >= 10) out.push(`za bardzo w stronę ${HUES[(dh > 0 ? Math.floor(target.h / 60) + 1 : Math.ceil(target.h / 60) + 5) % 6]}`);
+  return out;
+}
+
 const valid = ({ h, s, b }: Hsb) =>
   [h, s, b].every(Number.isInteger) && h >= 0 && h < 360 && s >= 0 && s <= 100 && b >= 0 && b <= 100;
 

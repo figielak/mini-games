@@ -109,6 +109,12 @@ Wspólne zasady w `quiz.ts`, wspólny ekran `Quiz.tsx`.
 - Jeden ruch z 5 kolorami (wszystkie składowe int). Wynik liczy serwer: suma ΔE (CIE76 w Lab), każda ucięta do 100,
   zapisana w dziesiątych częściach (int). Mniej lepiej.
 - Pusta lista = limit czasu = 5 × 100.
+- Ekran: wzór i podgląd mają ten sam rozmiar (duże pole wydaje się jaśniejsze i bardziej nasycone), suwaki startują losowo,
+  przycisk „Zatwierdź kolor” w kolorze gracza. Po zatwierdzeniu porównanie: wzór i odpowiedź obok siebie, zgodność w % (100 − ΔE)
+  i podpowiedzi z `hints` („za ciemny”, „za mało nasycony”, „za bardzo w stronę żółci”; progi: jasność 8, nasycenie 10, barwa 10°).
+  Po ostatnim kolorze nie ma porównania, od razu ekran wyników (pary wszystkich kolorów są tam).
+- Tabela wyników pokazuje średnią zgodność w % (100 − suma ΔE / 5); kolejność ta sama co po sumie ΔE. Pod tabelą notka „więcej znaczy lepiej”,
+  nad parami legenda „wzór | odpowiedź”; wszystkie procenty z jednym miejscem po przecinku.
 
 ### Policz kropki (`kropki`)
 - 10 rund, w każdej 8-40 kropek (bez nakładania, odstęp środków ≥ 0,08) widocznych 0,5 s, potem gracz wpisuje liczbę.

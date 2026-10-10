@@ -53,7 +53,7 @@ export { VISIBLE_MS as STOPER_VISIBLE_MS, type View as StoperView } from "./stop
 export { COLORS as STROOP_COLORS, type View as StroopView } from "./stroop.ts";
 export type { View as LiczenieView } from "./liczenie.ts";
 export { ATTEMPTS as KOLO_ATTEMPTS, judge as koloJudge, MAX_POINTS as KOLO_MAX_POINTS, type Point as KoloPoint, type View as KoloView } from "./kolo.ts";
-export { COUNT as KOLOR_COUNT, distance as kolorDistance, type Hsb, hsbToRgb as kolorHsbToRgb, SHOW_MS as KOLOR_SHOW_MS, type View as KolorView } from "./kolor.ts";
+export { COUNT as KOLOR_COUNT, distance as kolorDistance, type Hsb, hints as kolorHints, hsbToRgb as kolorHsbToRgb, SHOW_MS as KOLOR_SHOW_MS, type View as KolorView } from "./kolor.ts";
 export { ROUNDS as KROPKI_ROUNDS, SHOW_MS as KROPKI_SHOW_MS, type View as KropkiView } from "./kropki.ts";
 export { DURATION_MS as QUIZ_DURATION_MS, type QuizMove } from "./quiz.ts";
 export { around as shipAround, isValidFleet, MODES as STATKI_MODES, randomFleet, type Rules as StatkiRules, type Ship, shipCells, type Shot, type View as StatkiView } from "./statki.ts";
