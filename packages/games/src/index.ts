@@ -6,6 +6,7 @@ import { kolo } from "./kolo.ts";
 import { kolor } from "./kolor.ts";
 import { kropki } from "./kropki.ts";
 import { liczenie } from "./liczenie.ts";
+import { mapa } from "./mapa.ts";
 import { memory } from "./memory.ts";
 import { obrot } from "./obrot.ts";
 import { panstwaMiasta } from "./panstwa-miasta.ts";
@@ -71,6 +72,8 @@ export { MAX_YEAR as ROK_MAX_YEAR, MIN_YEAR as ROK_MIN_YEAR, REVEAL_MS as ROK_RE
 export { BALLS, MOVE_MS, RADIUS, ROUNDS, SHOW_MS, SPEED_START, SPEED_STEP, TARGETS, position as sledzeniePosition, type Ball as SledzenieBall, type Move as SledzenieMove, type Result as SledzenieResult, type State as SledzenieState, type View as SledzenieView } from "./sledzenie.ts";
 export { BASE as WIEZA_BASE, build as wiezaBuild, left as wiezaLeft, LEVELS as WIEZA_LEVELS, MAX_STOP_MS as WIEZA_MAX_STOP_MS, START_WIDTH as WIEZA_START_WIDTH, type View as WiezaView } from "./wieza.ts";
 export { ACCEPT_PX as SRODEK_ACCEPT_PX, error as srodekError, offset as srodekOffset, type Point as SrodekPoint, project as srodekProject, ROUNDS as SRODEK_ROUNDS, type View as SrodekView } from "./srodek.ts";
+export { ASPECT as MAPA_ASPECT, distance as mapaDistance, error as mapaError, locate as mapaLocate, place as mapaPlace, type Point as MapaPoint, ROUNDS as MAPA_ROUNDS, type View as MapaView } from "./mapa.ts";
+export { OUTLINE as MAPA_OUTLINE } from "./mapa-dane.ts";
 export { DURATION_MS as STOJ_DURATION_MS, SCHEDULE as STOJ_SCHEDULE, score as stojScore, VISIBLE as STOJ_VISIBLE, type View as StojView } from "./stoj.ts";
 export { BEATS as RYTM_BEATS, MAX_TAPS as RYTM_MAX_TAPS, TAP_MS as RYTM_TAP_MS, type View as RytmView } from "./rytm.ts";
 export { DURATION_MS as QUIZ_DURATION_MS, type QuizMove } from "./quiz.ts";
@@ -101,5 +104,6 @@ export const GAMES: Record<string, GameDefinition<any, any>> = Object.assign(Obj
   [rytm.id]: rytm,
   [inny.id]: inny,
   [obrot.id]: obrot,
+  [mapa.id]: mapa,
   [panstwaMiasta.id]: panstwaMiasta,
 });
