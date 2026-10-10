@@ -37,6 +37,8 @@ export function Game({ view, me, dropped, send }: Props) {
     if (myTurn) navigator.vibrate?.(40);
   }, [myTurn]);
 
+  // Quizy (Kolor liter, Liczenie) mają w rundzie własny zegar „Do końca”; limit platformy obok niego tylko myli.
+  const [inRound, setInRound] = useState(false);
   // Poświata tła w kolorze gracza, na którego czekamy; poza turą jednej osoby zostaje akcent.
   const turnColor = view.phase === "playing" && game.waitingFor.length === 1 ? view.players.find((p) => p.id === game.waitingFor[0])?.color : undefined;
   useEffect(() => {
@@ -108,7 +110,7 @@ export function Game({ view, me, dropped, send }: Props) {
             </h1>
           </div>
           {/* Stoper: tykający limit tury zdradzałby upływ sekund, więc grający widzi go tylko przed startem. */}
-          {view.phase === "playing" && !(def.id === "stoper" && myTurn) && (
+          {view.phase === "playing" && !(def.id === "stoper" && myTurn) && !inRound && (
             <Countdown game={game} total={def.turn?.(game.view).seconds ?? def.turnSeconds} color={myTurn ? myColor : undefined} label={MINI_GAMES.has(def.id) ? "Limit" : undefined} />
           )}
           <ul className="flex flex-wrap gap-2">
@@ -271,6 +273,7 @@ export function Game({ view, me, dropped, send }: Props) {
           ranking={game.result?.ranking}
           winner={winner}
           onMove={(move) => send("move", move)}
+          onRound={setInRound}
         />
       )}
 
@@ -283,6 +286,7 @@ export function Game({ view, me, dropped, send }: Props) {
           ranking={game.result?.ranking}
           winner={winner}
           onMove={(move) => send("move", move)}
+          onRound={setInRound}
         />
       )}
 

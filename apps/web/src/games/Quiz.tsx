@@ -14,6 +14,8 @@ interface Props {
   /** Pytanie i cztery odpowiedzi dla pytania nr i; correct to indeks dobrej. */
   question: (i: number) => { prompt: ReactNode; options: ReactNode[]; correct: number };
   onMove: (move: QuizMove) => void;
+  /** Trwa runda: ekran gry chowa wtedy limit platformy, żeby nie było dwóch zegarów. */
+  onRound?: (on: boolean) => void;
 }
 
 /** Bez kary losowe klepanie byłoby szybsze niż myślenie. */
@@ -112,7 +114,7 @@ function Results({ view, me, players, ranking, winner }: Pick<Props, "view" | "m
   );
 }
 
-export function Quiz({ view, me, players, ranking, winner, intro, question, onMove }: Props) {
+export function Quiz({ view, me, players, ranking, winner, intro, question, onMove, onRound }: Props) {
   const playing = view.players.includes(me) && !(me in view.results);
   const [phase, setPhase] = useState<Phase>("intro");
   const [index, setIndex] = useState(0);
@@ -167,6 +169,8 @@ export function Quiz({ view, me, players, ranking, winner, intro, question, onMo
   }, [phase === "intro" || phase === "sent"]);
 
   useEffect(() => () => clearTimeout(run.current.timer), []);
+
+  useEffect(() => onRound?.(phase === "play" || phase === "wrong"), [phase]);
 
   if (!playing || phase === "sent") return <Results view={view} me={me} players={players} ranking={ranking} winner={winner} />;
 

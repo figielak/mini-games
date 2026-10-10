@@ -11,6 +11,7 @@ interface Props {
   ranking?: string[];
   winner?: string;
   onMove: (move: QuizMove) => void;
+  onRound?: (on: boolean) => void;
 }
 
 export function Stroop({ view, ...props }: Props) {
