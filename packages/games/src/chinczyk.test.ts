@@ -254,6 +254,35 @@ describe("koniec gry i ranking", () => {
     expect(game.waitingFor(s)).toEqual([B]); // A pominięta
   });
 
+  test("4 graczy: pełny ranking, ostatni dopisany sam", () => {
+    const home = [43, 42, 41, 39];
+    let s = game.setup([A, B, C, D], createRng(1));
+    s = roll(put(s, { [A]: [5, -1, -1, -1], [B]: home, [C]: home, [D]: home }, B), B, 1);
+    expect(view(s).ranking).toEqual([B]);
+    s = roll(s, C, 1);
+    expect(game.isOver(s)).toBeNull();
+    s = roll(s, D, 1);
+    expect(game.isOver(s)).toEqual({ winner: B, ranking: [B, C, D, A] });
+    expect(view(s).turn).toBeNull();
+    expect(view(s).movable).toEqual([]);
+  });
+
+  test("ostatni pionek wprowadzony szóstką: bez dodatkowego rzutu", () => {
+    let s = game.setup([A, B, C], createRng(1));
+    s = roll(put(s, { [A]: [43, 42, 40, 35], [B]: [5, -1, -1, -1], [C]: [5, -1, -1, -1] }, A), A, 6);
+    expect(view(s).ranking).toEqual([A]);
+    expect(game.waitingFor(s)).toEqual([B]);
+    expect(game.validateMove(s, A, { type: "roll" })).toBe(false);
+  });
+
+  test("wejście do domku końcowego nie zbija pionka stojącego na moim polu startowym", () => {
+    // Pozycja 20 u B to pole 0 toru, czyli start A; pozycja 40 u A jest już poza torem.
+    const s = roll(put(two(), { [A]: [39, 43, 42, 41], [B]: [20, -1, -1, -1] }, A), A, 1);
+    expect(s.pawns[B]).toEqual([20, -1, -1, -1]);
+    expect(view(s).last?.move).toEqual({ pawn: 0, from: 39, to: 40, captured: [] });
+    expect(game.isOver(s)).toEqual({ winner: A, ranking: [A, B] });
+  });
+
   test("ranking według kolejności kończenia", () => {
     let s = game.setup([A, B, C], createRng(1));
     s = roll(put(s, { [A]: [43, 42, 41, 39], [B]: [43, 42, 41, 39], [C]: [5, -1, -1, -1] }, A), A, 1);

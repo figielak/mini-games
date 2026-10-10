@@ -69,6 +69,10 @@ describe("ocena", () => {
     expect(judge(line)).toMatchObject({ status: "unfinished", score: 0 });
   });
 
+  test("palec w miejscu (same te same punkty): niedokończone, bez NaN", () => {
+    expect(judge(Array.from({ length: 30 }, (): Point => [0.5, 0.5]))).toMatchObject({ status: "unfinished", score: 0 });
+  });
+
   test("R = 0,1: za małe", () => expect(judge(circle({ r: 0.1 }))).toMatchObject({ status: "small", score: 0 }));
 
   test("luka 8% obwodu kosztuje", () => expect(score(circle({ turns: 0.92 }))).toBeLessThan(score(circle()) - 30));
@@ -142,6 +146,34 @@ describe("koniec", () => {
     let s = game.setup([A, B], createRng(1));
     for (const p of [A, B]) s = send(send(s, p, result(circle())), p, result([]));
     expect(game.isOver(s)).toEqual({ ranking: [A, B] });
+  });
+
+  test("same nieudane rysunki: 0 pkt u obu, remis", () => {
+    let s = game.setup([A, B], createRng(1));
+    for (let i = 0; i < ATTEMPTS; i++) s = send(s, A, result(circle({ turns: 0.5 })));
+    expect(s.best[A].score).toBe(0);
+    expect(game.validateMove(s, A, result(circle())), "jedenasta próba").toBe(false);
+    expect(game.isOver(s)).toBeNull();
+    s = send(s, B, result([]));
+    expect(game.isOver(s)).toEqual({ ranking: [A, B] });
+  });
+
+  test("licznik: próba go nie odnawia (także solo), koniec prób innego gracza tak", () => {
+    const key = (s: State) => game.turn!(s).key;
+    let s = game.setup([A, B], createRng(1));
+    expect(game.turn!(s).seconds).toBe(game.turnSeconds);
+    const both = key(s);
+    s = send(s, A, result(circle()));
+    expect(key(s)).toBe(both);
+    s = send(s, B, result([]));
+    const onlyA = key(s);
+    expect(onlyA).not.toBe(both);
+    s = send(s, A, result(circle()));
+    expect(key(s), "rysuje już tylko A").toBe(onlyA);
+
+    const solo = game.setup([A], createRng(1));
+    expect(key(send(solo, A, result(circle())))).toBe(key(solo));
+    expect(game.turn!(send(solo, A, result([]))).seconds).toBe(0);
   });
 
   test("po limicie czasu pusty rysunek", () => {

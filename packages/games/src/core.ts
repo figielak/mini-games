@@ -78,4 +78,5 @@ export const average = (times: number[]) => (times.length ? times.reduce((a, b) 
 
 /** Porównanie wyników „na trafienia”: więcej trafień wyżej, przy równej liczbie niższa średnia czasu. */
 export const byHitsThenAverage = (a: { times: number[] }, b: { times: number[] }) =>
-  b.times.length - a.times.length || average(a.times) - average(b.times);
+  // Dwa puste wyniki to remis: Infinity - Infinity dałoby NaN, a NaN !== 0 robiło zwycięzcę z pierwszego gracza.
+  b.times.length - a.times.length || (a.times.length ? average(a.times) - average(b.times) : 0);

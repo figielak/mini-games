@@ -190,9 +190,18 @@ export class LobbyRoom extends Room {
       if (!this.withinRateLimit(client.sessionId)) return;
       const parsed = ROOM_MESSAGES[type].safeParse(raw);
       if (!parsed.success) return;
-      handler(client, parsed.data);
+      // Wyjątek w obsłudze (np. błąd w zasadach gry) nie może zabić procesu, czyli wszystkich pokoi: wiadomość przepada.
+      try {
+        handler(client, parsed.data);
+      } catch (error) {
+        this.logError(`wiadomość ${type}`, error);
+      }
       this.update();
     });
+  }
+
+  private logError(where: string, error: unknown) {
+    console.error(`[${this.roomId}] ${this.gameId ?? "lobby"}, ${where}:`, error);
   }
 
   private withinRateLimit(id: string) {
@@ -273,9 +282,15 @@ export class LobbyRoom extends Room {
     this.turnEndsAt = Date.now() + ms;
     this.turnTimer = this.clock.setTimeout(() => {
       // Ruch zastępczy za każdego, na kogo wciąż czekamy (w rozstawianiu może to być dwóch graczy).
-      for (const player of def.waitingFor(this.match!.state)) {
-        if (this.phase !== "playing") break;
-        this.play(player, def.timeoutMove!(this.match!.state, player, rng));
+      try {
+        for (const player of def.waitingFor(this.match!.state)) {
+          if (this.phase !== "playing") break;
+          this.play(player, def.timeoutMove!(this.match!.state, player, rng));
+        }
+      } catch (error) {
+        // Bez ruchu zastępczego nie ruszyłby kolejny limit i partia wisiałaby bez końca, więc kończy się bez zwycięzcy.
+        this.logError("ruch po limicie czasu", error);
+        this.finish({});
       }
       this.update();
     }, ms);

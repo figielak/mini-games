@@ -50,6 +50,18 @@ describe("koniec", () => {
     expect(game.isOver(s)).toEqual({ winner: B, ranking: [B, C, A] });
   });
 
+  test("remis na górze i dwa puste wyniki: bez zwycięzcy", () => {
+    let s = game.setup([A, B], createRng(1));
+    s = send(s, A, result([600, 400]));
+    s = send(s, B, result([500, 500], 3));
+    expect(game.isOver(s)).toEqual({ ranking: [A, B] });
+
+    let t = game.setup([A, B], createRng(1));
+    t = send(t, A, result([]));
+    t = send(t, B, result([], 7));
+    expect(game.isOver(t)).toEqual({ ranking: [A, B] });
+  });
+
   test("po limicie czasu pusty wynik", () => {
     expect(game.timeoutMove!(game.setup([A], createRng(1)), A, createRng(1))).toEqual(result([]));
   });

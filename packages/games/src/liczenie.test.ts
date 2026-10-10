@@ -56,3 +56,27 @@ test("ranking: więcej poprawnych wyżej, remis rozstrzyga średnia", () => {
   s = send(s, C, result([1000, 1000]));
   expect(game.isOver(s)).toEqual({ winner: B, ranking: [B, C, A] });
 });
+
+describe("koniec", () => {
+  test("gra trwa, dopóki ktoś nie oddał wyniku", () => {
+    const s = send(game.setup([A, B], createRng(1)), A, result([500]));
+    expect(game.isOver(s)).toBeNull();
+    expect(game.waitingFor(s)).toEqual([B]);
+  });
+
+  test("remis na górze i solo: bez zwycięzcy", () => {
+    let s = game.setup([A, B], createRng(1));
+    s = send(s, A, result([1000, 2000]));
+    s = send(s, B, result([1500, 1500], 4));
+    expect(game.isOver(s)).toEqual({ ranking: [A, B] });
+    expect(game.isOver(send(game.setup([A], createRng(1)), A, result([500])))).toEqual({ ranking: [A] });
+  });
+
+  test("po limicie czasu pusty wynik; dwa limity to remis", () => {
+    let s = game.setup([A, B], createRng(1));
+    expect(game.timeoutMove!(s, A, createRng(1))).toEqual(result([]));
+    for (const p of [A, B]) s = send(s, p, game.timeoutMove!(s, p, createRng(1)));
+    expect(game.isOver(s)).toEqual({ ranking: [A, B] });
+    expect(game.waitingFor(s)).toEqual([]);
+  });
+});

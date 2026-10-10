@@ -59,7 +59,8 @@ export { DURATION_MS as QUIZ_DURATION_MS, type QuizMove } from "./quiz.ts";
 export { FLEET_LENGTHS, isValidFleet, randomFleet, SIZE as STATKI_SIZE, type Ship, shipCells, type Shot, type View as StatkiView } from "./statki.ts";
 
 // ponytail: `any`, bo każda gra ma inny stan i ruch; platforma rozmawia z nimi tylko przez GameDefinition
-export const GAMES: Record<string, GameDefinition<any, any>> = {
+// Bez prototypu: gameId przychodzi z sieci, a GAMES["constructor"] na zwykłym obiekcie zwróciłoby funkcję zamiast gry.
+export const GAMES: Record<string, GameDefinition<any, any>> = Object.assign(Object.create(null), {
   [piecWRzedzie.id]: piecWRzedzie,
   [statki.id]: statki,
   [chinczyk.id]: chinczyk,
@@ -74,4 +75,4 @@ export const GAMES: Record<string, GameDefinition<any, any>> = {
   [kolor.id]: kolor,
   [kropki.id]: kropki,
   [panstwaMiasta.id]: panstwaMiasta,
-};
+});

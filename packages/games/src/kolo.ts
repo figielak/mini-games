@@ -142,5 +142,12 @@ export const kolo: GameDefinition<State, Move> = {
 
   waitingFor: (state) => state.players.filter((p) => (state.attempts[p] ?? 0) < ATTEMPTS),
 
+  // 120 s na wszystkie próby, także gdy rysuje już tylko jeden gracz (bez tego każda jego próba odnawiałaby limit);
+  // licznik rusza od nowa dopiero, gdy ktoś skończy.
+  turn: (state) => {
+    const waiting = kolo.waitingFor(state);
+    return { key: waiting.join(), seconds: waiting.length ? kolo.turnSeconds! : 0 };
+  },
+
   timeoutMove: () => ({ type: "result", points: [] }),
 };

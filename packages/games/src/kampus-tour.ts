@@ -690,7 +690,9 @@ export const kampusTour: GameDefinition<State, Move> = {
       .filter((p) => !s.bankrupt.includes(p))
       .sort((a, b) => Number(b === s.monopoly) - Number(a === s.monopoly) || wealth(s, b) - wealth(s, a));
     const ranking = [...alive, ...[...s.bankrupt].reverse()];
-    return { winner: ranking[0], ranking };
+    // Równy majątek na górze po limicie rund: remis bez zwycięzcy, jak w pozostałych grach.
+    const tie = !s.monopoly && alive.length > 1 && wealth(s, alive[0]) === wealth(s, alive[1]);
+    return tie ? { ranking } : { winner: ranking[0], ranking };
   },
 
   waitingFor: (s) =>

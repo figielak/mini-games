@@ -105,6 +105,23 @@ describe("pisanie", () => {
     expect(forObserver).not.toContain("rokodyl");
   });
 
+  test("ukrywanie: litery przyszłych rund są puste dla gracza i obserwatora, odsłaniają się z rundą", () => {
+    let s = game.setup([A, B], createRng(3));
+    for (const viewer of [A, ""]) {
+      expect((game.playerView(s, viewer) as View).letters).toEqual([s.letters[0], "", "", "", ""]);
+    }
+    for (const phase of ["write", "vote", "summary"] as const) {
+      const { letters } = game.playerView({ ...s, phase, votes: {}, round: 1 }, A) as View;
+      expect(letters, phase).toEqual([s.letters[0], s.letters[1], "", "", ""]);
+    }
+    for (let r = 0; r < ROUNDS; r++) {
+      s = round(s, { [A]: on(s.letters[r]), [B]: on(s.letters[r]) });
+      if (s.phase === "summary") s = send(send(s, A, next), B, next);
+    }
+    expect((game.playerView(s, A) as View).letters).toEqual(s.letters);
+    expect(game.setup([A, B], createRng(4)).nonce).not.toBe(s.nonce);
+  });
+
   test("timeout: zapisany szkic jako Gotowe, a bez szkicu puste pola", () => {
     let s = start([A, B]);
     s = send(s, A, write(on("K"), false));

@@ -1,5 +1,5 @@
-import { expect, test } from "vitest";
-import { createRng, ROOM_CODE_ALPHABET, roomCode } from "./core.ts";
+import { describe, expect, test } from "vitest";
+import { byHitsThenAverage, createRng, rankResults, ROOM_CODE_ALPHABET, roomCode, shuffle } from "./core.ts";
 
 test("ten sam seed daje ten sam ciąg", () => {
   const a = createRng(42);
@@ -23,4 +23,61 @@ test("kod pokoju ma 4 znaki z alfabetu bez mylących znaków", () => {
     expect(code).toMatch(new RegExp(`^[${ROOM_CODE_ALPHABET}]{4}$`));
   }
   expect(ROOM_CODE_ALPHABET).not.toMatch(/[O0I1L]/);
+});
+
+test("shuffle: permutacja, oryginał bez zmian", () => {
+  const items = [1, 2, 3, 4, 5, 6, 7, 8];
+  const shuffled = shuffle(items, createRng(3));
+  expect(items).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+  expect([...shuffled].sort((a, b) => a - b)).toEqual(items);
+  expect(shuffle([], createRng(3))).toEqual([]);
+});
+
+describe("rankResults", () => {
+  const desc = (a: number, b: number) => b - a;
+
+  test("null, dopóki ktoś nie oddał wyniku (także bez żadnego wyniku)", () => {
+    expect(rankResults(["a", "b"], {}, desc)).toBeNull();
+    expect(rankResults(["a", "b"], { a: 1 }, desc)).toBeNull();
+  });
+
+  test("wynik 0 to też oddany wynik", () => {
+    expect(rankResults(["a", "b"], { a: 0, b: 1 }, desc)).toEqual({ winner: "b", ranking: ["b", "a"] });
+  });
+
+  test("solo: ranking bez zwycięzcy", () => {
+    expect(rankResults(["a"], { a: 5 }, desc)).toEqual({ ranking: ["a"] });
+  });
+
+  test("remis na górze: bez zwycięzcy, kolejność miejsc, reszta posortowana", () => {
+    expect(rankResults(["a", "b", "c"], { a: 1, b: 5, c: 5 }, desc)).toEqual({ ranking: ["b", "c", "a"] });
+    expect(rankResults(["a", "b", "c"], { a: 5, b: 5, c: 5 }, desc)).toEqual({ ranking: ["a", "b", "c"] });
+  });
+
+  test("remis poniżej pierwszego miejsca nie odbiera wygranej", () => {
+    expect(rankResults(["a", "b", "c"], { a: 2, b: 2, c: 9 }, desc)).toEqual({ winner: "c", ranking: ["c", "a", "b"] });
+  });
+
+  test("wynik gracza spoza listy jest ignorowany", () => {
+    expect(rankResults(["a", "b"], { a: 1, b: 2, x: 99 }, desc)).toEqual({ winner: "b", ranking: ["b", "a"] });
+  });
+});
+
+describe("byHitsThenAverage", () => {
+  const r = (...times: number[]) => ({ times });
+
+  test("więcej trafień wyżej, potem niższa średnia", () => {
+    expect(byHitsThenAverage(r(900, 900), r(100))).toBeLessThan(0);
+    expect(byHitsThenAverage(r(200), r(100))).toBeGreaterThan(0);
+    expect(byHitsThenAverage(r(100, 300), r(200, 200))).toBe(0);
+  });
+
+  test("dwa puste wyniki to remis, nie NaN", () => {
+    expect(byHitsThenAverage(r(), r())).toBe(0);
+    expect(rankResults(["a", "b"], { a: r(), b: r() }, byHitsThenAverage)).toEqual({ ranking: ["a", "b"] });
+  });
+
+  test("pusty wynik przegrywa z każdym trafieniem", () => {
+    expect(byHitsThenAverage(r(), r(5000))).toBeGreaterThan(0);
+  });
 });

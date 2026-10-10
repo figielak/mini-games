@@ -50,6 +50,20 @@ describe("koniec", () => {
     expect(game.isOver(s)).toEqual({ winner: B, ranking: [B, C, A] });
   });
 
+  test("kara wyrównuje czas: remis bez zwycięzcy; solo też", () => {
+    let s = game.setup([A, B], createRng(1));
+    s = send(s, A, result(20_000, 1));
+    s = send(s, B, result(23_000));
+    expect(game.isOver(s)).toEqual({ ranking: [A, B] });
+    expect(game.isOver(send(game.setup([A], createRng(1)), A, result(20_000)))).toEqual({ ranking: [A] });
+  });
+
+  test("granice czasu: najkrótszy i najdłuższy dozwolony", () => {
+    const s = game.setup([A, B], createRng(1));
+    expect(game.validateMove(s, A, result(3750))).toBe(true);
+    expect(game.validateMove(s, A, result(game.turnSeconds! * 1000))).toBe(true);
+  });
+
   test("po limicie czasu ostatnie miejsce", () => {
     let s = game.setup([A, B], createRng(1));
     s = send(s, A, game.timeoutMove!(s, A, createRng(1)));

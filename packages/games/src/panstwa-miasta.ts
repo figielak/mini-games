@@ -18,6 +18,9 @@ export type Phase = "write" | "vote" | "summary" | "over";
 
 export interface State {
   players: PlayerId[];
+  /** Nic nie losuje, tylko odróżnia partie (rewanż montuje grę na kliencie od nowa). */
+  nonce: number;
+  /** Litery kolejnych rund; w widoku przyszłe są puste. */
   letters: string[];
   round: number;
   phase: Phase;
@@ -85,7 +88,7 @@ export const panstwaMiasta: GameDefinition<State, Move> = {
     const pool = [...LETTERS];
     const letters = Array.from({ length: ROUNDS }, () => pool.splice(Math.floor(rng() * pool.length), 1)[0]);
     const totals = Object.fromEntries(players.map((p) => [p, 0]));
-    return newRound({ players, letters, totals, roundScores: {} } as unknown as State, 0);
+    return newRound({ players, nonce: Math.floor(rng() * 2 ** 32), letters, totals, roundScores: {} } as unknown as State, 0);
   },
 
   validateMove: (state, player, move) => {
@@ -130,11 +133,13 @@ export const panstwaMiasta: GameDefinition<State, Move> = {
   },
 
   // W pisaniu każdy widzi tylko swój szkic, w głosowaniu tylko swój głos; potem wszystko jest jawne.
+  // Litery przyszłych rund są puste (długość tablicy to dalej liczba rund), żeby nie dało się przygotować odpowiedzi.
   playerView: (state, player): View => {
     const own = <T>(rec: Record<PlayerId, T>) => (player in rec ? { [player]: rec[player] } : {});
-    if (state.phase === "write") return { ...state, answers: own(state.answers) };
-    if (state.phase === "vote") return { ...state, votes: own(state.votes) };
-    return state;
+    const shown = { ...state, letters: state.letters.map((l, i) => (i <= state.round ? l : "")) };
+    if (state.phase === "write") return { ...shown, answers: own(state.answers) };
+    if (state.phase === "vote") return { ...shown, votes: own(state.votes) };
+    return shown;
   },
 
   isOver: (state) => (state.phase === "over" ? rankResults(state.players, state.totals, (a, b) => b - a) : null),
