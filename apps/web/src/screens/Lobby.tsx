@@ -1,4 +1,5 @@
 import {
+  Angle,
   ArrowsClockwise,
   Boat,
   Buildings,
@@ -293,6 +294,7 @@ const ICONS: Record<string, Icon> = {
   inny: MagnifyingGlass,
   obrot: ArrowsClockwise,
   mapa: MapTrifold,
+  kat: Angle,
 };
 
 function seats(g: { minPlayers: number; maxPlayers: number }) {
@@ -324,6 +326,7 @@ const BLURBS: Record<string, string> = {
   inny: "Siatka identycznych symboli, jeden różni się obrotem, odcieniem, rozmiarem albo kształtem. 30 s, siatka rośnie po każdym trafieniu.",
   obrot: "Dwie figury z klocków: ta sama obrócona czy lustrzane odbicie? 30 s, pomyłka zabiera punkt.",
   mapa: "Nazwa miasta, wskazujesz je na konturze Polski. 10 rund, wygrywa najmniejsza suma kilometrów.",
+  kat: "Kąt miga przez 1,5 s, wpisujesz jego miarę w stopniach. 10 rund, wygrywa najmniejsza suma błędów.",
   wieza: "Klocek jeździ w poziomie, zatrzymujesz go nad poprzednim. To, co wystaje, zostaje ucięte. Liczy się wysokość wieży.",
 };
 

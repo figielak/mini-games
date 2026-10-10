@@ -1,10 +1,11 @@
 import { ArrowCounterClockwise, Check, Timer, Trophy, UsersThree } from "@phosphor-icons/react";
-import { CHINCZYK_TRACK, type ChinczykView, GAMES, type InnyView, type KampusTourView, type KolorView, type KoloView, type KropkiView, type LiczenieView, type MapaView, type MemoryView, type ObrotView, type PanstwaMiastaView, type PiecWRzedzieView, QUIZ_DURATION_MS, type RefleksView, type RokView, type RoomView, type RytmView, type SledzenieView, KROPKI_ROUNDS, ROK_ROUNDS, SCHULTE_SIZE, type SchulteView, type SimonView, type SrodekView, type StatkiView, type StojView, type StoperView, type StroopView, WIEZA_LEVELS, type WiezaView } from "@mini-games/games";
+import { CHINCZYK_TRACK, type ChinczykView, GAMES, type InnyView, type KampusTourView, type KatView, type KolorView, type KoloView, type KropkiView, type LiczenieView, type MapaView, type MemoryView, type ObrotView, type PanstwaMiastaView, type PiecWRzedzieView, QUIZ_DURATION_MS, type RefleksView, type RokView, type RoomView, type RytmView, type SledzenieView, ROK_ROUNDS, SCHULTE_SIZE, type SchulteView, type SimonView, type SrodekView, type StatkiView, type StojView, type StoperView, type StroopView, WIEZA_LEVELS, type WiezaView } from "@mini-games/games";
 import { useEffect, useMemo, useState } from "react";
 import { Chinczyk } from "../games/Chinczyk.tsx";
 import { KampusTour } from "../games/KampusTour.tsx";
 import { Kolo } from "../games/Kolo.tsx";
 import { Kolor } from "../games/Kolor.tsx";
+import { Kat } from "../games/Kat.tsx";
 import { Kropki } from "../games/Kropki.tsx";
 import { Liczenie } from "../games/Liczenie.tsx";
 import { Mapa } from "../games/Mapa.tsx";
@@ -85,8 +86,8 @@ export function Game({ view, me, dropped, send }: Props) {
   const fleet = def.id === "statki" && view.phase === "playing" ? (game.view as StatkiView) : null;
   // Tabela Schultego w trakcie partii zamiast punktów pokazuje postęp każdego gracza.
   const schulte = def.id === "schulte" && view.phase === "playing" ? (game.view as SchulteView) : null;
-  // Policz kropki tak samo: numer rundy każdego gracza.
-  const kropki = def.id === "kropki" && view.phase === "playing" ? (game.view as KropkiView) : null;
+  // Policz kropki i Kąt tak samo: numer rundy każdego gracza.
+  const kropki = (def.id === "kropki" || def.id === "kat") && view.phase === "playing" ? (game.view as KropkiView | KatView) : null;
   // Wieża: wysokość wieży każdego gracza (po oddaniu wyniku ta z wyniku).
   const wieza = def.id === "wieza" && view.phase === "playing" ? (game.view as WiezaView) : null;
   // Który rok? też.
@@ -180,7 +181,7 @@ export function Game({ view, me, dropped, send }: Props) {
                     ) : schulte ? (
                       <Progress done={id in schulte.results ? SCHULTE_LAST : (schulte.progress[id] ?? 0)} total={SCHULTE_LAST} color={p?.color} />
                     ) : kropki ? (
-                      <Progress done={id in kropki.results ? KROPKI_ROUNDS : (kropki.progress[id] ?? 0)} total={KROPKI_ROUNDS} color={p?.color} />
+                      <Progress done={id in kropki.results ? kropki.rounds.length : (kropki.progress[id] ?? 0)} total={kropki.rounds.length} color={p?.color} />
                     ) : wieza ? (
                       <Progress done={wieza.results[id]?.height ?? wieza.progress[id] ?? 0} total={WIEZA_LEVELS} color={p?.color} />
                     ) : rok ? (
@@ -287,6 +288,17 @@ export function Game({ view, me, dropped, send }: Props) {
           <Kolor
             key={JSON.stringify((game.view as KolorView).targets)}
             view={game.view as KolorView}
+            me={me}
+            players={view.players}
+            ranking={game.result?.ranking}
+            onMove={(move) => send("move", move)}
+          />
+        )}
+
+        {def.id === "kat" && (
+          <Kat
+            key={JSON.stringify((game.view as KatView).rounds)}
+            view={game.view as KatView}
             me={me}
             players={view.players}
             ranking={game.result?.ranking}
@@ -494,7 +506,7 @@ export function Game({ view, me, dropped, send }: Props) {
   );
 }
 
-const MINI_GAMES = new Set(["refleks", "simon", "stoper", "schulte", "stroop", "liczenie", "kolo", "kolor", "kropki", "rok", "srodek", "stoj", "sledzenie", "wieza", "rytm", "inny", "obrot", "mapa", "panstwa-miasta"]);
+const MINI_GAMES = new Set(["refleks", "simon", "stoper", "schulte", "stroop", "liczenie", "kolo", "kolor", "kropki", "rok", "srodek", "stoj", "sledzenie", "wieza", "rytm", "inny", "obrot", "mapa", "kat", "panstwa-miasta"]);
 
 const SCHULTE_LAST = SCHULTE_SIZE * SCHULTE_SIZE;
 
