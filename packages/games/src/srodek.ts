@@ -2,28 +2,31 @@ import { z } from "zod";
 import { type GameDefinition, type PlayerId, rankResults } from "./core.ts";
 
 export const ROUNDS = 10;
-/** Bok pola w umownych px: wynik nie zależy od rozmiaru telefonu. */
+/** Bok pola w umownych px (do strefy akceptacji): nie zależy od rozmiaru telefonu. */
 export const FIELD = 300;
-/** Kara za rundę po limicie czasu; więcej niż najgorsza uczciwa runda (MAX_LEN / 2 × FIELD + ACCEPT_PX). */
-export const MAX_DISTANCE = 150;
-/** Strefa akceptacji: dotknięcie dalej od odcinka nie jest odpowiedzią (przypadkowe stuknięcie, próba nadużycia rzutowania). */
+/** Kara za rundę po limicie czasu, w % długości odcinka; więcej niż najgorsza uczciwa runda (koniec odcinka = 50% plus strefa). */
+export const MAX_ERROR = 100;
+/** Strefa akceptacji w umownych px (dotyczy palca, nie oka): dotknięcie dalej od odcinka nie jest odpowiedzią (przypadkowe stuknięcie, próba nadużycia rzutowania). */
 export const ACCEPT_PX = 30;
-/** Długość odcinka i odstęp końców od krawędzi, w ułamkach boku pola. */
-export const MIN_LEN = 0.25;
-export const MAX_LEN = 0.7;
-export const MARGIN = 0.1;
+/**
+ * Długość odcinka i odstęp końców od krawędzi, w ułamkach boku pola. Długie, bo niedokładność palca jest stała,
+ * a pomyłka oka rośnie z długością: na krótkim odcinku gra mierzyłaby palec.
+ */
+export const MIN_LEN = 0.5;
+export const MAX_LEN = 0.9;
+export const MARGIN = 0.05;
 
 /** Pozycja na polu, 0-1 w obu osiach. */
 export type Point = { x: number; y: number };
 export type Segment = { a: Point; b: Point };
 
-/** Pusta lista = limit czasu (MAX_DISTANCE za każdą rundę). */
+/** Pusta lista = limit czasu (MAX_ERROR za każdą rundę). */
 export type Move = { type: "result"; taps: Point[] };
 
 export interface State {
   players: PlayerId[];
   segments: Segment[];
-  /** Suma błędów w dziesiątych częściach px (int). */
+  /** Suma błędów w dziesiątych częściach procenta (int). */
   results: Record<PlayerId, number>;
   taps: Record<PlayerId, Point[]>;
 }
@@ -43,11 +46,11 @@ function param({ a, b }: Segment, tap: Point): number {
 /** Rzut prostopadły dotknięcia na prostą odcinka (może wypaść tuż za końcem). */
 export const project = (segment: Segment, tap: Point): Point => along(segment, param(segment, tap));
 
-/** Błąd rundy w umownych px: odległość rzutu od środka, wzdłuż odcinka. Odchylenie w bok nic nie kosztuje. */
-export function distance(segment: Segment, tap: Point): number {
-  const { a, b } = segment;
-  return Math.abs(param(segment, tap) - 0.5) * Math.hypot(b.x - a.x, b.y - a.y) * FIELD;
-}
+/**
+ * Błąd rundy w % długości odcinka: odległość rzutu od środka, wzdłuż odcinka (koniec = 50). Odchylenie w bok nic nie kosztuje,
+ * a każda runda waży tyle samo niezależnie od długości.
+ */
+export const error = (segment: Segment, tap: Point): number => Math.abs(param(segment, tap) - 0.5) * 100;
 
 /** Odległość dotknięcia od najbliższego punktu odcinka w umownych px (do strefy akceptacji). */
 export function offset(segment: Segment, tap: Point): number {
@@ -55,20 +58,18 @@ export function offset(segment: Segment, tap: Point): number {
   return Math.hypot(tap.x - nearest.x, tap.y - nearest.y) * FIELD;
 }
 
-// Losowy środek, kąt i długość; odrzucane, dopóki któryś koniec wychodzi poza margines (średnio kilka prób).
+// Najpierw kąt i długość, potem środek tam, gdzie oba końce mieszczą się w marginesie: każdy kąt i długość są równie częste
+// (losowanie z odrzucaniem przy długich odcinkach zostawiałoby prawie same przekątne).
 function segment(rng: () => number): Segment {
-  for (;;) {
-    const x = MARGIN + rng() * (1 - 2 * MARGIN);
-    const y = MARGIN + rng() * (1 - 2 * MARGIN);
-    const angle = rng() * Math.PI;
-    const half = (MIN_LEN + rng() * (MAX_LEN - MIN_LEN)) / 2;
-    const dx = Math.cos(angle) * half;
-    const dy = Math.sin(angle) * half;
-    const ends = { a: { x: x - dx, y: y - dy }, b: { x: x + dx, y: y + dy } };
-    if ([ends.a.x, ends.a.y, ends.b.x, ends.b.y].every((v) => v >= MARGIN && v <= 1 - MARGIN)) return ends;
-  }
+  const angle = rng() * Math.PI;
+  const half = (MIN_LEN + rng() * (MAX_LEN - MIN_LEN)) / 2;
+  const dx = Math.cos(angle) * half;
+  const dy = Math.sin(angle) * half;
+  const center = (reach: number) => MARGIN + reach + rng() * (1 - 2 * MARGIN - 2 * reach);
+  const x = center(Math.abs(dx));
+  const y = center(dy);
+  return { a: { x: x - dx, y: y - dy }, b: { x: x + dx, y: y + dy } };
 }
-
 
 // ponytail: odcinki są w widoku od startu (jak kropki w Policz kropki), da się podejrzeć; między znajomymi wystarczy.
 export const srodek: GameDefinition<State, Move> = {
@@ -94,7 +95,7 @@ export const srodek: GameDefinition<State, Move> = {
     (taps.length === 0 || (taps.length === ROUNDS && taps.every((t, i) => offset(state.segments[i], t) <= ACCEPT_PX))),
 
   applyMove: (state, player, { taps }) => {
-    const sum = taps.length ? state.segments.reduce((s, seg, i) => s + distance(seg, taps[i]), 0) : ROUNDS * MAX_DISTANCE;
+    const sum = taps.length ? state.segments.reduce((s, seg, i) => s + error(seg, taps[i]), 0) : ROUNDS * MAX_ERROR;
     return {
       ...state,
       results: { ...state.results, [player]: Math.round(sum * 10) },
