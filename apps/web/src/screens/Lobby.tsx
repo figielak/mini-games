@@ -1,4 +1,5 @@
 import {
+  ArrowsClockwise,
   Boat,
   Buildings,
   CalendarBlank,
@@ -289,6 +290,7 @@ const ICONS: Record<string, Icon> = {
   wieza: Stack,
   rytm: Metronome,
   inny: MagnifyingGlass,
+  obrot: ArrowsClockwise,
 };
 
 function seats(g: { minPlayers: number; maxPlayers: number }) {
@@ -318,6 +320,7 @@ const BLURBS: Record<string, string> = {
   sledzenie: "Kulki lecą po polu, trzy z nich są celami. Widzisz je krótko, potem śledzisz ruch i wskazujesz te trzy.",
   rytm: "Metronom gra 8 uderzeń i cichnie, a ty stukasz dalej w tym samym tempie przez 10 s. Wygrywa najmniejsza odchyłka.",
   inny: "Siatka identycznych symboli, jeden różni się obrotem, odcieniem, rozmiarem albo kształtem. 30 s, siatka rośnie po każdym trafieniu.",
+  obrot: "Dwie figury z klocków: ta sama obrócona czy lustrzane odbicie? 30 s, pomyłka zabiera punkt.",
   wieza: "Klocek jeździ w poziomie, zatrzymujesz go nad poprzednim. To, co wystaje, zostaje ucięte. Liczy się wysokość wieży.",
 };
 

@@ -3,7 +3,7 @@ import { Trophy } from "@phosphor-icons/react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Intro, Stats } from "../screens/ui.tsx";
 
-/** Wspólny przebieg Stroopa i Szybkiego liczenia: 30 s pytań, cztery odpowiedzi, pomyłka blokuje na chwilę. */
+/** Wspólny przebieg Koloru liter, Liczenia, Innego elementu i Obrotu: 30 s pytań z odpowiedziami do wyboru, pomyłka blokuje na chwilę. */
 interface Props {
   view: { players: string[]; results: Record<string, { times: number[]; errors: number }> };
   me: string;
@@ -20,6 +20,10 @@ interface Props {
   question: (i: number) => { prompt?: ReactNode; options: ReactNode[]; correct: number; cols?: number; status?: ReactNode };
   /** Po pomyłce wraca to samo pytanie zamiast następnego; czas trafienia liczy się od pierwszego pokazania. */
   retry?: boolean;
+  /** Gra, w której błędy odejmują punkty (Obrót): wynik zamiast trafień w pasku i w tabeli, z własną notką i opisem punktacji. */
+  points?: (res: { times: number[]; errors: number }) => number;
+  note?: string;
+  score?: string;
   onMove: (move: QuizMove) => void;
   /** Start rundy (ile ms potrwa) i jej koniec (null): nagłówek pokazuje wtedy czas rundy zamiast limitu platformy. */
   onRound?: (msLeft: number | null) => void;
@@ -151,7 +155,7 @@ export function QuizPreview({ prompt, options, correct }: { prompt: ReactNode; o
   );
 }
 
-export function Quiz({ view, me, players, ranking, winner, task, preview, question, retry, onMove, onRound }: Props) {
+export function Quiz({ view, me, players, ranking, winner, task, preview, question, retry, points, note, score = "Liczą się trafienia, pomyłka blokuje na sekundę", onMove, onRound }: Props) {
   const playing = view.players.includes(me) && !(me in view.results);
   const [phase, setPhase] = useState<Phase>("intro");
   const [index, setIndex] = useState(0);
@@ -209,7 +213,7 @@ export function Quiz({ view, me, players, ranking, winner, task, preview, questi
   const idle = phase === "intro" || phase === "sent";
   useEffect(() => onRound?.(idle ? null : QUIZ_DURATION_MS), [idle]);
 
-  if (!playing || phase === "sent") return <Results view={view} me={me} players={players} ranking={ranking} winner={winner} />;
+  if (!playing || phase === "sent") return <Results view={view} me={me} players={players} ranking={ranking} winner={winner} points={points} note={note} />;
 
   if (phase === "intro") {
     return (
@@ -217,7 +221,7 @@ export function Quiz({ view, me, players, ranking, winner, task, preview, questi
         preview={preview}
         time={`${QUIZ_DURATION_MS / 1000} sekund`}
         task={task}
-        score="Liczą się trafienia, pomyłka blokuje na sekundę"
+        score={score}
         onStart={start}
       />
     );
@@ -228,7 +232,7 @@ export function Quiz({ view, me, players, ranking, winner, task, preview, questi
     <div className="flex flex-1 flex-col gap-3">
       <Stats
         items={[
-          { label: "Trafienia", value: run.current.times.length },
+          points ? { label: "Punkty", value: points(run.current) } : { label: "Trafienia", value: run.current.times.length },
           { label: "Błędy", value: run.current.errors, warn: run.current.errors > 0 },
           { label: "Seria", value: run.current.streak },
         ]}

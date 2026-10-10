@@ -1,5 +1,5 @@
 import { ArrowCounterClockwise, Check, Timer, Trophy, UsersThree } from "@phosphor-icons/react";
-import { CHINCZYK_TRACK, type ChinczykView, GAMES, type InnyView, type KampusTourView, type KolorView, type KoloView, type KropkiView, type LiczenieView, type MemoryView, type PanstwaMiastaView, type PiecWRzedzieView, QUIZ_DURATION_MS, type RefleksView, type RokView, type RoomView, type RytmView, type SledzenieView, KROPKI_ROUNDS, ROK_ROUNDS, SCHULTE_SIZE, type SchulteView, type SimonView, type SrodekView, type StatkiView, type StojView, type StoperView, type StroopView, WIEZA_LEVELS, type WiezaView } from "@mini-games/games";
+import { CHINCZYK_TRACK, type ChinczykView, GAMES, type InnyView, type KampusTourView, type KolorView, type KoloView, type KropkiView, type LiczenieView, type MemoryView, type ObrotView, type PanstwaMiastaView, type PiecWRzedzieView, QUIZ_DURATION_MS, type RefleksView, type RokView, type RoomView, type RytmView, type SledzenieView, KROPKI_ROUNDS, ROK_ROUNDS, SCHULTE_SIZE, type SchulteView, type SimonView, type SrodekView, type StatkiView, type StojView, type StoperView, type StroopView, WIEZA_LEVELS, type WiezaView } from "@mini-games/games";
 import { useEffect, useMemo, useState } from "react";
 import { Chinczyk } from "../games/Chinczyk.tsx";
 import { KampusTour } from "../games/KampusTour.tsx";
@@ -8,6 +8,7 @@ import { Kolor } from "../games/Kolor.tsx";
 import { Kropki } from "../games/Kropki.tsx";
 import { Liczenie } from "../games/Liczenie.tsx";
 import { Memory } from "../games/Memory.tsx";
+import { Obrot } from "../games/Obrot.tsx";
 import { PanstwaMiasta } from "../games/PanstwaMiasta.tsx";
 import { PiecWRzedzie } from "../games/PiecWRzedzie.tsx";
 import { Refleks } from "../games/Refleks.tsx";
@@ -381,6 +382,19 @@ export function Game({ view, me, dropped, send }: Props) {
           />
         )}
 
+        {def.id === "obrot" && (
+          <Obrot
+            key={(game.view as ObrotView).trials.map((t) => +t.mirror).join("")}
+            view={game.view as ObrotView}
+            me={me}
+            players={view.players}
+            ranking={game.result?.ranking}
+            winner={winner}
+            onMove={(move) => send("move", move)}
+            onRound={onRound}
+          />
+        )}
+
         {def.id === "inny" && (
           <Inny
             key={(game.view as InnyView).trials.map((t) => t.odd).join()}
@@ -468,7 +482,7 @@ export function Game({ view, me, dropped, send }: Props) {
   );
 }
 
-const MINI_GAMES = new Set(["refleks", "simon", "stoper", "schulte", "stroop", "liczenie", "kolo", "kolor", "kropki", "rok", "srodek", "stoj", "sledzenie", "wieza", "rytm", "inny", "panstwa-miasta"]);
+const MINI_GAMES = new Set(["refleks", "simon", "stoper", "schulte", "stroop", "liczenie", "kolo", "kolor", "kropki", "rok", "srodek", "stoj", "sledzenie", "wieza", "rytm", "inny", "obrot", "panstwa-miasta"]);
 
 const SCHULTE_LAST = SCHULTE_SIZE * SCHULTE_SIZE;
 
