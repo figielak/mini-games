@@ -30,6 +30,7 @@ Reguły platformy (limit tury, rewanż, walkower, obserwatorzy) są w `KONCEPT.m
 | Inny element | `inny` | 1-6 | 90 s | mini-gra |
 | Obrót | `obrot` | 1-6 | 90 s | mini-gra |
 | Mapa | `mapa` | 1-6 | 180 s | mini-gra |
+| Kąt | `kat` | 1-6 | 120 s | mini-gra |
 
 Nazwy w UI zmieniały się (2026-10-10), `id`, nazwy plików i typów zostały stare: Sekwencja = `simon`, Kolor liter = `stroop`,
 Odcień = `kolor`, Gomoku = `piec-w-rzedzie`. Ranking w SQLite jest po `id`, więc `id` nie wolno zmieniać.
@@ -39,8 +40,8 @@ Odcień = `kolor`, Gomoku = `piec-w-rzedzie`. Ranking w SQLite jest po `id`, wi�
 - Wyzwanie losuje serwer w `setup` (to samo dla wszystkich) i od razu wysyła w widoku. `playerView` zwraca cały stan,
   więc nic nie jest ukryte (da się podejrzeć; świadoma decyzja, komentarze `ponytail:`).
 - Partia toczy się na kliencie. Każdy gracz wysyła jeden ruch `{ type: "result", ... }`; drugi ruch tego samego gracza jest odrzucany.
-  Wyjątki: Narysuj koło (do 10 ruchów na gracza), Tabela Schultego, Policz kropki, Który rok? i Wieża (dodatkowy ruch `progress` po każdym trafieniu, rundzie albo klocku).
-- Serwer odrzuca tylko nierealne wartości. Wynik liczy serwer tam, gdzie się da (Narysuj koło, Odcień, Policz kropki, Który rok?, Środek, Stój!, Śledzenie, Wieża, Rytm, Mapa),
+  Wyjątki: Narysuj koło (do 10 ruchów na gracza), Tabela Schultego, Policz kropki, Kąt, Który rok? i Wieża (dodatkowy ruch `progress` po każdym trafieniu, rundzie albo klocku).
+- Serwer odrzuca tylko nierealne wartości. Wynik liczy serwer tam, gdzie się da (Narysuj koło, Odcień, Policz kropki, Który rok?, Środek, Stój!, Śledzenie, Wieża, Rytm, Mapa, Kąt),
   w reszcie ufa klientowi.
 - Partia zaczyna się ekranem instrukcji (platforma, nie zasady gry): każdy klika „Start” osobno (wiadomość pokoju `begin`) i gra od razu,
   po `INTRO_SECONDS` (15 s) gra rusza sama. Limit tury startuje, gdy wystartują wszyscy albo minie 15 s; wynik oddany wcześniej go nie uruchamia.
@@ -137,7 +138,20 @@ Wspólne zasady w `quiz.ts`, wspólny ekran `Quiz.tsx` (dzielą je też Inny ele
   (pasek „3/10” w pigułce gracza), nie odnawia limitu (`turn` ma stały klucz), może spaść po odświeżeniu strony.
 - Ekran: kwadratowy kafel stoi w tym samym miejscu we wszystkich fazach (kropki, pole odpowiedzi, porównanie).
   Po każdej odpowiedzi kropki wracają na ekran razem z „Było 42, wpisałeś 38”, różnicą ze znakiem i sumą błędów;
-  wynik idzie na serwer dopiero po „Wyniki” na ostatnim porównaniu.
+  wynik idzie na serwer dopiero po „Wyniki” na ostatnim porównaniu. Ekran (`Szacowanie.tsx`) dzieli z Kątem.
+
+### Kąt (`kat`)
+Przebieg i ekran jak w Policz kropki (`Szacowanie.tsx`); inny jest rysunek, zakres odpowiedzi i wynik po limicie czasu.
+- 10 rund, w każdej kąt widoczny 1,5 s (`SHOW_MS`), potem gracz wpisuje jego miarę w stopniach.
+- Serwer losuje rundy, te same dla wszystkich. Runda `{ angle, rotation }`, obie liczby całkowite w stopniach: `angle` 5-175 (`MIN`, `MAX`),
+  `rotation` 0-359 to kierunek pierwszego ramienia, drugie leży pod `rotation + angle`. Bez kątów wklęsłych, więc nie trzeba oznaczać mierzonej strony.
+- Jeden ruch z 10 odpowiedziami (int 0-180, `MAX_ANSWER`). Wynik liczy serwer: suma |odpowiedź − kąt|, mniej lepiej, bez tolerancji.
+- Pusta lista = limit czasu = w każdej rundzie najgorszy możliwy błąd, czyli `max(kąt, 180 − kąt)`
+  (nie zera jak w kropkach: zero przy kącie 10° byłoby prawie trafieniem).
+- Ruch `progress` (`done` = liczba odpowiedzianych rund, int 1-9) po każdej odpowiedzi poza ostatnią: tylko do podglądu u rywali
+  (pasek „3/10” w pigułce gracza), nie odnawia limitu (`turn` ma stały klucz), może spaść po odświeżeniu strony.
+- Ekran: wierzchołek na środku kwadratowego kafla, oba ramiona tej samej długości (40% boku). Po odpowiedzi kąt wraca z łukiem przy wierzchołku
+  razem z „Było 70°, wpisałeś 62°”, różnicą ze znakiem i sumą błędów.
 
 ### Który rok? (`rok`)
 - 10 rund, w każdej jedno wydarzenie historyczne, wynalazek albo premiera; gracz ustawia rok suwakiem w zakresie 1900-2025.
