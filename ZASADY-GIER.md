@@ -29,7 +29,7 @@ Odcień = `kolor`, Gomoku = `piec-w-rzedzie`. Ranking w SQLite jest po `id`, wi�
 - Wyzwanie losuje serwer w `setup` (to samo dla wszystkich) i od razu wysyła w widoku. `playerView` zwraca cały stan,
   więc nic nie jest ukryte (da się podejrzeć; świadoma decyzja, komentarze `ponytail:`).
 - Partia toczy się na kliencie. Każdy gracz wysyła jeden ruch `{ type: "result", ... }`; drugi ruch tego samego gracza jest odrzucany.
-  Wyjątek: Narysuj koło (do 10 ruchów na gracza).
+  Wyjątki: Narysuj koło (do 10 ruchów na gracza) i Tabela Schultego (dodatkowy ruch `progress` po każdym trafieniu).
 - Serwer odrzuca tylko nierealne wartości. Wynik liczy serwer tam, gdzie się da (Narysuj koło, Odcień, Policz kropki),
   w reszcie ufa klientowi.
 - `waitingFor` = gracze bez wyniku. Po limicie `timeoutMove` wpisuje najgorszy możliwy wynik.
@@ -58,6 +58,13 @@ Odcień = `kolor`, Gomoku = `piec-w-rzedzie`. Ranking w SQLite jest po `id`, wi�
 - Siatka 5×5 z liczbami 1-25 w losowym układzie, dotykasz po kolei od 1.
 - Wynik: `ms` + 3000 ms za każdą pomyłkę (`total`), mniej lepiej.
 - Walidacja: `ms` od 3750 (25 × 150 ms) do 180000, `mistakes` int ≥ 0. Limit czasu: 180000 ms, 0 pomyłek.
+- Tryby: **Klasyczna** (domyślna; znalezione liczby zostają widoczne, jak w oryginale) i **Łatwa** (`latwa`; znalezione gasną).
+  Tryb zmienia tylko wygląd, zasady i ranking są wspólne. Dotknięcie już znalezionej liczby nic nie robi w obu trybach.
+- Postęp rywali: po każdym trafieniu (poza ostatnim) klient wysyła `{ type: "progress", found }` (int 1-24, tylko gracz bez wyniku).
+  Serwer zapisuje go w `progress` i pokazuje w pigułkach graczy jako pasek i `12/25`. Wartość nie musi rosnąć
+  (po odświeżeniu gracz zaczyna od 1) i nie wpływa na wynik.
+- Limit przez `turn()` ze stałym kluczem: ruch `progress` nie odnawia 180 s, nawet gdy gra już tylko jedna osoba.
+- Ekran: trafiony kafelek błyska na zielono, pomyłka na czerwono z potrząśnięciem; lokalny zegar ma etykietę „Twój czas”.
 
 ### Kolory (`stroop`) i Liczenie (`liczenie`)
 Wspólne zasady w `quiz.ts`, wspólny ekran `Quiz.tsx`.
