@@ -468,7 +468,8 @@ describe("tryb Szybki", () => {
   });
 
   test("własne pionki w domku wolno przeskakiwać", () => {
-    const s = roll(put(quick(), { [A]: [38, 40, -1, -1] }, A), A, 4);
+    // Ruszyć może też pionek z pola 40 (nadwyżka na 43), więc jest wybór.
+    const s = move(roll(put(quick(), { [A]: [38, 40, -1, -1] }, A), A, 4), A, 0);
     expect(s.pawns[A]).toEqual([42, 40, -1, -1]);
   });
 
