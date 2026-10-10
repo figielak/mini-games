@@ -36,6 +36,16 @@ test("pickGame: id gry albo null (powrót do listy gier)", () => {
   expect(ROOM_MESSAGES.pickGame.safeParse({}).success).toBe(false);
 });
 
+test("turniej: gospodarz ustawia długość, grę zaznacza każdy (jedna gra na wiadomość)", () => {
+  expect(ROOM_MESSAGES.pickTournament.safeParse({ length: 8 }).success).toBe(true);
+  expect(ROOM_MESSAGES.pickTournament.safeParse({ length: "8" }).success).toBe(false);
+  expect(ROOM_MESSAGES.markGame.safeParse({ id: "stoper", mark: "must" }).success).toBe(true);
+  expect(ROOM_MESSAGES.markGame.safeParse({ id: "stoper", mark: "skip" }).success).toBe(true);
+  expect(ROOM_MESSAGES.markGame.safeParse({ id: "stoper", mark: "any" }).success).toBe(true);
+  expect(ROOM_MESSAGES.markGame.safeParse({ id: "stoper", mark: "moze" }).success).toBe(false);
+  expect(ROOM_MESSAGES.markGame.safeParse({ id: 1, mark: "must" }).success).toBe(false);
+});
+
 // Gra z trybami przechodzi kontrakt w każdym trybie.
 const CASES = Object.values(GAMES).flatMap((game) =>
   (game.modes ?? [undefined]).map((mode) => ({ game, mode: mode?.id, name: mode ? `${game.name} (${mode.name})` : game.name })),

@@ -1,10 +1,11 @@
 import { describe, expect, test } from "vitest";
 import { createRng, GAMES } from "./index.ts";
-import { advance, begin, cleanConfig, create, DEFAULT_LENGTH, draw, gamePoints, isDone, MIN_LENGTH, standings, TOURNAMENT_ID, type Tournament, winner } from "./turniej.ts";
+import { advance, begin, cleanConfig, create, DEFAULT_LENGTH, draw, gamePoints, isDone, mark, MIN_LENGTH, standings, TOURNAMENT_ID, type Tournament, winner } from "./turniej.ts";
 
 // Testy napisane przed implementacją. Ustalają zasady:
 // - turniej to seria mini-gier, nie gra z rejestru; `id` "turniej" służy tylko rankingowi,
 // - konfiguracja: liczba gier (3 do liczby niewykluczonych, przycinana), gry „na pewno” (podnoszą długość) i wykluczone,
+// - gry zaznacza każdy w pokoju, po jednej naraz: na pewno, bez albo z powrotem losowo; ostatnie zaznaczenie wygrywa,
 // - losowanie: wszystkie „na pewno” i losowe z reszty, bez powtórzeń i bez wykluczonych,
 // - punkty za grę: liczba graczy ze ściśle gorszym miejscem; gra przerwana daje wszystkim 0,
 // - tabela: suma punktów, potem wygrane gry (samodzielne 1. miejsce przy 2+ graczach),
@@ -58,6 +59,51 @@ describe("konfiguracja", () => {
     expect(cleanConfig(config(Number.NaN), POOL)).toBeNull();
     expect(cleanConfig(config(3, [], POOL.slice(0, 8)), POOL)).toBeNull();
     expect(cleanConfig(config(3, [], POOL.slice(0, 7)), POOL)).toEqual(config(3, [], POOL.slice(0, 7)));
+  });
+});
+
+describe("wspólne zaznaczanie gier", () => {
+  const base = config(5, ["g2"], ["g9"]);
+
+  test("gra losowa staje się pewna albo wykluczona", () => {
+    expect(mark(base, "g4", "must", POOL)).toEqual(config(5, ["g2", "g4"], ["g9"]));
+    expect(mark(base, "g4", "skip", POOL)).toEqual(config(5, ["g2"], ["g4", "g9"]));
+  });
+
+  test("ostatnie zaznaczenie wygrywa: pewna → wykluczona, wykluczona → pewna, obie → losowa", () => {
+    expect(mark(base, "g2", "skip", POOL)).toEqual(config(5, [], ["g2", "g9"]));
+    expect(mark(base, "g9", "must", POOL)).toEqual(config(5, ["g2", "g9"], []));
+    expect(mark(base, "g2", "any", POOL)).toEqual(config(5, [], ["g9"]));
+    expect(mark(base, "g9", "any", POOL)).toEqual(config(5, ["g2"], []));
+  });
+
+  test("to samo zaznaczenie drugi raz nic nie zmienia", () => {
+    expect(mark(base, "g2", "must", POOL)).toEqual(base);
+    expect(mark(base, "g9", "skip", POOL)).toEqual(base);
+    expect(mark(base, "g5", "any", POOL)).toEqual(base);
+  });
+
+  test("zaznaczenie zmienia tylko jedną grę, więc dwie osoby naraz sobie nie przeszkadzają", () => {
+    const afterAnia = mark(base, "g4", "must", POOL)!;
+    expect(mark(afterAnia, "g7", "skip", POOL)).toEqual(config(5, ["g2", "g4"], ["g7", "g9"]));
+  });
+
+  test("długość dopasowuje się jak w konfiguracji: rośnie z grami pewnymi, maleje z pulą", () => {
+    expect(mark(config(3, ["g1", "g2", "g3"]), "g4", "must", POOL)!.length).toBe(4);
+    expect(mark(config(10), "g1", "skip", POOL)!.length).toBe(9);
+  });
+
+  test("odrzucone: nieznana gra i wykluczenie, po którym zostałyby mniej niż 3 gry", () => {
+    expect(mark(base, "nie-ma", "must", POOL)).toBeNull();
+    expect(mark(base, "constructor", "skip", POOL)).toBeNull();
+    expect(mark(config(3, [], POOL.slice(0, 7)), "g8", "skip", POOL)).toBeNull();
+  });
+
+  test("nie zmienia poprzedniej konfiguracji", () => {
+    const copy = JSON.parse(JSON.stringify(base));
+    mark(base, "g4", "must", POOL);
+    mark(base, "g2", "skip", POOL);
+    expect(base).toEqual(copy);
   });
 });
 
