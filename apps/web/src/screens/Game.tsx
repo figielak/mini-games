@@ -1,5 +1,5 @@
 import { ArrowCounterClockwise, Check, Timer, UsersThree } from "@phosphor-icons/react";
-import { CHINCZYK_TRACK, type ChinczykView, GAMES, type KampusTourView, type KolorView, type KoloView, type KropkiView, type LiczenieView, type PanstwaMiastaView, type PiecWRzedzieView, type RefleksView, type RoomView, type SchulteView, type SimonView, type StatkiView, type StoperView, type StroopView } from "@mini-games/games";
+import { CHINCZYK_TRACK, type ChinczykView, GAMES, type KampusTourView, type KolorView, type KoloView, type KropkiView, type LiczenieView, type PanstwaMiastaView, type PiecWRzedzieView, type RefleksView, type RoomView, SCHULTE_SIZE, type SchulteView, type SimonView, type StatkiView, type StoperView, type StroopView } from "@mini-games/games";
 import { useEffect, useMemo, useState } from "react";
 import { Chinczyk } from "../games/Chinczyk.tsx";
 import { KampusTour } from "../games/KampusTour.tsx";
@@ -68,6 +68,8 @@ export function Game({ view, me, dropped, send }: Props) {
   const ludo = def.id === "chinczyk" ? (game.view as ChinczykView) : null;
   // Statki w trakcie partii zamiast punktów pokazują flotę (w bitwie: pozostałą).
   const fleet = def.id === "statki" && view.phase === "playing" ? (game.view as StatkiView) : null;
+  // Tabela Schultego w trakcie partii zamiast punktów pokazuje postęp każdego gracza.
+  const schulte = def.id === "schulte" && view.phase === "playing" ? (game.view as SchulteView) : null;
   const myColor = view.players.find((p) => p.id === me)?.color;
   const winner = view.phase === "over" ? game.result?.winner : undefined;
   const winnerColor = view.players.find((p) => p.id === winner)?.color;
@@ -107,7 +109,7 @@ export function Game({ view, me, dropped, send }: Props) {
           </div>
           {/* Stoper: tykający limit tury zdradzałby upływ sekund, więc grający widzi go tylko przed startem. */}
           {view.phase === "playing" && !(def.id === "stoper" && myTurn) && (
-            <Countdown game={game} total={def.turn?.(game.view).seconds ?? def.turnSeconds} color={myTurn ? myColor : undefined} />
+            <Countdown game={game} total={def.turn?.(game.view).seconds ?? def.turnSeconds} color={myTurn ? myColor : undefined} label={MINI_GAMES.has(def.id) ? "Limit" : undefined} />
           )}
           <ul className="flex flex-wrap gap-2">
             {view.seats.map((id) => {
@@ -138,6 +140,8 @@ export function Game({ view, me, dropped, send }: Props) {
                     </span>
                   ) : fleet ? (
                     <FleetLeft board={fleet.boards[id]} lengths={fleet.lengths} color={p?.color ?? "#8b8b92"} />
+                  ) : schulte ? (
+                    <SchulteProgress found={id in schulte.results ? SCHULTE_LAST : (schulte.progress[id] ?? 0)} color={p?.color} />
                   ) : (
                     // Klucz z wyniku: po wygranej liczba montuje się od nowa i wskakuje.
                     <span
@@ -197,6 +201,7 @@ export function Game({ view, me, dropped, send }: Props) {
           me={me}
           players={view.players}
           ranking={game.result?.ranking}
+          winner={winner}
           onMove={(move) => send("move", move)}
         />
       )}
@@ -264,6 +269,7 @@ export function Game({ view, me, dropped, send }: Props) {
           me={me}
           players={view.players}
           ranking={game.result?.ranking}
+          winner={winner}
           onMove={(move) => send("move", move)}
         />
       )}
@@ -275,6 +281,7 @@ export function Game({ view, me, dropped, send }: Props) {
           me={me}
           players={view.players}
           ranking={game.result?.ranking}
+          winner={winner}
           onMove={(move) => send("move", move)}
         />
       )}
@@ -328,6 +335,22 @@ export function Game({ view, me, dropped, send }: Props) {
 
 const MINI_GAMES = new Set(["refleks", "simon", "stoper", "schulte", "stroop", "liczenie", "kolo", "kolor", "kropki", "panstwa-miasta"]);
 
+const SCHULTE_LAST = SCHULTE_SIZE * SCHULTE_SIZE;
+
+/** Cienki pasek i licznik znalezionych liczb w pigułce gracza. */
+function SchulteProgress({ found, color }: { found: number; color?: string }) {
+  return (
+    <>
+      <span className="h-1 w-10 overflow-hidden rounded-full bg-line" aria-hidden>
+        <span className="block h-full rounded-full transition-[width] duration-200" style={{ width: `${(found / SCHULTE_LAST) * 100}%`, backgroundColor: color }} />
+      </span>
+      <span className="font-mono text-xs text-fg tabular-nums">
+        {found}/{SCHULTE_LAST}
+      </span>
+    </>
+  );
+}
+
 /** Rewanż rusza, gdy kliknie go każdy grający; „Do lobby” od jednej osoby kończy serię. */
 function OverActions({ view, me, send }: { view: RoomView; me: string; send: Send }) {
   const seated = view.players.filter((p) => view.seats.includes(p.id));
@@ -366,8 +389,9 @@ function OverActions({ view, me, send }: { view: RoomView; me: string; send: Sen
 /**
  * `tense`: pasek w kolorze akcentu (gra na czas, np. Państwa-miasta), a nie spokojny szary.
  * `color`: pasek w kolorze gracza (moja tura). Czerwień i tak przychodzi na ostatnie 10 s.
+ * `label`: podpis przed paskiem (mini-gry mają własny zegar partii, więc limit platformy musi być nazwany).
  */
-function Countdown({ game, total, tense, color }: { game: NonNullable<RoomView["game"]>; total?: number; tense?: boolean; color?: string }) {
+function Countdown({ game, total, tense, color, label }: { game: NonNullable<RoomView["game"]>; total?: number; tense?: boolean; color?: string; label?: string }) {
   const deadline = useMemo(() => (game.msLeft === null ? null : Date.now() + game.msLeft), [game]);
   const [now, setNow] = useState(Date.now);
 
@@ -383,6 +407,7 @@ function Countdown({ game, total, tense, color }: { game: NonNullable<RoomView["
     const left = Math.max(0, deadline - now) / (total * 1000);
     return (
       <div className="flex items-center gap-2">
+        {label && <span className="label">{label}</span>}
         <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-line" role="progressbar" aria-label="Czas tury" aria-valuenow={seconds}>
           <div
             className={`h-full rounded-full transition-[width] duration-300 ease-linear ${seconds <= 10 ? "animate-pulse bg-warning" : tense ? "bg-accent" : "bg-fg-muted"}`}

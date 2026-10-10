@@ -36,6 +36,20 @@ export function Scores({ rows }: { rows: { id: string; nick: string; color?: str
   );
 }
 
+/** Pasek statystyk nad planszą mini-gry: każda liczba ma etykietę, `warn` barwi wartość (kara, błędy). */
+export function Stats({ items }: { items: { label: string; value: ReactNode; warn?: boolean }[] }) {
+  return (
+    <dl className="flex justify-between gap-3 rounded-inset border border-line bg-surface px-4 py-2">
+      {items.map((item) => (
+        <div key={item.label} className="flex flex-col items-center first:items-start last:items-end">
+          <dt className="label">{item.label}</dt>
+          <dd className={`font-mono text-lg leading-tight font-semibold tabular-nums ${item.warn ? "text-warning" : ""}`}>{item.value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
 /** Przycisk przyklejony do dołu ekranu: przy otwartej klawiaturze i długiej liście zostaje pod kciukiem. */
 export function StickyBar({ children }: { children: ReactNode }) {
   return <div className="sticky bottom-0 -mx-4 flex items-center gap-3 bg-bg/90 px-4 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">{children}</div>;

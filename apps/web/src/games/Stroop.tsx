@@ -9,6 +9,7 @@ interface Props {
   me: string;
   players: LobbyPlayer[];
   ranking?: string[];
+  winner?: string;
   onMove: (move: QuizMove) => void;
 }
 
@@ -22,7 +23,7 @@ export function Stroop({ view, ...props }: Props) {
         const { word, ink } = view.trials[i % view.trials.length];
         return {
           prompt: (
-            <span className="text-4xl font-bold tracking-wide" style={{ color: HUES[ink] }}>
+            <span className="text-[min(12vw,3.5rem)] font-bold tracking-wide" style={{ color: HUES[ink] }}>
               {STROOP_COLORS[word]}
             </span>
           ),

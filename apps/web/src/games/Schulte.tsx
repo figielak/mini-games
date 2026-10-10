@@ -1,6 +1,6 @@
 import { type LobbyPlayer, SCHULTE_PENALTY_MS, SCHULTE_SIZE, type SchulteView, schulteTotal } from "@mini-games/games";
 import { useEffect, useRef, useState } from "react";
-import { Scores } from "../screens/ui.tsx";
+import { Scores, Stats } from "../screens/ui.tsx";
 
 interface Props {
   view: SchulteView;
@@ -108,13 +108,13 @@ export function Schulte({ view, me, players, ranking, onMove }: Props) {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex justify-between font-mono text-sm text-fg-muted">
-        <span>Szukaj: {target}</span>
-        <span>
-          {mistakes > 0 && <span className="text-warning">+{(mistakes * SCHULTE_PENALTY_MS) / 1000} s · </span>}
-          Twój czas: {seconds(now - start.current)} s
-        </span>
-      </div>
+      <Stats
+        items={[
+          { label: "Szukaj", value: target },
+          { label: "Kara", value: `+${(mistakes * SCHULTE_PENALTY_MS) / 1000} s`, warn: mistakes > 0 },
+          { label: "Twój czas", value: `${seconds(now - start.current)} s` },
+        ]}
+      />
       <div className="grid aspect-square grid-cols-5 gap-2">
         {view.grid.map((n) => (
           <button

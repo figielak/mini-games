@@ -21,7 +21,7 @@ export type View = State;
 
 export const stroop: GameDefinition<State, Move> = {
   id: "stroop",
-  name: "Kolory",
+  name: "Kolor liter",
   minPlayers: 1,
   maxPlayers: 6,
   turnSeconds: 60,

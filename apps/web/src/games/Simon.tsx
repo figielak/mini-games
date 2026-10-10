@@ -1,7 +1,7 @@
 import { Circle, type Icon, Square, Star, Triangle } from "@phosphor-icons/react";
 import type { LobbyPlayer, SimonView } from "@mini-games/games";
 import { useEffect, useRef, useState } from "react";
-import { Scores } from "../screens/ui.tsx";
+import { Scores, Stats } from "../screens/ui.tsx";
 
 interface Props {
   view: SimonView;
@@ -82,10 +82,12 @@ export function Simon({ view, me, players, ranking, onMove }: Props) {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex justify-between font-mono text-sm text-fg-muted">
-        <span>Seria: {length - 1}</span>
-        <span>{phase === "show" ? "Patrz" : "Powtórz"}</span>
-      </div>
+      <Stats
+        items={[
+          { label: "Seria", value: length - 1 },
+          { label: "Teraz", value: phase === "show" ? "Patrz" : "Powtórz" },
+        ]}
+      />
       <div className="grid aspect-square grid-cols-2 gap-3">
         {PADS.map(({ color, icon: PadIcon }, i) => (
           <button

@@ -1,6 +1,6 @@
 import { KOLO_ATTEMPTS, KOLO_MAX_POINTS, koloJudge, type KoloPoint, type KoloView, type LobbyPlayer } from "@mini-games/games";
 import { type PointerEvent, useRef, useState } from "react";
-import { Scores } from "../screens/ui.tsx";
+import { Scores, Stats } from "../screens/ui.tsx";
 
 interface Props {
   view: KoloView;
@@ -99,12 +99,12 @@ export function Kolo({ view, me, players, ranking, onMove }: Props) {
     return (
       <section className="flex flex-col gap-3">
         <p className="text-fg-muted">Narysuj palcem jednym ruchem jak najdoskonalszy okrąg. Liczy się najlepsza z {KOLO_ATTEMPTS} prób.</p>
-        <p className="flex justify-between font-mono text-sm">
-          <span>
-            Próba {attempts + 1}/{KOLO_ATTEMPTS}
-          </span>
-          {best && <span>Najlepsza: {percent(best.score)}</span>}
-        </p>
+        <Stats
+          items={[
+            { label: "Próba", value: `${attempts + 1}/${KOLO_ATTEMPTS}` },
+            { label: "Najlepsza", value: best ? percent(best.score) : "-" },
+          ]}
+        />
         <svg
           viewBox="0 0 1 1"
           className="aspect-square w-full touch-none select-none rounded-tile border border-line bg-surface [-webkit-touch-callout:none]"
