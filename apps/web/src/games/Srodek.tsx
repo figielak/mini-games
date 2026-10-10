@@ -1,4 +1,4 @@
-import { type LobbyPlayer, SRODEK_ACCEPT_PX, srodekDistance, srodekOffset, srodekProject, SRODEK_ROUNDS, type SrodekPoint, type SrodekView } from "@mini-games/games";
+import { type LobbyPlayer, SRODEK_ACCEPT_PX, srodekError, srodekOffset, srodekProject, SRODEK_ROUNDS, type SrodekPoint, type SrodekView } from "@mini-games/games";
 import { Fragment, type PointerEvent, useEffect, useState } from "react";
 import { Intro, Scores, Stats } from "../screens/ui.tsx";
 
@@ -12,9 +12,9 @@ interface Props {
 
 /** Tyle ms widać prawdziwy środek i własny punkt na odcinku, zanim wskoczy następna runda. */
 const REVEAL_MS = 1000;
-/** Progi celności w umownych px: do PERFECT „Idealnie!” na zielono, powyżej CLOSE kolor ostrzeżenia. */
-const PERFECT_PX = 5;
-const CLOSE_PX = 20;
+/** Progi celności w % długości odcinka: do PERFECT „Idealnie!” na zielono, powyżej CLOSE kolor ostrzeżenia. */
+const PERFECT = 2;
+const CLOSE = 8;
 /** Lupa nad kaflem: średnica w % boku kafla i wycinek pola w jednostkach viewBox (100 = bok), czyli powiększenie ok. 1,7×. */
 const LOUPE_SIZE = 40;
 const LOUPE_SPAN = 24;
@@ -22,9 +22,9 @@ const LOUPE_SPAN = 24;
 const TICK = 2;
 
 const num = (n: number) => n.toFixed(1).replace(".", ",");
-const px = (n: number) => `${num(n)} px`;
+const percent = (n: number) => `${num(n)}%`;
 const grade = (d: number) =>
-  d <= PERFECT_PX ? { text: "text-success", stroke: "stroke-success" } : d <= CLOSE_PX ? { text: "", stroke: "stroke-fg" } : { text: "text-warning", stroke: "stroke-warning" };
+  d <= PERFECT ? { text: "text-success", stroke: "stroke-success" } : d <= CLOSE ? { text: "", stroke: "stroke-fg" } : { text: "text-warning", stroke: "stroke-warning" };
 
 /** Odcinek z poprzecznymi kreskami na końcach, żeby było jednoznaczne, gdzie się zaczyna i kończy. */
 function Segment({ a, b }: { a: SrodekPoint; b: SrodekPoint }) {
@@ -65,7 +65,7 @@ export function Srodek({ view, me, players, ranking, onMove }: Props) {
   const [miss, setMiss] = useState(0);
   const index = phase === "reveal" ? taps.length - 1 : taps.length;
   const color = players.find((p) => p.id === me)?.color;
-  const distances = (list: SrodekPoint[]) => list.map((t, i) => srodekDistance(view.segments[i], t));
+  const distances = (list: SrodekPoint[]) => list.map((t, i) => srodekError(view.segments[i], t));
 
   useEffect(() => {
     if (phase !== "reveal") return;
@@ -106,7 +106,7 @@ export function Srodek({ view, me, players, ranking, onMove }: Props) {
   const over = ranking !== undefined;
   const rows = (ranking ?? view.players).map((id) => {
     const p = players.find((pl) => pl.id === id);
-    return { id, nick: p?.nick ?? "Gracz", color: p?.color, me: id === me, score: id in view.results ? px(view.results[id] / 10) : null };
+    return { id, nick: p?.nick ?? "Gracz", color: p?.color, me: id === me, score: id in view.results ? percent(view.results[id] / 10) : null };
   });
 
   if (!playing || phase === "sent") {
@@ -141,7 +141,7 @@ export function Srodek({ view, me, players, ranking, onMove }: Props) {
                   {r.errors.map((d, i) => (
                     <span
                       key={i}
-                      className={`rounded-md border py-1 ${grade(d).text} ${d <= PERFECT_PX ? "font-semibold" : ""} ${best(i) === r.id ? "" : "border-line"}`}
+                      className={`rounded-md border py-1 ${grade(d).text} ${d <= PERFECT ? "font-semibold" : ""} ${best(i) === r.id ? "" : "border-line"}`}
                       style={best(i) === r.id ? { borderColor: r.color, backgroundColor: `color-mix(in srgb, ${r.color} 28%, transparent)` } : undefined}
                     >
                       {/* Na ekranie 360 px komórka mieści trzy znaki. */}
@@ -152,7 +152,7 @@ export function Srodek({ view, me, players, ranking, onMove }: Props) {
               ))}
             </div>
             <p className="text-xs text-fg-muted">
-              Błąd w każdej rundzie (px){played.length > 1 && "; tło w kolorze gracza ma najlepszy w rundzie"}. Zielony: do {PERFECT_PX} px, czerwony: ponad {CLOSE_PX} px.
+              Błąd w każdej rundzie (% długości odcinka){played.length > 1 && "; tło w kolorze gracza ma najlepszy w rundzie"}. Zielony: do {PERFECT}%, czerwony: ponad {CLOSE}%.
             </p>
           </section>
         )}
@@ -166,7 +166,7 @@ export function Srodek({ view, me, players, ranking, onMove }: Props) {
         preview={<Preview />}
         time={`${SRODEK_ROUNDS} rund, w każdej jeden odcinek`}
         task="Dotknij odcinka w połowie długości. Możesz przytrzymać i przesunąć, liczy się miejsce puszczenia"
-        score="Liczy się suma błędów wzdłuż odcinka w px, mniej znaczy lepiej"
+        score="Liczy się suma błędów w % długości odcinka, mniej znaczy lepiej"
         onStart={() => setPhase("play")}
       />
     );
@@ -177,7 +177,7 @@ export function Srodek({ view, me, players, ranking, onMove }: Props) {
   // Liczy się rzut dotknięcia na odcinek, więc to jego pokazujemy: w trakcie celowania (tylko w strefie) i po puszczeniu.
   const spot = aim && srodekOffset(segment, aim) <= SRODEK_ACCEPT_PX ? srodekProject(segment, aim) : null;
   const mine = phase === "reveal" ? srodekProject(segment, taps[index]) : null;
-  const error = mine ? srodekDistance(segment, taps[index]) : 0;
+  const error = mine ? srodekError(segment, taps[index]) : 0;
 
   // Na niskim ekranie kafel maleje, żeby wiersz pod nim mieścił się bez przewijania (21rem = nagłówek gry + wiersze nad i pod kaflem).
   return (
@@ -185,7 +185,7 @@ export function Srodek({ view, me, players, ranking, onMove }: Props) {
       <Stats
         items={[
           { label: "Runda", value: `${index + 1}/${SRODEK_ROUNDS}` },
-          { label: "Suma błędów", value: px(distances(taps).reduce((s, d) => s + d, 0)) },
+          { label: "Suma błędów", value: percent(distances(taps).reduce((s, d) => s + d, 0)) },
         ]}
       />
       <div
@@ -227,13 +227,13 @@ export function Srodek({ view, me, players, ranking, onMove }: Props) {
       <p className="flex h-10 items-center justify-center gap-3" role="status">
         {mine ? (
           <>
-            {error <= PERFECT_PX && <span className="text-lg font-semibold text-success">Idealnie!</span>}
-            <span className={`font-mono text-3xl font-semibold tabular-nums ${grade(error).text}`}>{px(error)}</span>
+            {error <= PERFECT && <span className="text-lg font-semibold text-success">Idealnie!</span>}
+            <span className={`font-mono text-3xl font-semibold tabular-nums ${grade(error).text}`}>{percent(error)}</span>
           </>
         ) : miss ? (
           <span className="text-sm text-warning">Dotknij na odcinku</span>
         ) : (
-          <span className="text-sm text-fg-muted">Dotknij odcinka w połowie, przytrzymaj, żeby poprawić</span>
+          <span className="text-sm text-fg-muted">Dotknij odcinka w połowie długości</span>
         )}
       </p>
     </section>

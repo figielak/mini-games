@@ -297,7 +297,7 @@ const BLURBS: Record<string, string> = {
   kolo: "Rysujesz palcem koło, do 10 prób. Liczy się najlepsza, wynik to procent idealności.",
   kolor: "Widzisz kolor przez 2 s, potem odtwarzasz go suwakami. 5 kolorów, wygrywa najmniejszy błąd.",
   kropki: "Kropki migają przez 1,5 s, wpisujesz, ile ich było. 10 rund, wygrywa najmniejsza suma błędów.",
-  srodek: "Odcinek pod losowym kątem, dotykasz dokładnie jego środka. 10 rund, wygrywa najmniejsza suma odległości.",
+  srodek: "Odcinek pod losowym kątem, dotykasz dokładnie jego środka. 10 rund, wygrywa najmniejsza suma błędów.",
 };
 
 /** Nazwy kolorów z PLAYER_COLORS (ta sama kolejność), dla czytników ekranu. */
