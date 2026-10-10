@@ -1,5 +1,5 @@
 import { ArrowCounterClockwise, Check, Timer, Trophy, UsersThree } from "@phosphor-icons/react";
-import { CHINCZYK_TRACK, type ChinczykView, GAMES, type InnyView, type KampusTourView, type KolorView, type KoloView, type KropkiView, type LiczenieView, type MemoryView, type ObrotView, type PanstwaMiastaView, type PiecWRzedzieView, QUIZ_DURATION_MS, type RefleksView, type RokView, type RoomView, type RytmView, type SledzenieView, KROPKI_ROUNDS, ROK_ROUNDS, SCHULTE_SIZE, type SchulteView, type SimonView, type SrodekView, type StatkiView, type StojView, type StoperView, type StroopView, WIEZA_LEVELS, type WiezaView } from "@mini-games/games";
+import { CHINCZYK_TRACK, type ChinczykView, GAMES, type InnyView, type KampusTourView, type KolorView, type KoloView, type KropkiView, type LiczenieView, type MapaView, type MemoryView, type ObrotView, type PanstwaMiastaView, type PiecWRzedzieView, QUIZ_DURATION_MS, type RefleksView, type RokView, type RoomView, type RytmView, type SledzenieView, KROPKI_ROUNDS, ROK_ROUNDS, SCHULTE_SIZE, type SchulteView, type SimonView, type SrodekView, type StatkiView, type StojView, type StoperView, type StroopView, WIEZA_LEVELS, type WiezaView } from "@mini-games/games";
 import { useEffect, useMemo, useState } from "react";
 import { Chinczyk } from "../games/Chinczyk.tsx";
 import { KampusTour } from "../games/KampusTour.tsx";
@@ -7,6 +7,7 @@ import { Kolo } from "../games/Kolo.tsx";
 import { Kolor } from "../games/Kolor.tsx";
 import { Kropki } from "../games/Kropki.tsx";
 import { Liczenie } from "../games/Liczenie.tsx";
+import { Mapa } from "../games/Mapa.tsx";
 import { Memory } from "../games/Memory.tsx";
 import { Obrot } from "../games/Obrot.tsx";
 import { PanstwaMiasta } from "../games/PanstwaMiasta.tsx";
@@ -326,6 +327,17 @@ export function Game({ view, me, dropped, send }: Props) {
           />
         )}
 
+        {def.id === "mapa" && (
+          <Mapa
+            key={(game.view as MapaView).cities.map((c) => c.name).join()}
+            view={game.view as MapaView}
+            me={me}
+            players={view.players}
+            ranking={game.result?.ranking}
+            onMove={(move) => send("move", move)}
+          />
+        )}
+
         {def.id === "stoj" && (
           <Stoj
             key={(game.view as StojView).reds.join()}
@@ -482,7 +494,7 @@ export function Game({ view, me, dropped, send }: Props) {
   );
 }
 
-const MINI_GAMES = new Set(["refleks", "simon", "stoper", "schulte", "stroop", "liczenie", "kolo", "kolor", "kropki", "rok", "srodek", "stoj", "sledzenie", "wieza", "rytm", "inny", "obrot", "panstwa-miasta"]);
+const MINI_GAMES = new Set(["refleks", "simon", "stoper", "schulte", "stroop", "liczenie", "kolo", "kolor", "kropki", "rok", "srodek", "stoj", "sledzenie", "wieza", "rytm", "inny", "obrot", "mapa", "panstwa-miasta"]);
 
 const SCHULTE_LAST = SCHULTE_SIZE * SCHULTE_SIZE;
 
