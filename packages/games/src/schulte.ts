@@ -8,13 +8,22 @@ export const PENALTY_MS = 3000;
 const MIN_MS = SIZE * SIZE * 150;
 
 export type Result = { ms: number; mistakes: number };
-export type Move = { type: "result" } & Result;
+export type Move = ({ type: "result" } & Result) | { type: "progress"; found: number };
+
+/** Tryb zmienia tylko wygląd: w Łatwej znalezione liczby gasną. */
+const MODES = [
+  { id: "klasyczna", name: "Klasyczna", hint: "Znalezione liczby zostają widoczne", default: true },
+  { id: "latwa", name: "Łatwa", hint: "Znalezione liczby gasną" },
+];
 
 export interface State {
   players: PlayerId[];
   /** Liczby 1-25 w kolejności pól (wiersz po wierszu), ta sama dla wszystkich. */
   grid: number[];
   results: Record<PlayerId, Result>;
+  mode: string;
+  /** Ile liczb gracz już znalazł (1-24), zgłaszane przez klienta; tylko do podglądu u rywali. */
+  progress: Record<PlayerId, number>;
 }
 
 export type View = State;
@@ -30,23 +39,33 @@ export const schulte: GameDefinition<State, Move> = {
   minPlayers: 1,
   maxPlayers: 6,
   turnSeconds: TURN_SECONDS,
-  moveSchema: z.object({ type: z.literal("result"), ms: z.number(), mistakes: z.number() }),
+  // Stały klucz: ruch progress nie odnawia limitu, nawet gdy gra już tylko jedna osoba.
+  turn: () => ({ key: "run", seconds: TURN_SECONDS }),
+  modes: MODES,
+  moveSchema: z.discriminatedUnion("type", [
+    z.object({ type: z.literal("result"), ms: z.number(), mistakes: z.number() }),
+    z.object({ type: z.literal("progress"), found: z.number() }),
+  ]),
 
-  setup: (players, rng) => ({
+  setup: (players, rng, mode) => ({
     players,
     grid: shuffle(Array.from({ length: SIZE * SIZE }, (_, i) => i + 1), rng),
     results: {},
+    mode: MODES.some((m) => m.id === mode) ? mode! : MODES[0].id,
+    progress: {},
   }),
 
-  validateMove: (state, player, { ms, mistakes }) =>
+  validateMove: (state, player, move) =>
     state.players.includes(player) &&
     !(player in state.results) &&
-    ms >= MIN_MS &&
-    ms <= TURN_SECONDS * 1000 &&
-    Number.isInteger(mistakes) &&
-    mistakes >= 0,
+    (move.type === "progress"
+      ? Number.isInteger(move.found) && move.found >= 1 && move.found < SIZE * SIZE
+      : move.ms >= MIN_MS && move.ms <= TURN_SECONDS * 1000 && Number.isInteger(move.mistakes) && move.mistakes >= 0),
 
-  applyMove: (state, player, { ms, mistakes }) => ({ ...state, results: { ...state.results, [player]: { ms: Math.round(ms), mistakes } } }),
+  applyMove: (state, player, move) =>
+    move.type === "progress"
+      ? { ...state, progress: { ...state.progress, [player]: move.found } }
+      : { ...state, results: { ...state.results, [player]: { ms: Math.round(move.ms), mistakes: move.mistakes } } },
 
   playerView: (state): View => state,
 
