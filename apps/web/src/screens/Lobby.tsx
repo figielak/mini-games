@@ -4,6 +4,7 @@ import {
   Calculator,
   Check,
   CircleDashed,
+  CirclesThree,
   Crown,
   DiceFive,
   DotsNine,
@@ -277,6 +278,7 @@ const ICONS: Record<string, Icon> = {
   kropki: DotsNine,
   srodek: LineSegment,
   stoj: HandPalm,
+  sledzenie: CirclesThree,
 };
 
 function seats(g: { minPlayers: number; maxPlayers: number }) {
@@ -301,6 +303,7 @@ const BLURBS: Record<string, string> = {
   kropki: "Kropki migają przez 1,5 s, wpisujesz, ile ich było. 10 rund, wygrywa najmniejsza suma błędów.",
   srodek: "Odcinek pod losowym kątem, dotykasz dokładnie jego środka. 10 rund, wygrywa najmniejsza suma błędów.",
   stoj: "Zielone pole dotykasz, czerwonego nie wolno. 30 s, tempo rośnie, błąd zabiera 2 punkty.",
+  sledzenie: "Kulki lecą po polu, trzy z nich są celami. Widzisz je krótko, potem śledzisz ruch i wskazujesz te trzy.",
 };
 
 /** Nazwy kolorów z PLAYER_COLORS (ta sama kolejność), dla czytników ekranu. */

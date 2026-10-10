@@ -1,5 +1,5 @@
 import { ArrowCounterClockwise, Check, Timer, UsersThree } from "@phosphor-icons/react";
-import { CHINCZYK_TRACK, type ChinczykView, GAMES, type KampusTourView, type KolorView, type KoloView, type KropkiView, type LiczenieView, type PanstwaMiastaView, type PiecWRzedzieView, type RefleksView, type RoomView, KROPKI_ROUNDS, SCHULTE_SIZE, type SchulteView, type SimonView, type SrodekView, type StatkiView, type StojView, type StoperView, type StroopView } from "@mini-games/games";
+import { CHINCZYK_TRACK, type ChinczykView, GAMES, type KampusTourView, type KolorView, type KoloView, type KropkiView, type LiczenieView, type PanstwaMiastaView, type PiecWRzedzieView, type RefleksView, type RoomView, type SledzenieView, KROPKI_ROUNDS, SCHULTE_SIZE, type SchulteView, type SimonView, type SrodekView, type StatkiView, type StojView, type StoperView, type StroopView } from "@mini-games/games";
 import { useEffect, useMemo, useState } from "react";
 import { Chinczyk } from "../games/Chinczyk.tsx";
 import { KampusTour } from "../games/KampusTour.tsx";
@@ -12,6 +12,7 @@ import { PiecWRzedzie } from "../games/PiecWRzedzie.tsx";
 import { Refleks } from "../games/Refleks.tsx";
 import { Schulte } from "../games/Schulte.tsx";
 import { Simon } from "../games/Simon.tsx";
+import { Sledzenie } from "../games/Sledzenie.tsx";
 import { Srodek } from "../games/Srodek.tsx";
 import { FleetLeft, Statki } from "../games/Statki.tsx";
 import { Stoj } from "../games/Stoj.tsx";
@@ -288,6 +289,17 @@ export function Game({ view, me, dropped, send }: Props) {
           />
         )}
 
+        {def.id === "sledzenie" && (
+          <Sledzenie
+            key={JSON.stringify((game.view as SledzenieView).rounds)}
+            view={game.view as SledzenieView}
+            me={me}
+            players={view.players}
+            ranking={game.result?.ranking}
+            onMove={(move) => send("move", move)}
+          />
+        )}
+
         {def.id === "schulte" && (
           <Schulte
             key={(game.view as SchulteView).grid.join()}
@@ -373,7 +385,7 @@ export function Game({ view, me, dropped, send }: Props) {
   );
 }
 
-const MINI_GAMES = new Set(["refleks", "simon", "stoper", "schulte", "stroop", "liczenie", "kolo", "kolor", "kropki", "srodek", "stoj", "panstwa-miasta"]);
+const MINI_GAMES = new Set(["refleks", "simon", "stoper", "schulte", "stroop", "liczenie", "kolo", "kolor", "kropki", "srodek", "stoj", "sledzenie", "panstwa-miasta"]);
 
 const SCHULTE_LAST = SCHULTE_SIZE * SCHULTE_SIZE;
 
