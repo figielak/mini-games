@@ -25,6 +25,7 @@ Reguły platformy (limit tury, rewanż, walkower, obserwatorzy) są w `KONCEPT.m
 | Środek | `srodek` | 1-6 | 60 s | mini-gra |
 | Stój! | `stoj` | 1-6 | 60 s | mini-gra |
 | Śledzenie | `sledzenie` | 1-6 | 300 s | mini-gra |
+| Inny element | `inny` | 1-6 | 90 s | mini-gra |
 
 Nazwy w UI zmieniały się (2026-10-10), `id`, nazwy plików i typów zostały stare: Sekwencja = `simon`, Kolor liter = `stroop`,
 Odcień = `kolor`, Gomoku = `piec-w-rzedzie`. Ranking w SQLite jest po `id`, więc `id` nie wolno zmieniać.
@@ -78,7 +79,7 @@ Odcień = `kolor`, Gomoku = `piec-w-rzedzie`. Ranking w SQLite jest po `id`, wi�
 - Ekran: trafiony kafelek błyska na zielono, pomyłka na czerwono z potrząśnięciem; lokalny zegar ma etykietę „Twój czas”.
 
 ### Kolor liter (`stroop`) i Liczenie (`liczenie`)
-Wspólne zasady w `quiz.ts`, wspólny ekran `Quiz.tsx`.
+Wspólne zasady w `quiz.ts`, wspólny ekran `Quiz.tsx` (dzieli je też Inny element).
 - 30 s pytań z czterema odpowiedziami; serwer losuje 200 pytań (starczy przy 150 ms na odpowiedź).
 - Pomyłka blokuje na 1 s (inaczej losowe klepanie byłoby szybsze niż myślenie).
 - Wynik: `times` (czasy poprawnych) i `errors`. Ranking jak w Refleksie: trafienia, potem niższa średnia. `errors` nie wpływa na ranking, ale jest widoczne w pasku statystyk i w wynikach.
@@ -212,6 +213,25 @@ Wspólne zasady w `quiz.ts`, wspólny ekran `Quiz.tsx`.
 - Ekran: kwadratowy kafel z kulkami; cele podświetlone kolorem gracza, w ruchu wszystkie jednakowe. Po zatrzymaniu dotknięcie zaznacza kulkę
   (ponowne odznacza), trzecie zatwierdza. Potem przez 1 s widać prawdziwe cele; pomyłka to wibracja 60.
   Ruch kulek jest treścią gry, więc działa także przy `prefers-reduced-motion`.
+
+### Inny element (`inny`)
+Wynik, walidacja, ranking i ekran końcowy jak w Kolorze liter (`quiz.ts`, `Quiz.tsx`); inne jest tylko to, co widać na planszy.
+- 30 s. Siatka identycznych symboli, jeden się różni; dotykasz tego jednego.
+- Serwer losuje 200 plansz, te same dla wszystkich. Plansza `{ cols, rows, odd, base, other }`: wszystkie pola mają symbol `base`,
+  pole `odd` ma `other`. Symbol to `{ sides, angle, hue, light, size }` (wielokąt foremny, obrót w stopniach, barwa i jasność HSL, rozmiar w % pola symbolu).
+- Siatka rośnie z każdym trafieniem na przemian o kolumnę i wiersz: 2×2, 3×2, 3×3, 4×3 … 6×6 na planszy 8 i dalej bez zmian
+  (`MAX_SIDE = 6`: przy 360 px kafel ma wtedy 48 px).
+- `other` różni się od `base` dokładnie jednym polem, rodzaj różnicy losowany po równo co planszę. Różnica maleje liniowo
+  od planszy 0 do planszy 16 (`HARD`), dalej jest stała:
+  - **obrót**: trójkąt, `angle` ± od 40° do 8°,
+  - **odcień**: `light` ± od 20 do 5 punktów (jasność, nie barwa, więc działa też dla daltonistów),
+  - **rozmiar**: `size` ± od 20 do 10 punktów przy bazowym 80,
+  - **kształt**: `sides` n kontra n ± 1, n = `3 + floor(i / 3)`; nigdy mniej niż 3 boki. Tylko na planszach 0-7 (`SHAPE_BOARDS = 8`,
+    dopóki siatka rośnie): inna liczba boków rzuca się w oczy nawet na 6×6, więc dalej zostają same subtelne różnice.
+  Barwa bazowa, kąt bazowy, znak różnicy i pole `odd` są losowe.
+- Pomyłka blokuje na 1 s i plansza zostaje (numer planszy = liczba trafień). Czas trafienia liczy się od pierwszego pokazania planszy;
+  szukanie dłuższe niż 5 s liczy się jak 5 s.
+- Limit czasu: zero trafień.
 
 ## 2. Gomoku (`piec-w-rzedzie`)
 
