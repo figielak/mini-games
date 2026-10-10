@@ -27,6 +27,7 @@ import { wieza } from "./wieza.ts";
 
 export * from "./core.ts";
 export * from "./lobby.ts";
+export * from "./turniej.ts";
 export { TRACK as CHINCZYK_TRACK, type View as ChinczykView } from "./chinczyk.ts";
 export {
   ALLOWANCE as KAMPUS_ALLOWANCE,
