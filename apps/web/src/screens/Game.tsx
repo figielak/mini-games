@@ -37,6 +37,16 @@ export function Game({ view, me, dropped, send }: Props) {
     if (myTurn) navigator.vibrate?.(40);
   }, [myTurn]);
 
+  // Poświata tła w kolorze gracza, na którego czekamy; poza turą jednej osoby zostaje akcent.
+  const turnColor = view.phase === "playing" && game.waitingFor.length === 1 ? view.players.find((p) => p.id === game.waitingFor[0])?.color : undefined;
+  useEffect(() => {
+    if (!turnColor) return;
+    document.body.style.setProperty("--ambient", turnColor);
+    return () => {
+      document.body.style.removeProperty("--ambient");
+    };
+  }, [turnColor]);
+
   // Kampus Tour ma własny, poziomy układ na cały ekran: gracze w rogach, licznik i rewanż w środku planszy.
   if (def.id === "kampus-tour") {
     return (
@@ -59,6 +69,8 @@ export function Game({ view, me, dropped, send }: Props) {
   // Statki w bitwie zamiast punktów pokazują pozostałą flotę.
   const fleet = def.id === "statki" && (game.view as StatkiView).phase === "battle" ? (game.view as StatkiView) : null;
   const myColor = view.players.find((p) => p.id === me)?.color;
+  const winner = view.phase === "over" ? game.result?.winner : undefined;
+  const winnerColor = view.players.find((p) => p.id === winner)?.color;
 
   // Państwa-miasta w trakcie partii mają własny nagłówek: runda, pasek czasu fazy, litera.
   const ownHeader = def.id === "panstwa-miasta" && view.phase === "playing";
@@ -83,7 +95,11 @@ export function Game({ view, me, dropped, send }: Props) {
       {!ownHeader && (
         <header className="tile flex flex-col gap-3 p-4">
           <div className="flex items-center justify-between gap-3">
-            <h1 className="text-xl font-semibold" style={myTurn ? { color: myColor } : undefined}>
+            {/* Koniec partii: tytuł w kolorze zwycięzcy; podbicie tylko u niego, przegrany dostaje spokojną wersję. */}
+            <h1
+              className={`origin-left text-xl font-semibold ${winner === me ? "animate-[title-pop_0.5s_cubic-bezier(0.2,0.8,0.4,1)]" : ""}`}
+              style={{ color: winner ? winnerColor : myTurn ? myColor : undefined }}
+            >
               {status}
             </h1>
           </div>
@@ -91,13 +107,14 @@ export function Game({ view, me, dropped, send }: Props) {
           <ul className="flex flex-wrap gap-2">
             {view.seats.map((id) => {
               const p = view.players.find((pl) => pl.id === id);
-              const active = view.phase === "playing" && game.waitingFor.includes(id);
+              const active = id === winner || (view.phase === "playing" && game.waitingFor.includes(id));
               return (
                 <li
                   key={id}
                   className={`flex min-h-9 items-center gap-2 rounded-full border px-3 text-sm transition-colors ${fleet ? "w-full" : ""} ${
-                    active ? "border-line-hover bg-surface" : "border-transparent text-fg-muted"
+                    active ? "" : "border-transparent text-fg-muted"
                   }`}
+                  style={active ? { borderColor: p?.color, backgroundColor: `color-mix(in srgb, ${p?.color} 16%, transparent)` } : undefined}
                 >
                   <span className="size-2.5 rounded-full" style={{ backgroundColor: p?.color }} aria-hidden />
                   {nick(id)}
@@ -116,7 +133,13 @@ export function Game({ view, me, dropped, send }: Props) {
                   ) : fleet ? (
                     <FleetLeft board={fleet.boards[id]} color={p?.color ?? "#8b8b92"} />
                   ) : (
-                    <span className="font-mono">{view.scores[id] ?? 0}</span>
+                    // Klucz z wyniku: po wygranej liczba montuje się od nowa i wskakuje.
+                    <span
+                      key={view.scores[id] ?? 0}
+                      className={`text-base font-semibold text-fg tabular-nums ${id === winner ? "animate-[stone-pop_0.5s_ease-out]" : ""}`}
+                    >
+                      {view.scores[id] ?? 0}
+                    </span>
                   )}
                 </li>
               );
@@ -306,16 +329,20 @@ function OverActions({ view, me, send }: { view: RoomView; me: string; send: Sen
   const iWant = wants.some((p) => p.id === me);
   return (
     <>
-      {wants.length > 0 && (
-        <p className="basis-full text-center text-sm text-fg-muted" role="status">
-          Rewanż chce: {wants.map((p) => p.nick).join(", ")}
-          {waiting.length > 0 && <> · czekamy na: {waiting.map((p) => p.nick).join(", ")}</>}
+      {wants.length > 0 && !iWant && (
+        <p className="basis-full text-center text-sm" role="status">
+          {wants.map((p) => p.nick).join(", ")} {wants.length === 1 ? "chce" : "chcą"} rewanżu
         </p>
       )}
       {view.seats.includes(me) && (
-        <button type="button" className="btn btn-primary flex-1" disabled={iWant} onClick={() => send("rematch")}>
+        <button
+          type="button"
+          className={`btn btn-primary flex-1 ${wants.length > 0 && !iWant ? "animate-[ring-pulse_1.2s_ease-in-out_infinite] outline-2 outline-accent" : ""}`}
+          disabled={iWant}
+          onClick={() => send("rematch")}
+        >
           <ArrowCounterClockwise size={18} weight="bold" aria-hidden />
-          {iWant ? "Czekamy na resztę" : "Rewanż"}
+          {iWant ? `Czekamy na: ${waiting.map((p) => p.nick).join(", ")}…` : "Rewanż"}
         </button>
       )}
       <button type="button" className="btn btn-ghost flex-1" onClick={() => send("toLobby")}>
@@ -355,7 +382,7 @@ function Countdown({ game, total, tense, color }: { game: NonNullable<RoomView["
             style={{ width: `${Math.min(1, left) * 100}%`, backgroundColor: seconds > 10 ? color : undefined }}
           />
         </div>
-        <span className={`w-10 text-right font-mono text-xs ${seconds <= 10 ? "text-warning" : "text-fg-muted"}`}>{seconds} s</span>
+        <span className={`w-10 text-right text-sm font-medium tabular-nums ${seconds <= 10 ? "text-warning" : "text-fg"}`}>{seconds} s</span>
       </div>
     );
   }

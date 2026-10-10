@@ -48,14 +48,15 @@ html {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Poświata jak na dashboardzie figielak.dev, ale słabsza i nieruchoma: telefon na wykładzie nie ma świecić. */
+/* Poświata jak na dashboardzie figielak.dev, ale słabsza i nieruchoma: telefon na wykładzie nie ma świecić.
+   W partii --ambient (ustawiane w Game.tsx) to kolor gracza, który ma ruch. */
 body::before {
   content: "";
   position: fixed;
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  background: radial-gradient(60vmax 60vmax at 85% -10%, rgb(255 36 69 / 0.16), transparent 70%);
+  background: radial-gradient(60vmax 60vmax at 85% -10%, color-mix(in srgb, var(--ambient, var(--color-accent)) 16%, transparent), transparent 70%);
 }
 
 @layer components {
@@ -214,6 +215,21 @@ body::before {
 @keyframes stone-pop {
   from {
     transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+/* Pięć w rzędzie: zwycięska linia dorysowuje się od pierwszego do ostatniego kamienia (pathLength=1). */
+@keyframes line-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+}
+
+/* Nagłówek gry: „Wygrywasz!” u zwycięzcy. */
+@keyframes title-pop {
+  from {
+    transform: scale(1.25);
     opacity: 0;
   }
 }
