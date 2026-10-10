@@ -14,6 +14,7 @@ import {
   type GameDefinition,
   type GameResult,
   type LobbyPlayer,
+  mark,
   MAX_PLAYERS,
   MINI_GAME_IDS,
   NEXT_SECONDS,
@@ -91,15 +92,25 @@ export class LobbyRoom extends Room {
       this.resetReady();
     });
 
-    // Wybór turnieju albo zmiana jego ustawień; jak zmiana trybu, kasuje gotowość gości.
-    this.on("pickTournament", (client, raw) => {
-      const config = cleanConfig(raw, MINI_GAME_IDS);
+    // Wybór turnieju albo zmiana liczby gier; jak zmiana trybu, kasuje gotowość gości. Zaznaczone gry zostają.
+    this.on("pickTournament", (client, { length }) => {
+      const { must = [], skip = [] } = this.tournament?.config ?? {};
+      const config = cleanConfig({ length, must, skip }, MINI_GAME_IDS);
       if (!this.isHost(client) || this.phase !== "lobby" || !config) return;
       // Miejsca dostają wszyscy tylko przy wyborze turnieju; zmiana ustawień nie rusza tych, których gospodarz przesadził.
       if (!this.tournament) this.seats = [...this.players.keys()];
       this.tournament = create(config);
       this.gameId = null;
       this.mode = null;
+      this.resetReady();
+    });
+
+    // Gry turnieju zaznacza każdy w pokoju; spory rozstrzygają gracze między sobą, nie aplikacja.
+    this.on("markGame", (client, { id, mark: state }) => {
+      if (!this.players.has(client.sessionId) || this.phase !== "lobby" || !this.tournament) return;
+      const config = mark(this.tournament.config, id, state, MINI_GAME_IDS);
+      if (!config) return;
+      this.tournament = create(config);
       this.resetReady();
     });
 

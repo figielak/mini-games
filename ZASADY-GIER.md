@@ -541,7 +541,10 @@ Seria mini-gier puszczana po kolei w jednym pokoju. To nie jest gra z rejestru `
 (instrukcja, limit, wynik i ranking jak w sekcji 1), a pokój sumuje punkty. Zasady w `turniej.ts`, przebieg w `LobbyRoom.ts`.
 
 - Gracze: wszyscy z miejscem (1-6). Skład jest stały na cały turniej; kto dołączy w trakcie, ogląda.
-- Konfiguracja gospodarza `{ length, must, skip }` (wiadomość pokoju `pickTournament`, sprawdza ją `cleanConfig`):
+- Konfiguracja `{ length, must, skip }` (sprawdza ją `cleanConfig`). Liczbę gier ustawia gospodarz (wiadomość pokoju `pickTournament`),
+  a gry zaznacza **każdy w pokoju**, także oglądający (wiadomość `markGame`: jedna gra na raz, `must`, `skip` albo `any`, funkcja `mark`).
+  Lista jest wspólna i wygrywa ostatnie zaznaczenie; spory gracze rozstrzygają między sobą, aplikacja ich nie rozsądza.
+  Każda zmiana kasuje gotowość gości.
   - `length`: liczba gier, od `MIN_LENGTH` (3) do liczby niewykluczonych mini-gier, domyślnie `DEFAULT_LENGTH` (8); wartość spoza zakresu jest przycinana,
   - `must`: gry, które będą na pewno; gdy jest ich więcej niż `length`, długość rośnie do ich liczby,
   - `skip`: gry wykluczone; po wykluczeniu muszą zostać co najmniej 3 gry,

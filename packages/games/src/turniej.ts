@@ -7,7 +7,7 @@ export const DEFAULT_LENGTH = 8;
 /** Tyle widać wyniki gry i tabelę, zanim następna gra ruszy sama. */
 export const NEXT_SECONDS = 15;
 
-/** Ustawienia gospodarza: liczba gier, gry, które będą na pewno, i gry wykluczone. Resztę losuje serwer. */
+/** Ustawienia turnieju: liczba gier (gospodarz), gry, które będą na pewno, i gry wykluczone (zaznacza każdy). Resztę losuje serwer. */
 export interface Config {
   length: number;
   must: string[];
@@ -45,6 +45,15 @@ export function cleanConfig(raw: Config, pool: string[]): Config | null {
   const available = pool.length - skip.length;
   if (available < MIN_LENGTH) return null;
   return { length: Math.max(MIN_LENGTH, must.length, Math.min(raw.length, available)), must, skip };
+}
+
+export type Mark = "must" | "skip" | "any";
+
+/** Zaznaczenie jednej gry (na pewno, bez albo z powrotem losowo); ostatnie zaznaczenie wygrywa. Null, gdy się nie da. */
+export function mark(config: Config, id: string, state: Mark, pool: string[]): Config | null {
+  if (!pool.includes(id)) return null;
+  const list = (ids: string[], on: boolean) => [...ids.filter((g) => g !== id), ...(on ? [id] : [])];
+  return cleanConfig({ length: config.length, must: list(config.must, state === "must"), skip: list(config.skip, state === "skip") }, pool);
 }
 
 export const create = (config: Config): Tournament => ({ config, games: [], index: 0, points: [], extra: false });

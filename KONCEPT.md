@@ -123,7 +123,8 @@ Po partii ekran podsumowania (`KampusSummary.tsx`): wykres majątku, zapłacone 
 
 - Seria mini-gier puszczana po kolei w jednym pokoju, 1-6 graczy. To nie jest gra z rejestru `GAMES`: pokój odpala kolejne mini-gry
   zwykłym `startMatch` i sumuje punkty (zasady w `turniej.ts`, czyste funkcje).
-- Gospodarz ustawia liczbę gier (3 do liczby niewykluczonych, domyślnie 8) i może każdą mini-grę oznaczyć jako pewną albo wykluczoną; resztę losuje serwer.
+- Gospodarz ustawia liczbę gier (3 do liczby niewykluczonych, domyślnie 8). Każdą mini-grę można oznaczyć jako pewną albo wykluczoną;
+  lista jest wspólna i zaznacza ją każdy w pokoju (spory rozstrzygają gracze, nie aplikacja). Resztę losuje serwer.
 - Punkty za grę: liczba graczy ze ściśle gorszym miejscem (remisujący dostają tyle samo). Tabela: suma punktów, potem wygrane gry.
 - Po każdej grze widać jej wyniki i tabelę; następna rusza po „Dalej” od wszystkich albo sama po 15 s.
 - Remis na szczycie po ostatniej grze daje jedną dogrywkę (dolosowana gra); po niej remis zostaje bez zwycięzcy.
@@ -188,7 +189,7 @@ Wspólne pomocnicze w `core.ts`: `createRng` (mulberry32), `roomCode`, `rankResu
   zmiana trybu kasuje gotowość gości), gracze i start; gospodarz wraca do listy gier przez `pickGame` z `null`.
 - Mini-gry mają osobny ekran z listą (`MiniGames.tsx`); otwiera go kafel u gospodarza (lokalnie, bez stanu w pokoju), a goście widzą go,
   gdy gospodarz wybierze grę. Mini-gry mają zasady narzucone z góry, bez trybów.
-- Turniej ma ekran ustawień (`TournamentSetup` w `Setup.tsx`): wiadomość `pickTournament` niesie całą konfigurację i kasuje gotowość gości.
+- Turniej ma ekran ustawień (`TournamentSetup` w `Setup.tsx`): `pickTournament` (gospodarz) ustawia liczbę gier, `markGame` (każdy) zaznacza jedną grę; obie kasują gotowość gości.
   W trakcie turnieju `gameId` to bieżąca gra, a `tournament` w `RoomView` niesie listę gier i punkty; „Dalej” między grami to wiadomość `rematch`.
 - Limit 3 pokoi na IP, rate limit 10 wiadomości/s na klienta.
 

@@ -60,8 +60,10 @@ export function cleanNick(raw: unknown): string | null {
 export const ROOM_MESSAGES = {
   // null: gospodarz wraca z ekranu gry do listy gier.
   pickGame: z.object({ gameId: z.string().nullable() }),
-  // Wybór turnieju i każda zmiana jego ustawień; zakres i znane gry sprawdza cleanConfig.
-  pickTournament: z.object({ length: z.number(), must: z.array(z.string()).max(64), skip: z.array(z.string()).max(64) }),
+  // Wybór turnieju i zmiana liczby gier (gospodarz); zakres sprawdza cleanConfig.
+  pickTournament: z.object({ length: z.number() }),
+  // Zaznaczenie jednej gry turnieju: na pewno, bez albo z powrotem losowo. Może każdy w pokoju.
+  markGame: z.object({ id: z.string(), mark: z.enum(["must", "skip", "any"]) }),
   pickMode: z.object({ mode: z.string() }),
   toggleSeat: z.object({ id: z.string() }),
   pickColor: z.object({ color: z.enum(PLAYER_COLORS) }),

@@ -74,7 +74,7 @@ export function Lobby({ view, me, dropped, send, onLeave, onMini }: Props) {
               .map((g) => (
                 <GameTile key={g.id} game={g} players={view.players.length} onClick={() => send("pickGame", { gameId: g.id })} />
               ))}
-            <Tile icon={Trophy} name="Turniej" hint={`1-${MAX_PLAYERS} os.`} onClick={() => send("pickTournament", { length: DEFAULT_LENGTH, must: [], skip: [] })} />
+            <Tile icon={Trophy} name="Turniej" hint={`1-${MAX_PLAYERS} os.`} onClick={() => send("pickTournament", { length: DEFAULT_LENGTH })} />
             <Tile icon={GameController} name="Mini-gry" hint={`${MINI_GAMES.length} gier`} onClick={onMini} />
           </div>
         </section>

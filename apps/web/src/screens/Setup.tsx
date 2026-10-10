@@ -63,20 +63,19 @@ export function Setup({ view, me, dropped, send, onLeave }: Props) {
 }
 
 /**
- * Ekran turnieju przed startem: liczba gier i dobór mini-gier. Każdą grę da się oznaczyć jako pewną albo wykluczoną,
- * resztę losuje serwer. Każda zmiana leci do pokoju jako cała konfiguracja; goście widzą to samo tylko do odczytu.
+ * Ekran turnieju przed startem: liczba gier (gospodarz) i dobór mini-gier. Każdą grę da się oznaczyć jako pewną albo wykluczoną,
+ * resztę losuje serwer. Gry zaznacza każdy w pokoju, lista jest wspólna; spory gracze rozstrzygają między sobą.
  */
 export function TournamentSetup({ view, me, dropped, send, onLeave }: Props) {
   const isHost = view.hostId === me;
   const { length, must, skip } = view.tournament!.config;
   const available = MINI_GAMES.length - skip.length;
-  const pick = (config: { length?: number; must?: string[]; skip?: string[] }) => send("pickTournament", { length, must, skip, ...config });
+  const pick = (config: { length: number }) => send("pickTournament", config);
 
   // Dotknięcie przełącza: losowo → na pewno → bez → losowo. Wykluczyć się nie da, gdy zostałoby za mało gier.
   function cycle(id: string) {
-    if (skip.includes(id)) return pick({ skip: skip.filter((g) => g !== id) });
-    if (!must.includes(id)) return pick({ must: [...must, id] });
-    pick({ must: must.filter((g) => g !== id), skip: available > MIN_LENGTH ? [...skip, id] : skip });
+    const next = skip.includes(id) ? "any" : !must.includes(id) ? "must" : available > MIN_LENGTH ? "skip" : "any";
+    send("markGame", { id, mark: next });
   }
 
   return (
@@ -134,10 +133,9 @@ export function TournamentSetup({ view, me, dropped, send, onLeave }: Props) {
               <button
                 key={g.id}
                 type="button"
-                disabled={!isHost}
                 aria-label={`${g.name}: ${state}`}
                 className={`flex min-h-12 items-center gap-2 rounded-inset border px-3 py-2 text-left text-sm transition-colors ${
-                  state === "na pewno" ? "border-accent bg-accent-soft" : state === "bez" ? "border-line text-fg-muted line-through opacity-50" : "border-line enabled:hover:border-line-hover"
+                  state === "na pewno" ? "border-accent bg-accent-soft" : state === "bez" ? "border-line text-fg-muted line-through opacity-50" : "border-line hover:border-line-hover"
                 }`}
                 onClick={() => cycle(g.id)}
               >
@@ -149,7 +147,7 @@ export function TournamentSetup({ view, me, dropped, send, onLeave }: Props) {
             );
           })}
         </div>
-        {isHost && <p className="px-1 text-sm text-fg-muted">Dotknij gry, żeby była na pewno; drugie dotknięcie ją wyklucza, trzecie wraca do losowania.</p>}
+        <p className="px-1 text-sm text-fg-muted">Lista jest wspólna, zaznaczać może każdy. Dotknij gry, żeby była na pewno; drugie dotknięcie ją wyklucza, trzecie wraca do losowania.</p>
       </section>
 
       <Players view={view} me={me} send={send} />
