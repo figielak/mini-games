@@ -29,6 +29,7 @@ Reguły platformy (limit tury, rewanż, walkower, obserwatorzy) są w `KONCEPT.m
 | Rytm | `rytm` | 1-6 | 60 s | mini-gra |
 | Inny element | `inny` | 1-6 | 90 s | mini-gra |
 | Obrót | `obrot` | 1-6 | 90 s | mini-gra |
+| Mapa | `mapa` | 1-6 | 180 s | mini-gra |
 
 Nazwy w UI zmieniały się (2026-10-10), `id`, nazwy plików i typów zostały stare: Sekwencja = `simon`, Kolor liter = `stroop`,
 Odcień = `kolor`, Gomoku = `piec-w-rzedzie`. Ranking w SQLite jest po `id`, więc `id` nie wolno zmieniać.
@@ -39,7 +40,7 @@ Odcień = `kolor`, Gomoku = `piec-w-rzedzie`. Ranking w SQLite jest po `id`, wi�
   więc nic nie jest ukryte (da się podejrzeć; świadoma decyzja, komentarze `ponytail:`).
 - Partia toczy się na kliencie. Każdy gracz wysyła jeden ruch `{ type: "result", ... }`; drugi ruch tego samego gracza jest odrzucany.
   Wyjątki: Narysuj koło (do 10 ruchów na gracza), Tabela Schultego, Policz kropki, Który rok? i Wieża (dodatkowy ruch `progress` po każdym trafieniu, rundzie albo klocku).
-- Serwer odrzuca tylko nierealne wartości. Wynik liczy serwer tam, gdzie się da (Narysuj koło, Odcień, Policz kropki, Który rok?, Środek, Stój!, Śledzenie, Wieża, Rytm),
+- Serwer odrzuca tylko nierealne wartości. Wynik liczy serwer tam, gdzie się da (Narysuj koło, Odcień, Policz kropki, Który rok?, Środek, Stój!, Śledzenie, Wieża, Rytm, Mapa),
   w reszcie ufa klientowi.
 - Partia zaczyna się ekranem instrukcji (platforma, nie zasady gry): każdy klika „Start” osobno (wiadomość pokoju `begin`) i gra od razu,
   po `INTRO_SECONDS` (15 s) gra rusza sama. Limit tury startuje, gdy wystartują wszyscy albo minie 15 s; wynik oddany wcześniej go nie uruchamia.
@@ -303,6 +304,26 @@ Przebieg, walidacja i ekran końcowy jak w Kolorze liter (`quiz.ts`, `Quiz.tsx`)
   Liczy go klient jak w Kolorze liter (serwer zna `mirror`, więc mógłby liczyć sam z listy odpowiedzi, gdyby ktoś zaczął oszukiwać).
 - Limit czasu: zero trafień i zero pomyłek.
 - Ekran końcowy: tabela z punktami, średnim czasem i błędami (jak w Stój!).
+
+### Mapa (`mapa`)
+- 10 rund, w każdej nazwa miasta; gracz wskazuje je na konturze Polski (sam kontur, bez rzek i województw).
+- Serwer losuje 10 różnych miast z puli 62 (`CITIES` w `mapa-dane.ts`), te same i w tej samej kolejności dla wszystkich.
+  Pula to miasta od ok. 55 tys. mieszkańców; z konurbacji śląskiej tylko Katowice i Gliwice, bez miast przyklejonych do większych
+  (Sosnowiec, Pabianice, Pruszków), bo różnica kilku km byłaby zgadywaniem.
+- Pole gry to prostokąt geograficzny `BOUNDS` (13,9-24,3°E, 48,9-54,95°N), odwzorowanie liniowe: `x` to długość, `y` szerokość (północ u góry).
+  Kafel ma proporcje `ASPECT` (szerokość pola ściśnięta `cos 52°`), więc Polska wygląda jak na zwykłej mapie; zniekształcenie
+  na północy i południu do ok. 6% dotyczy tylko rysunku, nie wyniku.
+- Jeden ruch z 10 punktami (`x`, `y` w ułamkach pola). Wynik liczy serwer, więc nie zależy od rozmiaru telefonu.
+- Błąd rundy = odległość po ortodromie (haversine, R = 6371 km) od wskazanego punktu do miasta, zaokrąglona do pełnych km.
+  Wynik = suma z 10 rund w km (int), mniej lepiej.
+- Punkt poza konturem Polski jest ważną odpowiedzią (liczy się sama odległość). Punkt poza polem (`x` albo `y` poza 0-1) odrzuca cały ruch.
+- Pusta lista = limit czasu = 10 × 1000 km (`MAX_ERROR`, więcej niż przekątna pola, czyli niż najgorsza uczciwa runda).
+- Limit 180 s na całą partię, bez limitu na rundę.
+- Kontur (`OUTLINE`) pochodzi z Natural Earth 1:50m (domena publiczna), uproszczony do 126 punktów (dokładność ok. 2 km).
+- Ekran: nazwa miasta nad mapą, dotknięcie stawia znacznik w kolorze gracza, kolejne dotknięcie albo przeciągnięcie go przenosi,
+  „Zatwierdź” kończy rundę. Potem przez 1,5 s widać prawdziwe miejsce (pierścień), linię do znacznika i odległość w km:
+  do 20 km na zielono z „Idealnie!”, ponad 150 km kolorem ostrzeżenia.
+- Ekran końcowy: suma każdego gracza i tabela rund (miasto, km każdego gracza, najlepszy w rundzie na tle w swoim kolorze).
 
 ## 2. Gomoku (`piec-w-rzedzie`)
 
