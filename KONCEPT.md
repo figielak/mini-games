@@ -67,7 +67,10 @@ Po partii ekran podsumowania (`KampusSummary.tsx`): wykres majątku, zapłacone 
 ### 2.3a Chińczyk (spoza pierwotnego planu)
 
 - 2-4 graczy, wyjście tylko na 6, 3 próby, gdy żaden pionek nie stoi na torze, 6 = kolejny rzut, max 3 szóstki z rzędu.
-- Gra toczy się do pełnego rankingu (`isOver` zwraca `ranking`). Jedyny możliwy ruch wykonuje się sam.
+- Pole startowe z pionkiem właściciela jest bezpieczne (rywal nie może na nim stanąć); w domku końcowym nie wolno przeskakiwać własnych pionków.
+- Dwa tryby w lobby: Klasyczny (jak wyżej, 4 pionki, pełny ranking, 60 s) i Szybki (pionek na starcie, wyjście na 1 i 6,
+  nadwyżka oczek do domku przepada, dodatkowy rzut za zbicie i wejście do domku, koniec po pierwszym graczu z 3 pionkami, 20 s, szybsze animacje).
+- Klasyczny toczy się do pełnego rankingu (`isOver` zwraca `ranking`). Jedyny możliwy ruch wykonuje się sam.
 
 ### 2.4 Mini-gry (przerywniki)
 
@@ -142,7 +145,7 @@ Wspólne pomocnicze w `core.ts`: `createRng` (mulberry32), `roomCode`, `rankResu
 - Gracze bez miejsca oglądają partię. Nowy gracz dostaje miejsce sam, jeśli gra wybrana i jest wolne.
 - Rewanż po zgodzie wszystkich grających, kolejność miejsc rotuje; do lobby może wrócić każdy.
 - Limit tury: 60 s w większości gier; dłużej w Sekwencji (300 s), Tabeli Schultego i Odcieniu (180 s),
-  Narysuj koło i Policz kropki (120 s); Państwa-miasta mają limit per faza, Statki 90 s na całe rozstawianie.
+  Narysuj koło i Policz kropki (120 s); Państwa-miasta mają limit per faza, Statki 90 s na całe rozstawianie, Chińczyk w trybie Szybkim 20 s.
 - Gdy gracz z miejscem zniknie z pokoju w trakcie partii (wyjdzie sam albo nie wróci w 10 minut), partia się kończy:
   jeśli został jeden gracz, wygrywa walkowerem; przy większej liczbie kończy się bez zwycięzcy.
 - Lobby: gospodarz wybiera grę (i tryb, jeśli gra ma `modes`; zmiana trybu kasuje gotowość gości) i daje start, goście potwierdzają gotowość; każdy może zmienić swój kolor
