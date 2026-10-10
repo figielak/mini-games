@@ -47,13 +47,15 @@ const tint = (color: string, lightness: number, chroma: number) => `oklch(from $
 /** Meta miejsca bez gracza: ledwo widoczna. */
 const UNUSED = mix("var(--color-fg)", 6);
 
-/** Tempo animacji: krok pionka o jedno pole i czas turlania kostki. */
+/** Tempo animacji: krok pionka o jedno pole i czas turlania kostki; w trybie Szybkim krótsze. */
 const STEP_MS = 180;
 const ROLL_MS = 700;
+const QUICK_STEP_MS = 110;
+const QUICK_ROLL_MS = 400;
 const reducedMotion = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /** Czy kostka się właśnie turla: przez chwilę po każdym nowym rzucie (nie po odświeżeniu strony). */
-function useRolling(roll: number | undefined): boolean {
+function useRolling(roll: number | undefined, rollMs: number): boolean {
   const last = useRef(roll);
   const [rolling, setRolling] = useState(false);
   useEffect(() => {
@@ -61,9 +63,9 @@ function useRolling(roll: number | undefined): boolean {
     last.current = roll;
     if (reducedMotion) return;
     setRolling(true);
-    const t = setTimeout(() => setRolling(false), ROLL_MS);
+    const t = setTimeout(() => setRolling(false), rollMs);
     return () => clearTimeout(t);
-  }, [roll]);
+  }, [roll, rollMs]);
   return rolling;
 }
 
@@ -71,7 +73,7 @@ function useRolling(roll: number | undefined): boolean {
  * Pozycje pionków do wyświetlenia: pionek idzie pole po polu (wyjście z domku to jeden krok).
  * Zbicia i dalekie skoki (powrót po zerwanym połączeniu) zmieniają się od razu, ale dopiero gdy nikt już nie idzie.
  */
-function useWalk(target: Record<string, number[]>, paused: boolean): Record<string, number[]> {
+function useWalk(target: Record<string, number[]>, paused: boolean, stepMs: number): Record<string, number[]> {
   const [shown, setShown] = useState(target);
   useEffect(() => {
     if (paused) return;
@@ -84,9 +86,9 @@ function useWalk(target: Record<string, number[]>, paused: boolean): Record<stri
     if (reducedMotion || !ids.some((p) => target[p].some((_, i) => walking(p, i)))) return setShown(target);
     const t = setTimeout(() => {
       setShown((prev) => Object.fromEntries(ids.map((p) => [p, (prev[p] ?? target[p]).map((pos, i) => (walking(p, i) ? (pos < 0 ? 0 : pos + 1) : pos))])));
-    }, STEP_MS);
+    }, stepMs);
     return () => clearTimeout(t);
-  }, [shown, target, paused]);
+  }, [shown, target, paused, stepMs]);
   return shown;
 }
 
@@ -114,8 +116,9 @@ export function Chinczyk({ view, me, players, canMove, onMove }: Props) {
   const color = (id: string) => players.find((p) => p.id === id)?.color ?? "#8b8b92";
   const nick = (id: string) => players.find((p) => p.id === id)?.nick ?? "?";
   const last = view.last;
-  const rolling = useRolling(last?.roll);
-  const shown = useWalk(view.pawns, rolling);
+  const quick = view.mode === "szybki";
+  const rolling = useRolling(last?.roll, quick ? QUICK_ROLL_MS : ROLL_MS);
+  const shown = useWalk(view.pawns, rolling, quick ? QUICK_STEP_MS : STEP_MS);
   const settled = !rolling && view.players.every((p) => shown[p]?.every((pos, i) => pos === view.pawns[p][i]));
   const myMove = canMove && settled && view.phase === "move";
 
@@ -158,9 +161,8 @@ export function Chinczyk({ view, me, players, canMove, onMove }: Props) {
     });
   }
 
-  // Podgląd celu wybranego pionka (jak w regułach: z domku startowego na pole 0).
-  const from = pick !== null ? view.pawns[me][pick] : null;
-  const to = from === null ? null : from < 0 ? 0 : from + view.dice!;
+  // Podgląd celu wybranego pionka; cel liczy serwer (w trybie Szybkim nadwyżka oczek przepada).
+  const to = pick !== null ? (view.targets[pick] ?? null) : null;
   const targetKey = to === null ? null : key(cellOf(me, to, pick!));
   const victim = targetKey === null ? undefined : cells.get(targetKey)?.pawn;
   const capture = victim && victim.player !== me ? victim.player : null;
@@ -171,13 +173,17 @@ export function Chinczyk({ view, me, players, canMove, onMove }: Props) {
     if (last.note === "none") {
       if (last.dice === 6) return "Brak ruchu, ale szóstka daje kolejny rzut.";
       if (view.pawns[last.player].some((p) => p >= 0 && p < TRACK)) return "Brak możliwego ruchu.";
-      return view.turn === last.player ? `Bez szóstki. Próba ${4 - view.tries} z 3.` : "Bez szóstki, tura przechodzi.";
+      const miss = quick ? "Bez 1 i 6" : "Bez szóstki";
+      return view.turn === last.player ? `${miss}. Próba ${4 - view.tries} z 3.` : `${miss}, tura przechodzi.`;
     }
     if (!last.move || !settled) return null;
     if (last.move.to >= TRACK && view.ranking.includes(last.player))
       return `${nick(last.player)} kończy na ${view.ranking.indexOf(last.player) + 1}. miejscu!`;
-    if (last.move.captured.length) return `${nick(last.player)} zbija: ${last.move.captured.map(nick).join(", ")}!`;
-    if (last.dice === 6 && view.turn === last.player) return "Szóstka, kolejny rzut.";
+    const again = view.turn === last.player;
+    if (last.move.captured.length)
+      return `${nick(last.player)} zbija: ${last.move.captured.map(nick).join(", ")}!${again && last.dice !== 6 ? " Kolejny rzut." : ""}`;
+    if (last.dice === 6 && again) return "Szóstka, kolejny rzut.";
+    if (again && last.move.from < TRACK && last.move.to >= TRACK) return "Pionek w domku, kolejny rzut.";
     return null;
   })();
 
