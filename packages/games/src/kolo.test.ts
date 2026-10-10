@@ -53,6 +53,18 @@ describe("ocena", () => {
     expect(s).toBeLessThanOrEqual(950);
   });
 
+  test("zwraca dopasowany okrąg (klient pokazuje go po próbie)", () => {
+    const { circle: c } = judge(circle({ cx: 0.4, cy: 0.6, r: 0.25 }));
+    expect(c!.cx).toBeCloseTo(0.4);
+    expect(c!.cy).toBeCloseTo(0.6);
+    expect(c!.r).toBeCloseTo(0.25);
+  });
+
+  test("lekki owal 1,2:1 > 50%", () => {
+    const oval = circle().map(([x, y]): Point => [x, 0.5 + (y - 0.5) / 1.2]);
+    expect(score(oval)).toBeGreaterThan(500);
+  });
+
   test("kwadrat < 60%", () => expect(score(square())).toBeLessThan(600));
 
   test("elipsa 2:1 < 40%", () => {
