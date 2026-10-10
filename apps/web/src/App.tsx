@@ -1,11 +1,12 @@
 import type { Room } from "@colyseus/sdk";
-import type { RoomView } from "@mini-games/games";
+import { GAMES, type RoomView } from "@mini-games/games";
 import { CloseCode } from "@colyseus/sdk";
 import { useEffect, useState } from "react";
 import { forgetRoom, resumeRoom, watchRoom } from "./net.ts";
 import { Home } from "./screens/Home.tsx";
 import { Game } from "./screens/Game.tsx";
 import { Lobby } from "./screens/Lobby.tsx";
+import { Setup } from "./screens/Setup.tsx";
 
 export function App() {
   const [room, setRoom] = useState<Room | null>(null);
@@ -40,5 +41,8 @@ export function App() {
   if (!room) return <Home onRoom={setRoom} notice={notice} />;
   const send = (type: string, payload?: unknown) => room.send(type, payload);
   if (view && view.phase !== "lobby") return <Game view={view} me={room.sessionId} dropped={dropped} send={send} />;
-  return <Lobby view={view} me={room.sessionId} dropped={dropped} send={send} onLeave={() => room.leave()} />;
+  const lobby = { me: room.sessionId, dropped, send, onLeave: () => room.leave() };
+  // Gra główna ma własny ekran przed partią; mini-gry startują prosto z listy w lobby.
+  if (view?.gameId && GAMES[view.gameId]?.minPlayers > 1) return <Setup view={view} {...lobby} />;
+  return <Lobby view={view} {...lobby} />;
 }
