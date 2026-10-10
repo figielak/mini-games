@@ -7,7 +7,7 @@ import { Home } from "./screens/Home.tsx";
 import { Game } from "./screens/Game.tsx";
 import { Lobby } from "./screens/Lobby.tsx";
 import { MiniGames } from "./screens/MiniGames.tsx";
-import { Setup } from "./screens/Setup.tsx";
+import { Setup, TournamentSetup } from "./screens/Setup.tsx";
 
 export function App() {
   const [room, setRoom] = useState<Room | null>(null);
@@ -47,6 +47,7 @@ export function App() {
   const me = room.sessionId;
   const screen = { me, dropped, send, onLeave: () => room.leave() };
   const def = view?.gameId ? GAMES[view.gameId] : undefined;
+  if (view?.tournament) return <TournamentSetup view={view} {...screen} />;
   // Gra główna ma własny ekran przed partią; mini-gry wybiera się na osobnej liście.
   if (view && def && def.minPlayers > 1) return <Setup view={view} {...screen} />;
   if (view && (def || (mini && view.hostId === me))) {
@@ -56,5 +57,5 @@ export function App() {
     };
     return <MiniGames view={view} {...screen} onBack={back} />;
   }
-  return <Lobby view={view} {...screen} onMini={() => setMini(true)} onTournament={() => {}} />;
+  return <Lobby view={view} {...screen} onMini={() => setMini(true)} />;
 }

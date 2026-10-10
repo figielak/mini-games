@@ -1,6 +1,6 @@
-import { ArrowCounterClockwise, Check, Timer, Trophy, UsersThree } from "@phosphor-icons/react";
-import { CHINCZYK_TRACK, type ChinczykView, GAMES, type InnyView, type KampusTourView, type KatView, type KolorView, type KoloView, type KropkiView, type LiczenieView, type MapaView, type MemoryView, type ObrotView, type PanstwaMiastaView, type PiecWRzedzieView, QUIZ_DURATION_MS, type RefleksView, type RokView, type RoomView, type RytmView, type SledzenieView, ROK_ROUNDS, SCHULTE_SIZE, type SchulteView, type SimonView, type SrodekView, type StatkiView, type StojView, type StoperView, type StroopView, WIEZA_LEVELS, type WiezaView } from "@mini-games/games";
-import { useEffect, useMemo, useState } from "react";
+import { ArrowCounterClockwise, ArrowRight, Check, Timer, Trophy, UsersThree } from "@phosphor-icons/react";
+import { CHINCZYK_TRACK, type ChinczykView, GAMES, type InnyView, isDone, type KampusTourView, type KatView, type KolorView, type KoloView, type KropkiView, type LiczenieView, type MapaView, type MemoryView, type ObrotView, type PanstwaMiastaView, type PiecWRzedzieView, QUIZ_DURATION_MS, type RefleksView, type RokView, type RoomView, type RytmView, type SledzenieView, ROK_ROUNDS, SCHULTE_SIZE, type SchulteView, type SimonView, type SrodekView, standings, type StatkiView, type StojView, type StoperView, type StroopView, WIEZA_LEVELS, type WiezaView, winner as tournamentWinner } from "@mini-games/games";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { Chinczyk } from "../games/Chinczyk.tsx";
 import { KampusTour } from "../games/KampusTour.tsx";
 import { Kolo } from "../games/Kolo.tsx";
@@ -94,20 +94,36 @@ export function Game({ view, me, dropped, send }: Props) {
   const rok = def.id === "rok" && view.phase === "playing" ? (game.view as RokView) : null;
   const myColor = view.players.find((p) => p.id === me)?.color;
   const winner = view.phase === "over" ? game.result?.winner : undefined;
-  const winnerColor = view.players.find((p) => p.id === winner)?.color;
+  // Turniej: w nagłówku numer gry i punkty; po ostatniej grze tytuł ogłasza zwycięzcę turnieju, nie gry.
+  const t = view.tournament;
+  const table = t ? standings(t, view.seats) : null;
+  const tournamentOver = !!t && view.phase === "over" && isDone(t);
+  const champion = t && tournamentOver ? tournamentWinner(t, view.seats) : undefined;
+  const headline = tournamentOver ? champion : winner;
+  const winnerColor = view.players.find((p) => p.id === headline)?.color;
+  // W trakcie gry `index` to gry już rozegrane, po grze obejmuje też tę na ekranie.
+  const gameNo = t ? t.index + (view.phase === "playing" ? 1 : 0) : 0;
 
   // Państwa-miasta w trakcie partii mają własny nagłówek: runda, pasek czasu fazy, litera.
   const ownHeader = def.id === "panstwa-miasta" && view.phase === "playing";
 
   const status =
-    view.phase === "over"
-      ? game.result?.winner
-        ? game.result.winner === me
-          ? "Wygrywasz!"
-          : `Wygrywa ${nick(game.result.winner)}`
-        : game.result?.ranking?.length === 1
-          ? "Koniec"
-          : "Remis"
+    tournamentOver
+      ? champion
+        ? champion === me
+          ? "Wygrywasz turniej!"
+          : `Turniej wygrywa ${nick(champion)}`
+        : view.seats.length > 1
+          ? "Turniej: remis"
+          : "Koniec turnieju"
+      : view.phase === "over"
+        ? game.result?.winner
+          ? game.result.winner === me
+            ? "Wygrywasz!"
+            : `Wygrywa ${nick(game.result.winner)}`
+          : game.result?.ranking?.length === 1
+            ? "Koniec"
+            : "Remis"
       : myTurn
         ? (game.view as { phase?: string }).phase === "placing"
           ? "Ustaw statki"
@@ -127,11 +143,17 @@ export function Game({ view, me, dropped, send }: Props) {
       <Screen dropped={dropped}>
         {!ownHeader && (
           <header className="tile flex flex-col gap-3 p-4">
+            {t && (
+              <p className="label">
+                Turniej · {t.extra && gameNo === t.games.length ? "dogrywka" : `gra ${gameNo}/${t.games.length}`}
+                {view.phase === "over" && !tournamentOver && ` · ${def.name}`}
+              </p>
+            )}
             <div className="flex items-center justify-between gap-3">
               {/* Koniec partii: tytuł w kolorze zwycięzcy; podbicie tylko u niego, przegrany dostaje spokojną wersję. */}
               <h1
-                className={`origin-left text-xl font-semibold ${winner === me ? "animate-[title-pop_0.5s_cubic-bezier(0.2,0.8,0.4,1)]" : ""}`}
-                style={{ color: winner ? winnerColor : myTurn ? myColor : undefined }}
+                className={`origin-left text-xl font-semibold ${headline === me ? "animate-[title-pop_0.5s_cubic-bezier(0.2,0.8,0.4,1)]" : ""}`}
+                style={{ color: headline ? winnerColor : myTurn ? myColor : undefined }}
               >
                 {status}
               </h1>
@@ -186,6 +208,10 @@ export function Game({ view, me, dropped, send }: Props) {
                       <Progress done={wieza.results[id]?.height ?? wieza.progress[id] ?? 0} total={WIEZA_LEVELS} color={p?.color} />
                     ) : rok ? (
                       <Progress done={id in rok.results ? ROK_ROUNDS : (rok.progress[id] ?? 0)} total={ROK_ROUNDS} color={p?.color} />
+                    ) : table ? (
+                      <span className="font-mono text-sm font-semibold text-fg tabular-nums" aria-label={`Punkty w turnieju: ${table.find((r) => r.id === id)?.total ?? 0}`}>
+                        {table.find((r) => r.id === id)?.total ?? 0} pkt
+                      </span>
                     ) : (
                       // Puchar odróżnia wygrane partie w pokoju od wyniku bieżącej partii.
                       <span className="relative flex items-center gap-1 text-base font-semibold text-fg tabular-nums" aria-label={`Wygrane partie: ${view.scores[id] ?? 0}`}>
@@ -496,9 +522,38 @@ export function Game({ view, me, dropped, send }: Props) {
           </ol>
         )}
 
+        {view.phase === "over" && t && table && (
+          <section className="tile p-4">
+            <h2 className="label mb-2">{tournamentOver ? "Wyniki turnieju" : "Tabela turnieju"}</h2>
+            <ol className="flex flex-col gap-1">
+              {table.map((r, i) => (
+                <li key={r.id} className="flex items-center gap-3">
+                  <span className="w-5 font-mono text-fg-muted">{i + 1}.</span>
+                  <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: view.players.find((p) => p.id === r.id)?.color }} aria-hidden />
+                  <span className="min-w-0 flex-1 truncate">
+                    {nick(r.id)}
+                    {r.id === me && <span className="text-fg-muted"> (ty)</span>}
+                  </span>
+                  {tournamentOver ? (
+                    <span className="flex items-center gap-1 font-mono text-sm text-fg-muted" aria-label={`Wygrane gry: ${r.wins}`}>
+                      <Trophy size={14} weight="fill" aria-hidden />
+                      {r.wins}
+                    </span>
+                  ) : (
+                    <span className="font-mono text-sm text-fg-muted" aria-label={`Za tę grę: ${r.last}`}>
+                      +{r.last}
+                    </span>
+                  )}
+                  <span className="w-14 text-right font-mono font-semibold tabular-nums">{r.total} pkt</span>
+                </li>
+              ))}
+            </ol>
+          </section>
+        )}
+
         {view.phase === "over" && (
           <div className="mt-auto flex flex-col gap-2 pt-4">
-            <OverActions view={view} me={me} send={send} />
+            {t && !tournamentOver ? <NextActions view={view} me={me} send={send} countdown={<Countdown game={game} />} /> : <OverActions view={view} me={me} send={send} />}
           </div>
         )}
       </Screen>
@@ -551,6 +606,34 @@ function OverActions({ view, me, send }: { view: RoomView; me: string; send: Sen
       <button type="button" className="btn btn-ghost flex-1" onClick={() => send("toLobby")}>
         Do lobby
       </button>
+    </>
+  );
+}
+
+/** Między grami turnieju: „Dalej” od wszystkich grających odpala następną grę od razu, inaczej rusza sama po limicie. */
+function NextActions({ view, me, send, countdown }: { view: RoomView; me: string; send: Send; countdown: ReactNode }) {
+  const t = view.tournament!;
+  const waiting = view.players.filter((p) => view.seats.includes(p.id) && !p.ready);
+  const iWant = view.seats.includes(me) && !waiting.some((p) => p.id === me);
+  return (
+    <>
+      <p className="flex items-center justify-center gap-3 text-sm" role="status">
+        <span>
+          Następna gra: <span className="font-semibold">{t.extra && t.index === t.games.length - 1 ? "dogrywka, " : ""}{GAMES[t.games[t.index]]?.name}</span>
+        </span>
+        {countdown}
+      </p>
+      {view.seats.includes(me) && (
+        <button type="button" className="btn btn-primary w-full" disabled={iWant} onClick={() => send("rematch")}>
+          {!iWant && <ArrowRight size={18} weight="bold" aria-hidden />}
+          <span className="truncate">{iWant ? `Czekamy na: ${waiting.map((p) => p.nick).join(", ")}…` : "Dalej"}</span>
+        </button>
+      )}
+      {view.hostId === me && (
+        <button type="button" className="btn btn-ghost w-full" onClick={() => send("toLobby")}>
+          Zakończ turniej
+        </button>
+      )}
     </>
   );
 }

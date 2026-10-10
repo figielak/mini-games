@@ -34,7 +34,7 @@ import {
   Timer,
   Trophy,
 } from "@phosphor-icons/react";
-import { GAMES, type LobbyPlayer, MAX_PLAYERS, PLAYER_COLORS, type RoomView } from "@mini-games/games";
+import { DEFAULT_LENGTH, GAMES, type LobbyPlayer, MAX_PLAYERS, PLAYER_COLORS, type RoomView } from "@mini-games/games";
 import { useState } from "react";
 import { Screen, type Send, StickyBar } from "./ui.tsx";
 
@@ -46,10 +46,9 @@ interface Props {
   send: Send;
   onLeave: () => void;
   onMini: () => void;
-  onTournament: () => void;
 }
 
-export function Lobby({ view, me, dropped, send, onLeave, onMini, onTournament }: Props) {
+export function Lobby({ view, me, dropped, send, onLeave, onMini }: Props) {
   if (!view) {
     return (
       <Screen dropped={dropped}>
@@ -75,7 +74,7 @@ export function Lobby({ view, me, dropped, send, onLeave, onMini, onTournament }
               .map((g) => (
                 <GameTile key={g.id} game={g} players={view.players.length} onClick={() => send("pickGame", { gameId: g.id })} />
               ))}
-            <Tile icon={Trophy} name="Turniej" hint="1-6 os." disabled onClick={onTournament} />
+            <Tile icon={Trophy} name="Turniej" hint={`1-${MAX_PLAYERS} os.`} onClick={() => send("pickTournament", { length: DEFAULT_LENGTH, must: [], skip: [] })} />
             <Tile icon={GameController} name="Mini-gry" hint={`${MINI_GAMES.length} gier`} onClick={onMini} />
           </div>
         </section>
@@ -89,7 +88,7 @@ export function Lobby({ view, me, dropped, send, onLeave, onMini, onTournament }
 /** Lista graczy z miejscami, gotowością i wyborem koloru; wspólna dla lobby i ekranu gry. */
 export function Players({ view, me, send }: { view: RoomView; me: string; send: Send }) {
   const isHost = view.hostId === me;
-  const def = view.gameId ? GAMES[view.gameId] : undefined;
+  const def = picked(view);
   return (
     <section className="tile">
       <div className="mb-3 flex items-baseline justify-between">
@@ -176,7 +175,7 @@ export function Players({ view, me, send }: { view: RoomView; me: string; send: 
 /** Dolny pasek: start u gospodarza, gotowość u gościa z miejscem, informacja u oglądających. */
 export function StartBar({ view, me, send }: { view: RoomView; me: string; send: Send }) {
   const isHost = view.hostId === me;
-  const def = view.gameId ? GAMES[view.gameId] : undefined;
+  const def = picked(view);
   const hostNick = view.players.find((p) => p.id === view.hostId)?.nick ?? "gospodarz";
   const guests = view.seats.filter((id) => id !== view.hostId);
   const unready = view.players.filter((p) => guests.includes(p.id) && !p.ready);
@@ -216,6 +215,12 @@ export function StartBar({ view, me, send }: { view: RoomView; me: string; send:
       )}
     </StickyBar>
   );
+}
+
+/** To, co gospodarz wybrał do grania: gra albo turniej (wszyscy w pokoju, także solo). */
+export function picked(view: RoomView): { name: string; minPlayers: number; maxPlayers: number } | undefined {
+  if (view.tournament) return { name: "Turniej", minPlayers: 1, maxPlayers: MAX_PLAYERS };
+  return view.gameId ? GAMES[view.gameId] : undefined;
 }
 
 /** Mini-gry to gry, w które da się grać solo (minPlayers 1); reszta to gry główne. */
