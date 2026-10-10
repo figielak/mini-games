@@ -3,6 +3,7 @@ import {
   Buildings,
   CalendarBlank,
   Calculator,
+  Cards,
   Check,
   CircleDashed,
   CirclesThree,
@@ -17,12 +18,15 @@ import {
   type Icon,
   Lightning,
   LineSegment,
+  MagnifyingGlass,
+  Metronome,
   NumberSquareOne,
   Palette,
   Play,
   ShareNetwork,
   SignOut,
   SquaresFour,
+  Stack,
   Timer,
 } from "@phosphor-icons/react";
 import { GAMES, type LobbyPlayer, MAX_PLAYERS, PLAYER_COLORS, type RoomView } from "@mini-games/games";
@@ -266,6 +270,7 @@ const ICONS: Record<string, Icon> = {
   "piec-w-rzedzie": GridNine,
   statki: Boat,
   chinczyk: DiceFive,
+  memory: Cards,
   "kampus-tour": Buildings,
   "panstwa-miasta": GlobeHemisphereEast,
   refleks: Lightning,
@@ -281,6 +286,9 @@ const ICONS: Record<string, Icon> = {
   srodek: LineSegment,
   stoj: HandPalm,
   sledzenie: CirclesThree,
+  wieza: Stack,
+  rytm: Metronome,
+  inny: MagnifyingGlass,
 };
 
 function seats(g: { minPlayers: number; maxPlayers: number }) {
@@ -292,6 +300,7 @@ const BLURBS: Record<string, string> = {
   "piec-w-rzedzie": "Na zmianę stawiacie kamienie na planszy 15×15. Wygrywa pięć lub więcej w linii.",
   statki: "Rozstawiasz flotę, potem strzelacie na zmianę. Trafienie daje kolejny strzał, wygrywa ten, kto zatopi wszystko.",
   chinczyk: "Rzucasz kostką i prowadzisz pionki dookoła planszy do domku. Stając na pionku rywala, odsyłasz go na start.",
+  memory: "Na zmianę odkrywacie po dwie karty. Para zostaje u ciebie i daje kolejny ruch, wygrywa najwięcej par.",
   "kampus-tour": "Planszówka ekonomiczna: rzut dwiema kośćmi, kupujesz pola kampusu, rozbudowujesz je i zbierasz czynsz. Wygrywa ostatni wypłacalny albo najbogatszy po 20 rundach.",
   "panstwa-miasta": "5 rund, każda na inną literę i 6 kategorii. Kto pierwszy odda kartkę, daje STOP, potem głosujecie nad odpowiedziami.",
   refleks: "Dotknij pola, gdy zmieni kolor. 30 s, liczy się liczba trafień, falstart kosztuje czas.",
@@ -307,6 +316,9 @@ const BLURBS: Record<string, string> = {
   srodek: "Odcinek pod losowym kątem, dotykasz dokładnie jego środka. 10 rund, wygrywa najmniejsza suma błędów.",
   stoj: "Zielone pole dotykasz, czerwonego nie wolno. 30 s, tempo rośnie, błąd zabiera 2 punkty.",
   sledzenie: "Kulki lecą po polu, trzy z nich są celami. Widzisz je krótko, potem śledzisz ruch i wskazujesz te trzy.",
+  rytm: "Metronom gra 8 uderzeń i cichnie, a ty stukasz dalej w tym samym tempie przez 10 s. Wygrywa najmniejsza odchyłka.",
+  inny: "Siatka identycznych symboli, jeden różni się obrotem, odcieniem, rozmiarem albo kształtem. 30 s, siatka rośnie po każdym trafieniu.",
+  wieza: "Klocek jeździ w poziomie, zatrzymujesz go nad poprzednim. To, co wystaje, zostaje ucięte. Liczy się wysokość wieży.",
 };
 
 /** Nazwy kolorów z PLAYER_COLORS (ta sama kolejność), dla czytników ekranu. */

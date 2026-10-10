@@ -8,7 +8,7 @@ interface Props {
   ranking?: string[];
   winner?: string;
   onMove: (move: QuizMove) => void;
-  onRound?: (on: boolean) => void;
+  onRound?: (msLeft: number | null) => void;
 }
 
 export function Liczenie({ view, ...props }: Props) {

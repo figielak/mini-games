@@ -2,6 +2,12 @@ import { describe, expect, test } from "vitest";
 import { createRng } from "./core.ts";
 import { EVENTS, MIN_YEAR, MAX_YEAR, rok as game, type Move, ROUNDS, type State, type View } from "./rok.ts";
 
+// Ustalają zasady:
+// - 1-6 graczy naraz, każdy dostaje te same 10 wydarzeń z puli (rok 1900-2025, tekst bez roku),
+// - odpowiedź to 10 lat całkowitych z zakresu; wynik = suma |odpowiedź − rok|, mniejsza suma wyżej,
+// - pusta odpowiedź (limit czasu) liczy się w każdej rundzie jak najgorszy możliwy błąd,
+// - ruch progress zgłasza liczbę odpowiedzianych rund (1-9) do podglądu u rywali i nie odnawia limitu.
+
 const A = "ania";
 const B = "bartek";
 const C = "celina";
@@ -14,6 +20,11 @@ function send(s: State, player: string, move: Move): State {
   expect(game.validateMove(s, player, move), `${player} oddaje ruch`).toBe(true);
   return game.applyMove(s, player, move, createRng(1));
 }
+
+test("definicja: 1-6 graczy, limit 240 s, świeża gra trwa", () => {
+  expect([game.minPlayers, game.maxPlayers, game.turnSeconds]).toEqual([1, 6, 240]);
+  expect(game.isOver(game.setup([A, B], createRng(1)))).toBeNull();
+});
 
 test("10 rund, zakres lat, unikatowe teksty, ten sam seed i inne seedy", () => {
   expect(ROUNDS).toBe(10);
@@ -56,25 +67,49 @@ describe("walidacja", () => {
     ["1899", [...ok.slice(0, 9), 1899]],
     ["2026", [...ok.slice(0, 9), 2026]],
     ["ułamek", [...ok.slice(0, 9), 1962.5]],
-    ["ułamek 2", [...ok.slice(0, 9), 2.5]],
   ])("%s", (_, answers) => expect(game.validateMove(s, A, result(answers))).toBe(false));
 
   test("obcy gracz", () => expect(game.validateMove(s, C, result(ok))).toBe(false));
   test("drugi wynik", () => expect(game.validateMove(send(s, A, result(ok)), A, result(ok))).toBe(false));
   test("pusta odpowiedź", () => expect(game.validateMove(s, A, result([]))).toBe(true));
-  test("pusta lista nie odblokowuje limitu", () => expect(game.waitingFor(s)).toEqual([A, B]));
+  test("krańce zakresu przechodzą", () => {
+    expect(game.validateMove(s, A, result([...ok.slice(0, 9), MIN_YEAR]))).toBe(true);
+    expect(game.validateMove(s, A, result([...ok.slice(0, 9), MAX_YEAR]))).toBe(true);
+  });
+  test("po końcu gry", () => {
+    const over = send(send(s, A, result(ok)), B, result(ok));
+    expect(game.validateMove(over, A, result(ok))).toBe(false);
+    expect(game.validateMove(over, A, progress(3))).toBe(false);
+  });
 });
 
 describe("liczenie i koniec", () => {
-  test("bezbłędnie = 0, błędy w obie strony sumują się, pusta lista = najgorszy możliwy wynik", () => {
+  test("bezbłędnie = 0, błędy w obie strony sumują się, pusta lista = najgorszy możliwy wynik, odpowiedzi zostają w stanie", () => {
     let s = game.setup([A, B, C], createRng(1));
     const exact = years(s);
     const worst = exact.map((year) => Math.max(year - MIN_YEAR, MAX_YEAR - year));
     s = send(s, A, result(exact));
     s = send(s, B, result([]));
-    s = send(s, C, result(new Array(ROUNDS).fill(MIN_YEAR)));
-    expect(s.results).toEqual({ [A]: 0, [B]: worst.reduce((a, b) => a + b, 0), [C]: exact.reduce((sum, year) => sum + year - MIN_YEAR, 0) });
-    expect(game.isOver(s)).toEqual({ winner: A, ranking: [A, B, C] });
+    // Rok obok prawdziwego, na przemian w obie strony (bez wychodzenia poza zakres).
+    const near = exact.map((year, i) => (i % 2 && year < MAX_YEAR ? year + 1 : year - 1));
+    s = send(s, C, result(near));
+    expect(s.results).toEqual({ [A]: 0, [B]: worst.reduce((a, b) => a + b, 0), [C]: ROUNDS });
+    expect(s.answers).toEqual({ [A]: exact, [B]: [], [C]: near });
+    expect(game.isOver(s)).toEqual({ winner: A, ranking: [A, C, B] });
+  });
+
+  test("mniejsza suma wygrywa, niezależnie od miejsca; waitingFor kurczy się do pustego", () => {
+    let s = game.setup([A, B, C], createRng(1));
+    // Przesunięcie w stronę środka zakresu, żeby odpowiedź została w 1900-2025.
+    const off = (d: number) => years(s).map((y) => (y < 1960 ? y + d : y - d));
+    s = send(s, A, result(off(3)));
+    expect(game.waitingFor(s)).toEqual([B, C]);
+    expect(game.isOver(s)).toBeNull();
+    s = send(s, B, result(off(1)));
+    s = send(s, C, result(off(2)));
+    expect(s.results).toEqual({ [A]: 30, [B]: 10, [C]: 20 });
+    expect(game.isOver(s)).toEqual({ winner: B, ranking: [B, C, A] });
+    expect(game.waitingFor(s)).toEqual([]);
   });
 
   test("remis i solo bez zwycięzcy", () => {
@@ -88,12 +123,14 @@ describe("liczenie i koniec", () => {
     expect(game.waitingFor(alone)).toEqual([]);
   });
 
-  test("timeoutMove przechodzi validateMove i applyMove nie mutuje stan", () => {
+  test("timeoutMove przechodzi validateMove, applyMove nie zmienia poprzedniego stanu, stan przeżywa JSON", () => {
     const s = game.setup([A, B], createRng(1));
+    const before = JSON.stringify(s);
     const t = game.timeoutMove!(s, A, createRng(1));
     expect(game.validateMove(s, A, t)).toBe(true);
     const next = game.applyMove(s, A, t, createRng(1));
-    expect(next).not.toBe(s);
+    game.applyMove(s, A, progress(3), createRng(1));
+    expect(JSON.stringify(s)).toBe(before);
     expect(JSON.parse(JSON.stringify(next))).toEqual(next);
   });
 });

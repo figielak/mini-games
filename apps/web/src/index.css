@@ -282,7 +282,7 @@ body::before {
   }
 }
 
-/* Pływająca kwota przy panelu gracza w Kampus Tour. */
+/* Pływająca kwota przy panelu gracza w Kampus Tour i „+1” nad pigułką zwycięzcy. */
 @keyframes float-up {
   0% {
     opacity: 0;
@@ -321,6 +321,14 @@ body::before {
   }
   80% {
     transform: translateX(3px);
+  }
+}
+
+/* Wieża: ucięty kawałek klocka spada i gaśnie. */
+@keyframes piece-fall {
+  to {
+    opacity: 0;
+    transform: translateY(250%);
   }
 }
 

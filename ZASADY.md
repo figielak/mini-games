@@ -106,7 +106,7 @@ Ekran gry to jeden plik `apps/web/src/games/<Gra>.tsx`. Dostaje `view`, `me`, `p
 (oraz `canMove` albo `ranking`) i nie wie nic o sieci.
 
 **Czego gra nie rysuje sama**
-- Nagłówek ze statusem („Twój ruch!”, „Czekamy na: ...”, „Wygrywasz!”), pasek czasu, lista graczy z punktami,
+- Nagłówek ze statusem („Twój ruch!”, „Czekamy na: ...”, „Wygrywasz!”), pasek czasu, lista graczy z liczbą wygranych partii (puchar przed liczbą, „+1” nad pigułką zwycięzcy),
   „Oglądasz”, komunikat o rozłączeniu, przyciski „Rewanż” i „Do lobby”. To wszystko daje `screens/Game.tsx`.
 - Własny nagłówek ma tylko gra, której wspólny nie wystarcza (Państwa-miasta, Kampus Tour), i wtedy przejmuje cały jego zakres.
 

@@ -1,24 +1,28 @@
-import { ArrowCounterClockwise, Check, Timer, UsersThree } from "@phosphor-icons/react";
-import { CHINCZYK_TRACK, type ChinczykView, GAMES, type KampusTourView, type KolorView, type KoloView, type KropkiView, type LiczenieView, type PanstwaMiastaView, type PiecWRzedzieView, type RefleksView, type RokView, type RoomView, type SledzenieView, KROPKI_ROUNDS, ROK_ROUNDS, SCHULTE_SIZE, type SchulteView, type SimonView, type SrodekView, type StatkiView, type StojView, type StoperView, type StroopView } from "@mini-games/games";
+import { ArrowCounterClockwise, Check, Timer, Trophy, UsersThree } from "@phosphor-icons/react";
+import { CHINCZYK_TRACK, type ChinczykView, GAMES, type InnyView, type KampusTourView, type KolorView, type KoloView, type KropkiView, type LiczenieView, type MemoryView, type PanstwaMiastaView, type PiecWRzedzieView, QUIZ_DURATION_MS, type RefleksView, type RokView, type RoomView, type RytmView, type SledzenieView, KROPKI_ROUNDS, ROK_ROUNDS, SCHULTE_SIZE, type SchulteView, type SimonView, type SrodekView, type StatkiView, type StojView, type StoperView, type StroopView, WIEZA_LEVELS, type WiezaView } from "@mini-games/games";
 import { useEffect, useMemo, useState } from "react";
 import { Chinczyk } from "../games/Chinczyk.tsx";
 import { KampusTour } from "../games/KampusTour.tsx";
 import { Kolo } from "../games/Kolo.tsx";
 import { Kolor } from "../games/Kolor.tsx";
 import { Kropki } from "../games/Kropki.tsx";
-import { Rok } from "../games/Rok.tsx";
 import { Liczenie } from "../games/Liczenie.tsx";
+import { Memory } from "../games/Memory.tsx";
 import { PanstwaMiasta } from "../games/PanstwaMiasta.tsx";
 import { PiecWRzedzie } from "../games/PiecWRzedzie.tsx";
 import { Refleks } from "../games/Refleks.tsx";
+import { Rok } from "../games/Rok.tsx";
 import { Schulte } from "../games/Schulte.tsx";
 import { Simon } from "../games/Simon.tsx";
 import { Sledzenie } from "../games/Sledzenie.tsx";
 import { Srodek } from "../games/Srodek.tsx";
 import { FleetLeft, Statki } from "../games/Statki.tsx";
+import { Inny } from "../games/Inny.tsx";
 import { Stoj } from "../games/Stoj.tsx";
+import { Rytm } from "../games/Rytm.tsx";
 import { Stoper } from "../games/Stoper.tsx";
 import { Stroop } from "../games/Stroop.tsx";
+import { Wieza } from "../games/Wieza.tsx";
 import { IntroContext, Screen, type Send } from "./ui.tsx";
 
 interface Props {
@@ -41,8 +45,9 @@ export function Game({ view, me, dropped, send }: Props) {
     if (myTurn) navigator.vibrate?.(40);
   }, [myTurn]);
 
-  // Quizy (Kolor liter, Liczenie) mają w rundzie własny zegar „Do końca”; limit platformy obok niego tylko myli.
-  const [inRound, setInRound] = useState(false);
+  // Quizy (Kolor liter, Liczenie, Inny element): w rundzie pasek w nagłówku pokazuje jej 30 s zamiast limitu platformy.
+  const [round, setRound] = useState<{ msLeft: number } | null>(null);
+  const onRound = (msLeft: number | null) => setRound(msLeft === null ? null : { msLeft });
   // Poświata tła w kolorze gracza, na którego czekamy; poza turą jednej osoby zostaje akcent.
   const turnColor = view.phase === "playing" && game.waitingFor.length === 1 ? view.players.find((p) => p.id === game.waitingFor[0])?.color : undefined;
   useEffect(() => {
@@ -72,12 +77,17 @@ export function Game({ view, me, dropped, send }: Props) {
 
   // Wspólny nagłówek: wyraźne „Twój ruch!” w kolorze gracza i pasek czasu. Chińczyk zamiast punktów pokazuje pionki w domu.
   const ludo = def.id === "chinczyk" ? (game.view as ChinczykView) : null;
+  // Memory zamiast punktów pokazuje zebrane pary.
+  const memory = def.id === "memory" ? (game.view as MemoryView) : null;
   // Statki w trakcie partii zamiast punktów pokazują flotę (w bitwie: pozostałą).
   const fleet = def.id === "statki" && view.phase === "playing" ? (game.view as StatkiView) : null;
   // Tabela Schultego w trakcie partii zamiast punktów pokazuje postęp każdego gracza.
   const schulte = def.id === "schulte" && view.phase === "playing" ? (game.view as SchulteView) : null;
   // Policz kropki tak samo: numer rundy każdego gracza.
   const kropki = def.id === "kropki" && view.phase === "playing" ? (game.view as KropkiView) : null;
+  // Wieża: wysokość wieży każdego gracza (po oddaniu wyniku ta z wyniku).
+  const wieza = def.id === "wieza" && view.phase === "playing" ? (game.view as WiezaView) : null;
+  // Który rok? też.
   const rok = def.id === "rok" && view.phase === "playing" ? (game.view as RokView) : null;
   const myColor = view.players.find((p) => p.id === me)?.color;
   const winner = view.phase === "over" ? game.result?.winner : undefined;
@@ -123,9 +133,14 @@ export function Game({ view, me, dropped, send }: Props) {
                 {status}
               </h1>
             </div>
-            {/* Na ekranie instrukcji limit jeszcze nie ruszył. Stoper: tykający limit zdradzałby upływ sekund, więc grający go nie widzi. */}
-            {view.phase === "playing" && !game.intro && !(def.id === "stoper" && myTurn) && !inRound && (
-              <Countdown game={game} total={def.turn?.(game.view).seconds ?? def.turnSeconds} color={myTurn ? myColor : undefined} label={MINI_GAMES.has(def.id) ? "Limit" : undefined} />
+            {/* Na ekranie instrukcji limit jeszcze nie ruszył. Stoper i Rytm: tykający limit zdradzałby upływ sekund, więc grający go nie widzi. */}
+            {view.phase === "playing" && !game.intro && !((def.id === "stoper" || def.id === "rytm") && myTurn) && (
+              <Countdown
+                game={round ?? game}
+                total={round ? QUIZ_DURATION_MS / 1000 : (def.turn?.(game.view).seconds ?? def.turnSeconds)}
+                color={myTurn ? myColor : undefined}
+                label={round ? "Czas" : MINI_GAMES.has(def.id) ? "Limit" : undefined}
+              />
             )}
             <ul className="flex flex-wrap gap-2">
               {view.seats.map((id) => {
@@ -154,21 +169,37 @@ export function Game({ view, me, dropped, send }: Props) {
                           />
                         ))}
                       </span>
+                    ) : memory ? (
+                      <span className="text-base font-semibold text-fg tabular-nums" aria-label={`Pary: ${memory.owner.filter((o) => o === id).length / 2}`}>
+                        {memory.owner.filter((o) => o === id).length / 2}
+                      </span>
                     ) : fleet ? (
                       <FleetLeft board={fleet.boards[id]} lengths={fleet.lengths} color={p?.color ?? "#8b8b92"} />
                     ) : schulte ? (
                       <Progress done={id in schulte.results ? SCHULTE_LAST : (schulte.progress[id] ?? 0)} total={SCHULTE_LAST} color={p?.color} />
                     ) : kropki ? (
                       <Progress done={id in kropki.results ? KROPKI_ROUNDS : (kropki.progress[id] ?? 0)} total={KROPKI_ROUNDS} color={p?.color} />
+                    ) : wieza ? (
+                      <Progress done={wieza.results[id]?.height ?? wieza.progress[id] ?? 0} total={WIEZA_LEVELS} color={p?.color} />
                     ) : rok ? (
                       <Progress done={id in rok.results ? ROK_ROUNDS : (rok.progress[id] ?? 0)} total={ROK_ROUNDS} color={p?.color} />
                     ) : (
-                      // Klucz z wyniku: po wygranej liczba montuje się od nowa i wskakuje.
-                      <span
-                        key={view.scores[id] ?? 0}
-                        className={`text-base font-semibold text-fg tabular-nums ${id === winner ? "animate-[stone-pop_0.5s_ease-out]" : ""}`}
-                      >
-                        {view.scores[id] ?? 0}
+                      // Puchar odróżnia wygrane partie w pokoju od wyniku bieżącej partii.
+                      <span className="relative flex items-center gap-1 text-base font-semibold text-fg tabular-nums" aria-label={`Wygrane partie: ${view.scores[id] ?? 0}`}>
+                        <Trophy size={14} weight="fill" className="text-fg-muted" aria-hidden />
+                        {/* Klucz z wyniku: po wygranej liczba montuje się od nowa i wskakuje. */}
+                        <span key={view.scores[id] ?? 0} className={id === winner ? "animate-[stone-pop_0.5s_ease-out]" : ""}>
+                          {view.scores[id] ?? 0}
+                        </span>
+                        {id === winner && (
+                          <span
+                            className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 animate-[float-up_1.6s_ease-out_forwards] font-mono text-sm"
+                            style={{ color: p?.color }}
+                            aria-hidden
+                          >
+                            +1
+                          </span>
+                        )}
                       </span>
                     )}
                   </li>
@@ -212,6 +243,8 @@ export function Game({ view, me, dropped, send }: Props) {
             onMove={(move) => send("move", move)}
           />
         )}
+
+        {def.id === "memory" && <Memory view={game.view as MemoryView} players={view.players} canMove={myTurn} onMove={(move) => send("move", move)} />}
 
         {/* Klucz z wylosowanego wyzwania: rewanż montuje grę od nowa, bez stanu poprzedniej partii. */}
         {def.id === "refleks" && (
@@ -315,6 +348,28 @@ export function Game({ view, me, dropped, send }: Props) {
           />
         )}
 
+        {def.id === "rytm" && (
+          <Rytm
+            key={(game.view as RytmView).nonce}
+            view={game.view as RytmView}
+            me={me}
+            players={view.players}
+            ranking={game.result?.ranking}
+            onMove={(move) => send("move", move)}
+          />
+        )}
+
+        {def.id === "wieza" && (
+          <Wieza
+            key={JSON.stringify((game.view as WiezaView).sides)}
+            view={game.view as WiezaView}
+            me={me}
+            players={view.players}
+            ranking={game.result?.ranking}
+            onMove={(move) => send("move", move)}
+          />
+        )}
+
         {def.id === "schulte" && (
           <Schulte
             key={(game.view as SchulteView).grid.join()}
@@ -323,6 +378,19 @@ export function Game({ view, me, dropped, send }: Props) {
             players={view.players}
             ranking={game.result?.ranking}
             onMove={(move) => send("move", move)}
+          />
+        )}
+
+        {def.id === "inny" && (
+          <Inny
+            key={(game.view as InnyView).trials.map((t) => t.odd).join()}
+            view={game.view as InnyView}
+            me={me}
+            players={view.players}
+            ranking={game.result?.ranking}
+            winner={winner}
+            onMove={(move) => send("move", move)}
+            onRound={onRound}
           />
         )}
 
@@ -335,7 +403,7 @@ export function Game({ view, me, dropped, send }: Props) {
             ranking={game.result?.ranking}
             winner={winner}
             onMove={(move) => send("move", move)}
-            onRound={setInRound}
+            onRound={onRound}
           />
         )}
 
@@ -348,7 +416,7 @@ export function Game({ view, me, dropped, send }: Props) {
             ranking={game.result?.ranking}
             winner={winner}
             onMove={(move) => send("move", move)}
-            onRound={setInRound}
+            onRound={onRound}
           />
         )}
 
@@ -400,7 +468,7 @@ export function Game({ view, me, dropped, send }: Props) {
   );
 }
 
-const MINI_GAMES = new Set(["refleks", "simon", "stoper", "schulte", "stroop", "liczenie", "kolo", "kolor", "kropki", "rok", "srodek", "stoj", "sledzenie", "panstwa-miasta"]);
+const MINI_GAMES = new Set(["refleks", "simon", "stoper", "schulte", "stroop", "liczenie", "kolo", "kolor", "kropki", "rok", "srodek", "stoj", "sledzenie", "wieza", "rytm", "inny", "panstwa-miasta"]);
 
 const SCHULTE_LAST = SCHULTE_SIZE * SCHULTE_SIZE;
 
@@ -458,7 +526,7 @@ function OverActions({ view, me, send }: { view: RoomView; me: string; send: Sen
  * `color`: pasek w kolorze gracza (moja tura). Czerwień i tak przychodzi na ostatnie 10 s.
  * `label`: podpis przed paskiem (mini-gry mają własny zegar partii, więc limit platformy musi być nazwany).
  */
-function Countdown({ game, total, tense, color, label }: { game: NonNullable<RoomView["game"]>; total?: number; tense?: boolean; color?: string; label?: string }) {
+function Countdown({ game, total, tense, color, label }: { game: { msLeft: number | null }; total?: number; tense?: boolean; color?: string; label?: string }) {
   const deadline = useMemo(() => (game.msLeft === null ? null : Date.now() + game.msLeft), [game]);
   const [now, setNow] = useState(Date.now);
 
@@ -481,7 +549,8 @@ function Countdown({ game, total, tense, color, label }: { game: NonNullable<Roo
             style={{ width: `${Math.min(1, left) * 100}%`, backgroundColor: seconds > 10 ? color : undefined }}
           />
         </div>
-        <span className={`w-10 text-right text-sm font-medium tabular-nums ${seconds <= 10 ? "text-warning" : "text-fg"}`}>{seconds} s</span>
+        {/* Twarda spacja i min-w: trzycyfrowy limit („173 s”) nie ściska się ani nie łamie w wąskim polu. */}
+        <span className={`min-w-10 text-right text-sm font-medium whitespace-nowrap tabular-nums ${seconds <= 10 ? "text-warning" : "text-fg"}`}>{seconds}{"\u00a0"}s</span>
       </div>
     );
   }
