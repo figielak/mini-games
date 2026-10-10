@@ -25,6 +25,7 @@ Reguły platformy (limit tury, rewanż, walkower, obserwatorzy) są w `KONCEPT.m
 | Środek | `srodek` | 1-6 | 60 s | mini-gra |
 | Stój! | `stoj` | 1-6 | 60 s | mini-gra |
 | Śledzenie | `sledzenie` | 1-6 | 300 s | mini-gra |
+| Wieża | `wieza` | 1-6 | 180 s | mini-gra |
 | Inny element | `inny` | 1-6 | 90 s | mini-gra |
 
 Nazwy w UI zmieniały się (2026-10-10), `id`, nazwy plików i typów zostały stare: Sekwencja = `simon`, Kolor liter = `stroop`,
@@ -35,8 +36,8 @@ Odcień = `kolor`, Gomoku = `piec-w-rzedzie`. Ranking w SQLite jest po `id`, wi�
 - Wyzwanie losuje serwer w `setup` (to samo dla wszystkich) i od razu wysyła w widoku. `playerView` zwraca cały stan,
   więc nic nie jest ukryte (da się podejrzeć; świadoma decyzja, komentarze `ponytail:`).
 - Partia toczy się na kliencie. Każdy gracz wysyła jeden ruch `{ type: "result", ... }`; drugi ruch tego samego gracza jest odrzucany.
-  Wyjątki: Narysuj koło (do 10 ruchów na gracza), Tabela Schultego, Policz kropki i Który rok? (dodatkowy ruch `progress` po każdym trafieniu albo rundzie).
-- Serwer odrzuca tylko nierealne wartości. Wynik liczy serwer tam, gdzie się da (Narysuj koło, Odcień, Policz kropki, Który rok?, Środek, Stój!, Śledzenie),
+  Wyjątki: Narysuj koło (do 10 ruchów na gracza), Tabela Schultego, Policz kropki, Który rok? i Wieża (dodatkowy ruch `progress` po każdym trafieniu, rundzie albo klocku).
+- Serwer odrzuca tylko nierealne wartości. Wynik liczy serwer tam, gdzie się da (Narysuj koło, Odcień, Policz kropki, Który rok?, Środek, Stój!, Śledzenie, Wieża),
   w reszcie ufa klientowi.
 - Partia zaczyna się ekranem instrukcji (platforma, nie zasady gry): każdy klika „Start” osobno (wiadomość pokoju `begin`) i gra od razu,
   po `INTRO_SECONDS` (15 s) gra rusza sama. Limit tury startuje, gdy wystartują wszyscy albo minie 15 s; wynik oddany wcześniej go nie uruchamia.
@@ -213,6 +214,32 @@ Wspólne zasady w `quiz.ts`, wspólny ekran `Quiz.tsx` (dzieli je też Inny elem
 - Ekran: kwadratowy kafel z kulkami; cele podświetlone kolorem gracza, w ruchu wszystkie jednakowe. Po zatrzymaniu dotknięcie zaznacza kulkę
   (ponowne odznacza), trzecie zatwierdza. Potem przez 1 s widać prawdziwe cele; pomyłka to wibracja 60.
   Ruch kulek jest treścią gry, więc działa także przy `prefers-reduced-motion`.
+
+### Wieża (`wieza`)
+- Do 30 pięter. Pole ma szerokość 1. Na dole leży podstawa o szerokości 0,4 na środku pola; każdy następny klocek ma szerokość
+  poprzedniego i jeździ w poziomie od krawędzi do krawędzi pola, a gracz zatrzymuje go dotknięciem.
+- Odchyłka od poprzedniego klocka najwyżej 0,02 (`SNAP`) to trafienie idealne: klocek wyrównuje się i zachowuje szerokość.
+  Większa odchyłka: zostaje tylko część wspólna z poprzednim klockiem, reszta jest ucinana.
+- Część wspólna węższa niż 0,02 (`MIN_WIDTH`) to pudło i koniec partii. Pierwszy klocek zawsze trafia (przy podstawie 0,4 nie da się
+  odjechać dalej niż o 0,3), pudło jest możliwe dopiero na zwężonej wieży.
+- Tempo rośnie: prędkość klocka to 0,5 pola na sekundę na pierwszym piętrze i o 0,03 więcej na każdym następnym.
+- Serwer losuje dla każdego piętra stronę, z której startuje klocek (`sides`, true = z lewej). Pozycja to wzór od czasu
+  (`left(fromLeft, level, width, t)`, fala trójkątna lewej krawędzi w `[0, 1 − width]`), bez symulacji krokowej: ta sama funkcja
+  na serwerze i w ekranie.
+- Niedotknięty klocek spada sam po 5 s (`MAX_STOP_MS`) tam, gdzie akurat jest.
+- Jeden ruch ze `stops`: czasy zatrzymania kolejnych klocków w ms od ich startu (int 0-5000). Wynik liczy serwer (`build`):
+  `height` = liczba położonych klocków, `width` = szerokość ostatniego położonego (przy 0 klocków szerokość podstawy).
+  Czasy po pudle są ignorowane.
+- Ranking: wyższa wieża wyżej, przy równych szerszy ostatni klocek; równe oba to remis.
+- Walidacja: najwyżej 30 czasów, każdy całkowity 0-5000. Pusta lista = limit czasu = 0 pięter.
+- Ruch `progress` (`height` = wysokość wieży, int 1-29) po każdym położonym klocku poza trzydziestym: tylko do podglądu u rywali
+  (pasek i `10/30` w pigułkach graczy), nie wpływa na wynik. Po oddaniu wyniku pigułka pokazuje wysokość z wyniku.
+  Limit przez `turn()` ze stałym kluczem: ruch `progress` nie odnawia 180 s, nawet gdy gra już tylko jedna osoba.
+- Ekran: kwadratowy kafel, widać 8 górnych pięter, klocki w kolorze gracza. Dotknięcie kafla zatrzymuje klocek. Trafienie idealne
+  błyska na zielono, ucięty kawałek robi się czerwony i spada. Nad wieżą na chwilę pojawia się ocena: „Idealnie!”, procent klocka,
+  który został, albo „Pudło”. Statystyki: wysokość, szerokość i seria (trafienia idealne z rzędu). Pod kaflem jedno zdanie podpowiedzi.
+  Pudło to wibracja 60 i po 1 s wynik.
+  Ruch klocka jest treścią gry, więc działa także przy `prefers-reduced-motion`.
 
 ### Inny element (`inny`)
 Wynik, walidacja, ranking i ekran końcowy jak w Kolorze liter (`quiz.ts`, `Quiz.tsx`); inne jest tylko to, co widać na planszy.
