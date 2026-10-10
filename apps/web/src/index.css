@@ -282,7 +282,7 @@ body::before {
   }
 }
 
-/* Pływająca kwota przy panelu gracza w Kampus Tour. */
+/* Pływająca kwota przy panelu gracza w Kampus Tour i „+1” nad pigułką zwycięzcy. */
 @keyframes float-up {
   0% {
     opacity: 0;

@@ -1,4 +1,4 @@
-import { ArrowCounterClockwise, Check, Timer, UsersThree } from "@phosphor-icons/react";
+import { ArrowCounterClockwise, Check, Timer, Trophy, UsersThree } from "@phosphor-icons/react";
 import { CHINCZYK_TRACK, type ChinczykView, GAMES, type InnyView, type KampusTourView, type KolorView, type KoloView, type KropkiView, type LiczenieView, type MemoryView, type PanstwaMiastaView, type PiecWRzedzieView, QUIZ_DURATION_MS, type RefleksView, type RokView, type RoomView, type SledzenieView, KROPKI_ROUNDS, ROK_ROUNDS, SCHULTE_SIZE, type SchulteView, type SimonView, type SrodekView, type StatkiView, type StojView, type StoperView, type StroopView } from "@mini-games/games";
 import { useEffect, useMemo, useState } from "react";
 import { Chinczyk } from "../games/Chinczyk.tsx";
@@ -178,12 +178,22 @@ export function Game({ view, me, dropped, send }: Props) {
                     ) : rok ? (
                       <Progress done={id in rok.results ? ROK_ROUNDS : (rok.progress[id] ?? 0)} total={ROK_ROUNDS} color={p?.color} />
                     ) : (
-                      // Klucz z wyniku: po wygranej liczba montuje się od nowa i wskakuje.
-                      <span
-                        key={view.scores[id] ?? 0}
-                        className={`text-base font-semibold text-fg tabular-nums ${id === winner ? "animate-[stone-pop_0.5s_ease-out]" : ""}`}
-                      >
-                        {view.scores[id] ?? 0}
+                      // Puchar odróżnia wygrane partie w pokoju od wyniku bieżącej partii.
+                      <span className="relative flex items-center gap-1 text-base font-semibold text-fg tabular-nums" aria-label={`Wygrane partie: ${view.scores[id] ?? 0}`}>
+                        <Trophy size={14} weight="fill" className="text-fg-muted" aria-hidden />
+                        {/* Klucz z wyniku: po wygranej liczba montuje się od nowa i wskakuje. */}
+                        <span key={view.scores[id] ?? 0} className={id === winner ? "animate-[stone-pop_0.5s_ease-out]" : ""}>
+                          {view.scores[id] ?? 0}
+                        </span>
+                        {id === winner && (
+                          <span
+                            className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 animate-[float-up_1.6s_ease-out_forwards] font-mono text-sm"
+                            style={{ color: p?.color }}
+                            aria-hidden
+                          >
+                            +1
+                          </span>
+                        )}
                       </span>
                     )}
                   </li>
