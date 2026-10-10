@@ -6,11 +6,11 @@ import { KampusTour } from "../games/KampusTour.tsx";
 import { Kolo } from "../games/Kolo.tsx";
 import { Kolor } from "../games/Kolor.tsx";
 import { Kropki } from "../games/Kropki.tsx";
-import { Rok } from "../games/Rok.tsx";
 import { Liczenie } from "../games/Liczenie.tsx";
 import { PanstwaMiasta } from "../games/PanstwaMiasta.tsx";
 import { PiecWRzedzie } from "../games/PiecWRzedzie.tsx";
 import { Refleks } from "../games/Refleks.tsx";
+import { Rok } from "../games/Rok.tsx";
 import { Schulte } from "../games/Schulte.tsx";
 import { Simon } from "../games/Simon.tsx";
 import { Sledzenie } from "../games/Sledzenie.tsx";
@@ -78,6 +78,7 @@ export function Game({ view, me, dropped, send }: Props) {
   const schulte = def.id === "schulte" && view.phase === "playing" ? (game.view as SchulteView) : null;
   // Policz kropki tak samo: numer rundy każdego gracza.
   const kropki = def.id === "kropki" && view.phase === "playing" ? (game.view as KropkiView) : null;
+  // Który rok? też.
   const rok = def.id === "rok" && view.phase === "playing" ? (game.view as RokView) : null;
   const myColor = view.players.find((p) => p.id === me)?.color;
   const winner = view.phase === "over" ? game.result?.winner : undefined;

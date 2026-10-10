@@ -4,26 +4,35 @@ import { type GameDefinition, type PlayerId, rankResults, shuffle } from "./core
 export const ROUNDS = 10;
 export const MIN_YEAR = 1900;
 export const MAX_YEAR = 2025;
+/** Limit rundy na kliencie: po nim zatwierdza się rok ustawiony na suwaku. */
 export const ROUND_MS = 20000;
+/** Tyle ms widać prawdziwy rok, potem sama wskakuje następna runda. */
 export const REVEAL_MS = 2500;
 
 export type Event = { text: string; year: number };
 
+/** Pusta lista = limit czasu (w każdej rundzie najgorszy możliwy błąd). */
 export type Move = { type: "result"; answers: number[] } | { type: "progress"; done: number };
 
 export interface State {
   players: PlayerId[];
   events: Event[];
+  /** Suma odchyłek w latach. */
   results: Record<PlayerId, number>;
   answers: Record<PlayerId, number[]>;
+  /** Ile rund gracz już odpowiedział (1-9), zgłaszane przez klienta; tylko do podglądu u rywali. */
   progress: Record<PlayerId, number>;
 }
 
 export type View = State;
 
+// 10 rund po 20 s i 2,5 s odsłony to 225 s, reszta to zapas.
+const TURN_SECONDS = 240;
+
+/** Największy błąd, jaki da się zrobić w rundzie: dalszy koniec suwaka. */
 const worst = (year: number) => Math.max(year - MIN_YEAR, MAX_YEAR - year);
 
-// Pula wydarzeń z jednoznacznym rokiem, po cztery działy; tekst nie zdradza roku (żadnej czterocyfrowej liczby).
+// Pula wydarzeń z jednoznacznym rokiem w czterech działach; tekst nie zdradza roku (żadnej czterocyfrowej liczby).
 // Premiera = rok pierwszej premiery na świecie. Dopisując pozycję, sprawdź datę w źródle.
 export const EVENTS: Event[] = [
   // Historia świata
@@ -196,13 +205,15 @@ export const EVENTS: Event[] = [
   { text: "Kinowy pojedynek „Barbie” i „Oppenheimera”", year: 2023 },
 ];
 
+// ponytail: lata są w widoku od startu (jak kropki i cele w Kolorze), da się podejrzeć; między znajomymi wystarczy.
 export const rok: GameDefinition<State, Move> = {
   id: "rok",
   name: "Który rok?",
   minPlayers: 1,
   maxPlayers: 6,
-  turnSeconds: 240,
-  turn: () => ({ key: "run", seconds: 240 }),
+  turnSeconds: TURN_SECONDS,
+  // Stały klucz: ruch progress nie odnawia limitu, nawet gdy gra już tylko jedna osoba.
+  turn: () => ({ key: "run", seconds: TURN_SECONDS }),
   moveSchema: z.discriminatedUnion("type", [
     z.object({ type: z.literal("result"), answers: z.array(z.number()).max(ROUNDS) }),
     z.object({ type: z.literal("progress"), done: z.number() }),
@@ -223,22 +234,17 @@ export const rok: GameDefinition<State, Move> = {
       ? Number.isInteger(move.done) && move.done >= 1 && move.done < ROUNDS
       : move.answers.length === 0 || (move.answers.length === ROUNDS && move.answers.every((year) => Number.isInteger(year) && year >= MIN_YEAR && year <= MAX_YEAR))),
 
-  applyMove: (state, player, move) => {
-    if (move.type === "progress") {
-      return { ...state, progress: { ...state.progress, [player]: move.done } };
-    }
-
-    const score = state.events.reduce((sum, event, index) => {
-      // Pusta lista (limit czasu) to najgorszy możliwy błąd w każdej rundzie.
-      return sum + (move.answers.length === 0 ? worst(event.year) : Math.abs(move.answers[index] - event.year));
-    }, 0);
-
-    return {
-      ...state,
-      results: { ...state.results, [player]: score },
-      answers: { ...state.answers, [player]: move.answers },
-    };
-  },
+  applyMove: (state, player, move) =>
+    move.type === "progress"
+      ? { ...state, progress: { ...state.progress, [player]: move.done } }
+      : {
+          ...state,
+          results: {
+            ...state.results,
+            [player]: state.events.reduce((s, e, i) => s + (move.answers.length ? Math.abs(move.answers[i] - e.year) : worst(e.year)), 0),
+          },
+          answers: { ...state.answers, [player]: move.answers },
+        },
 
   playerView: (state): View => state,
 

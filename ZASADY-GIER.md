@@ -34,7 +34,7 @@ Odcień = `kolor`, Gomoku = `piec-w-rzedzie`. Ranking w SQLite jest po `id`, wi�
   więc nic nie jest ukryte (da się podejrzeć; świadoma decyzja, komentarze `ponytail:`).
 - Partia toczy się na kliencie. Każdy gracz wysyła jeden ruch `{ type: "result", ... }`; drugi ruch tego samego gracza jest odrzucany.
   Wyjątki: Narysuj koło (do 10 ruchów na gracza), Tabela Schultego, Policz kropki i Który rok? (dodatkowy ruch `progress` po każdym trafieniu albo rundzie).
-- Serwer odrzuca tylko nierealne wartości. Wynik liczy serwer tam, gdzie się da (Narysuj koło, Odcień, Policz kropki, Środek, Stój!, Śledzenie),
+- Serwer odrzuca tylko nierealne wartości. Wynik liczy serwer tam, gdzie się da (Narysuj koło, Odcień, Policz kropki, Który rok?, Środek, Stój!, Śledzenie),
   w reszcie ufa klientowi.
 - Partia zaczyna się ekranem instrukcji (platforma, nie zasady gry): każdy klika „Start” osobno (wiadomość pokoju `begin`) i gra od razu,
   po `INTRO_SECONDS` (15 s) gra rusza sama. Limit tury startuje, gdy wystartują wszyscy albo minie 15 s; wynik oddany wcześniej go nie uruchamia.
@@ -134,16 +134,20 @@ Wspólne zasady w `quiz.ts`, wspólny ekran `Quiz.tsx`.
   wynik idzie na serwer dopiero po „Wyniki” na ostatnim porównaniu.
 
 ### Który rok? (`rok`)
-- 10 rund, w każdej jeden event historyczny / wynalazek / premiera bez wskazania roku; gracz ustawia rok suwakiem.
-- Zasady: 1-6 graczy, mini-gra, limit partii 240 s, zakres lat 1900-2025, ta sama 10-elementowa pula dla wszystkich.
+- 10 rund, w każdej jedno wydarzenie historyczne, wynalazek albo premiera; gracz ustawia rok suwakiem w zakresie 1900-2025.
 - Pula `EVENTS` w `rok.ts`: ok. 160 wydarzeń z jednoznacznym rokiem w czterech działach (historia świata, historia Polski,
   wynalazki i technologia, popkultura); tekst nie zawiera czterocyfrowej liczby, premiera to rok pierwszej premiery.
+  Serwer losuje z niej 10 różnych wydarzeń, te same dla wszystkich.
 - Jeden ruch z 10 odpowiedziami (int 1900-2025). Wynik liczy serwer: suma |odpowiedź − rok|, mniej lepiej.
-- Pusta lista = limit czasu, liczona jako najgorszy możliwy wynik rundy: `max(rok − MIN_YEAR, MAX_YEAR − rok)`.
-- Ruch `progress` (`done` = liczba odpowiedzianych rund, int 1-9) po każdej odpowiedzi poza ostatnią: tylko do podglądu u rywali,
-  nie odnawia limitu (`turn` ma stały klucz), może spaść po odświeżeniu strony.
-- Ekran: na środku duży „rok” z suwakami do ±1 i paskiem czasu; po zatwierdzeniu pojawia się prawdziwy rok i różnica ze znakiem,
-  a na końcu tabela z odpowiedziami i prawdziwym rokiem każdego wydarzenia.
+- Pusta lista = limit czasu partii = w każdej rundzie najgorszy możliwy błąd, czyli `max(rok − 1900, 2025 − rok)`.
+- Limit rundy 20 s jest na kliencie: po czasie zatwierdza się rok ustawiony na suwaku. Suwak startuje na środku (1962).
+  Limit partii 240 s = 10 × (20 s + 2,5 s odsłony) plus zapas.
+- Ruch `progress` (`done` = liczba odpowiedzianych rund, int 1-9) po każdej odpowiedzi poza ostatnią: tylko do podglądu u rywali
+  (pasek „3/10” w pigułce gracza), nie odnawia limitu (`turn` ma stały klucz), może spaść po odświeżeniu strony.
+- Ekran: kafel z tekstem wydarzenia, dużym rokiem, suwakiem i przyciskami −1 / +1, nad nim pasek czasu rundy (ostatnie 5 s ostrzegawczy).
+  Po zatwierdzeniu przez 2,5 s ten sam kafel pokazuje prawdziwy rok, na torze własny rok (kolor gracza) i prawdziwy (pierścień)
+  oraz różnicę ze znakiem; potem sama wskakuje następna runda, po dziesiątej wynik idzie na serwer.
+- Ekran końcowy: jedna lista 10 wydarzeń z prawdziwym rokiem i odpowiedziami graczy (w trakcie tylko własne, po końcu wszystkich).
 
 ### Środek (`srodek`)
 - 10 rund, w każdej odcinek pod losowym kątem na kwadratowym polu; gracz dotyka jego środka.
