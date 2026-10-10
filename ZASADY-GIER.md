@@ -29,7 +29,7 @@ Odcień = `kolor`, Gomoku = `piec-w-rzedzie`. Ranking w SQLite jest po `id`, wi�
 - Wyzwanie losuje serwer w `setup` (to samo dla wszystkich) i od razu wysyła w widoku. `playerView` zwraca cały stan,
   więc nic nie jest ukryte (da się podejrzeć; świadoma decyzja, komentarze `ponytail:`).
 - Partia toczy się na kliencie. Każdy gracz wysyła jeden ruch `{ type: "result", ... }`; drugi ruch tego samego gracza jest odrzucany.
-  Wyjątki: Narysuj koło (do 10 ruchów na gracza) i Tabela Schultego (dodatkowy ruch `progress` po każdym trafieniu).
+  Wyjątki: Narysuj koło (do 10 ruchów na gracza) oraz Tabela Schultego i Policz kropki (dodatkowy ruch `progress` po każdym trafieniu albo rundzie).
 - Serwer odrzuca tylko nierealne wartości. Wynik liczy serwer tam, gdzie się da (Narysuj koło, Odcień, Policz kropki),
   w reszcie ufa klientowi.
 - `waitingFor` = gracze bez wyniku. Po limicie `timeoutMove` wpisuje najgorszy możliwy wynik.
@@ -120,6 +120,12 @@ Wspólne zasady w `quiz.ts`, wspólny ekran `Quiz.tsx`.
 - 10 rund, w każdej 8-40 kropek (bez nakładania, odstęp środków ≥ 0,08) widocznych 0,5 s, potem gracz wpisuje liczbę.
 - Jeden ruch z 10 odpowiedziami (int 0-99). Wynik liczy serwer: suma |odpowiedź − liczba kropek|, mniej lepiej.
 - Pusta lista = limit czasu, liczona jak same zera (czyli błąd = suma kropek).
+- Bez tolerancji: każda kropka różnicy to 1 punkt karny, w obie strony tak samo.
+- Ruch `progress` (`done` = liczba odpowiedzianych rund, int 1-9) po każdej odpowiedzi poza ostatnią: tylko do podglądu u rywali
+  (pasek „3/10” w pigułce gracza), nie odnawia limitu (`turn` ma stały klucz), może spaść po odświeżeniu strony.
+- Ekran: kwadratowy kafel stoi w tym samym miejscu we wszystkich fazach (kropki, pole odpowiedzi, porównanie).
+  Po każdej odpowiedzi kropki wracają na ekran razem z „Było 42, wpisałeś 38”, różnicą ze znakiem i sumą błędów;
+  wynik idzie na serwer dopiero po „Wyniki” na ostatnim porównaniu.
 
 ## 2. Gomoku (`piec-w-rzedzie`)
 

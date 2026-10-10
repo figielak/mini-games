@@ -13,7 +13,7 @@ const MARGIN = 0.05;
 export type Dot = { x: number; y: number };
 
 /** Pusta lista = limit czasu (liczona jak same zera). */
-export type Move = { type: "result"; answers: number[] };
+export type Move = { type: "result"; answers: number[] } | { type: "progress"; done: number };
 
 export interface State {
   players: PlayerId[];
@@ -21,9 +21,13 @@ export interface State {
   /** Suma błędów. */
   results: Record<PlayerId, number>;
   answers: Record<PlayerId, number[]>;
+  /** Ile rund gracz już odpowiedział (1-9), zgłaszane przez klienta; tylko do podglądu u rywali. */
+  progress: Record<PlayerId, number>;
 }
 
 export type View = State;
+
+const TURN_SECONDS = 120;
 
 const int = (rng: () => number, min: number, max: number) => min + Math.floor(rng() * (max - min + 1));
 
@@ -43,26 +47,37 @@ export const kropki: GameDefinition<State, Move> = {
   name: "Policz kropki",
   minPlayers: 1,
   maxPlayers: 6,
-  turnSeconds: 120,
-  moveSchema: z.object({ type: z.literal("result"), answers: z.array(z.number()).max(ROUNDS) }),
+  turnSeconds: TURN_SECONDS,
+  // Stały klucz: ruch progress nie odnawia limitu, nawet gdy gra już tylko jedna osoba.
+  turn: () => ({ key: "run", seconds: TURN_SECONDS }),
+  moveSchema: z.discriminatedUnion("type", [
+    z.object({ type: z.literal("result"), answers: z.array(z.number()).max(ROUNDS) }),
+    z.object({ type: z.literal("progress"), done: z.number() }),
+  ]),
 
   setup: (players, rng) => ({
     players,
     rounds: Array.from({ length: ROUNDS }, () => scatter(rng, int(rng, MIN, MAX))),
     results: {},
     answers: {},
+    progress: {},
   }),
 
-  validateMove: (state, player, { answers }) =>
+  validateMove: (state, player, move) =>
     state.players.includes(player) &&
     !(player in state.results) &&
-    (answers.length === 0 || (answers.length === ROUNDS && answers.every((a) => Number.isInteger(a) && a >= 0 && a <= 99))),
+    (move.type === "progress"
+      ? Number.isInteger(move.done) && move.done >= 1 && move.done < ROUNDS
+      : move.answers.length === 0 || (move.answers.length === ROUNDS && move.answers.every((a) => Number.isInteger(a) && a >= 0 && a <= 99))),
 
-  applyMove: (state, player, { answers }) => ({
-    ...state,
-    results: { ...state.results, [player]: state.rounds.reduce((s, dots, i) => s + Math.abs((answers[i] ?? 0) - dots.length), 0) },
-    answers: { ...state.answers, [player]: answers },
-  }),
+  applyMove: (state, player, move) =>
+    move.type === "progress"
+      ? { ...state, progress: { ...state.progress, [player]: move.done } }
+      : {
+          ...state,
+          results: { ...state.results, [player]: state.rounds.reduce((s, dots, i) => s + Math.abs((move.answers[i] ?? 0) - dots.length), 0) },
+          answers: { ...state.answers, [player]: move.answers },
+        },
 
   playerView: (state): View => state,
 
