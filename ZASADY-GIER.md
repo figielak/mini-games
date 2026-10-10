@@ -75,8 +75,7 @@ Odcień = `kolor`, Gomoku = `piec-w-rzedzie`. Ranking w SQLite jest po `id`, wi�
   Pusta lista jest dozwolona (limit czasu). Nie wpływają na ranking, służą tylko do ekranu końcowego.
 - Ekran końcowy: pod tabelą wyników wiersz z przewagą („Gracz 1 wygrywa o 0,3 s”, tylko gdy jest zwycięzca) i wykres międzyczasów
   (linia na gracza w jego kolorze, kropka na najdłużej szukanej liczbie, w legendzie „najdłużej 17 (4,1 s)”).
-- Tryby: **Klasyczna** (domyślna; znalezione liczby zostają widoczne, jak w oryginale) i **Łatwa** (`latwa`; znalezione gasną).
-  Tryb zmienia tylko wygląd, zasady i ranking są wspólne. Dotknięcie już znalezionej liczby nic nie robi w obu trybach.
+- Bez trybów: znalezione liczby zostają widoczne, jak w oryginale. Dotknięcie już znalezionej liczby nic nie robi.
 - Postęp rywali: po każdym trafieniu (poza ostatnim) klient wysyła `{ type: "progress", found }` (int 1-24, tylko gracz bez wyniku).
   Serwer zapisuje go w `progress` i pokazuje w pigułkach graczy jako pasek i `12/25`. Wartość nie musi rosnąć
   (po odświeżeniu gracz zaczyna od 1) i nie wpływa na wynik.

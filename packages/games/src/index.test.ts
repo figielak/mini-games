@@ -24,6 +24,10 @@ test("rejestr: id z sieci nie trafia w pola prototypu obiektu, a klucz to id gry
   for (const [id, game] of Object.entries(GAMES)) expect(game.id).toBe(id);
 });
 
+test("mini-gry mają zasady narzucone z góry: tryby tylko w grach głównych", () => {
+  for (const game of Object.values(GAMES)) if (game.minPlayers === 1) expect(game.modes, game.id).toBeUndefined();
+});
+
 // Gra z trybami przechodzi kontrakt w każdym trybie.
 const CASES = Object.values(GAMES).flatMap((game) =>
   (game.modes ?? [undefined]).map((mode) => ({ game, mode: mode?.id, name: mode ? `${game.name} (${mode.name})` : game.name })),
