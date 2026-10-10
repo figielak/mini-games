@@ -2,6 +2,7 @@ import type { GameDefinition } from "./core.ts";
 import { chinczyk } from "./chinczyk.ts";
 import { inny } from "./inny.ts";
 import { kampusTour } from "./kampus-tour.ts";
+import { kat } from "./kat.ts";
 import { kolo } from "./kolo.ts";
 import { kolor } from "./kolor.ts";
 import { kropki } from "./kropki.ts";
@@ -67,6 +68,7 @@ export type { Symbol as InnySymbol, View as InnyView } from "./inny.ts";
 export { type Cells as ObrotCells, score as obrotScore, type View as ObrotView } from "./obrot.ts";
 export { ATTEMPTS as KOLO_ATTEMPTS, judge as koloJudge, MAX_POINTS as KOLO_MAX_POINTS, type Point as KoloPoint, type View as KoloView } from "./kolo.ts";
 export { COUNT as KOLOR_COUNT, distance as kolorDistance, type Hsb, hints as kolorHints, hsbToRgb as kolorHsbToRgb, SHOW_MS as KOLOR_SHOW_MS, type View as KolorView } from "./kolor.ts";
+export { MAX_ANSWER as KAT_MAX_ANSWER, type Round as KatRound, SHOW_MS as KAT_SHOW_MS, type View as KatView } from "./kat.ts";
 export { ROUNDS as KROPKI_ROUNDS, SHOW_MS as KROPKI_SHOW_MS, type View as KropkiView } from "./kropki.ts";
 export { MAX_YEAR as ROK_MAX_YEAR, MIN_YEAR as ROK_MIN_YEAR, REVEAL_MS as ROK_REVEAL_MS, ROUND_MS as ROK_ROUND_MS, ROUNDS as ROK_ROUNDS, type Event as RokEvent, type View as RokView } from "./rok.ts";
 export { BALLS, MOVE_MS, RADIUS, ROUNDS, SHOW_MS, SPEED_START, SPEED_STEP, TARGETS, position as sledzeniePosition, type Ball as SledzenieBall, type Move as SledzenieMove, type Result as SledzenieResult, type State as SledzenieState, type View as SledzenieView } from "./sledzenie.ts";
@@ -105,5 +107,6 @@ export const GAMES: Record<string, GameDefinition<any, any>> = Object.assign(Obj
   [inny.id]: inny,
   [obrot.id]: obrot,
   [mapa.id]: mapa,
+  [kat.id]: kat,
   [panstwaMiasta.id]: panstwaMiasta,
 });
