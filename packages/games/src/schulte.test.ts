@@ -8,13 +8,16 @@ import { type Move, PENALTY_MS, schulte as game, type State, type View } from ".
 // - czas krótszy niż 25 × 150 ms jest nierealny, dłuższy niż limit tury też,
 // - ranking po czasie z karami rosnąco; po limicie czasu ostatnie miejsce,
 // - tryby Klasyczna (domyślna) i Łatwa różnią się tylko wyglądem, tryb trafia do widoku,
+// - wynik niesie 25 międzyczasów (suma równa czasowi) albo pustą listę; nie wpływają na ranking,
 // - po każdym trafieniu klient zgłasza postęp (1-24), który widzą rywale; postęp nie kończy gry i nie odnawia limitu.
 
 const A = "ania";
 const B = "bartek";
 const C = "celina";
 
-const result = (ms: number, mistakes = 0): Move => ({ type: "result", ms, mistakes });
+/** Równe międzyczasy, reszta z dzielenia w ostatnim. */
+const even = (ms: number) => Array.from({ length: 25 }, (_, i) => Math.floor(ms / 25) + (i === 24 ? ms % 25 : 0));
+const result = (ms: number, mistakes = 0, splits = even(ms)): Move => ({ type: "result", ms, mistakes, splits });
 const progress = (found: number): Move => ({ type: "progress", found });
 
 function send(s: State, player: string, move: Move): State {
@@ -122,4 +125,26 @@ describe("postęp", () => {
     expect(game.turn!(s)).toEqual({ key: "run", seconds: game.turnSeconds });
     expect(game.turn!(send(s, A, progress(5)))).toEqual(game.turn!(s));
   });
+});
+
+describe("międzyczasy", () => {
+  const s = game.setup([A, B], createRng(1));
+
+  test("trafiają do widoku razem z wynikiem", () => {
+    const splits = [...even(20_000).slice(0, 23), 300, 1300];
+    const after = send(s, A, result(20_000, 1, splits));
+    expect((game.playerView(after, B) as View).results[A]).toEqual({ ms: 20_000, mistakes: 1, splits });
+  });
+
+  test("pusta lista przechodzi; tak oddaje wynik limit czasu", () => {
+    expect(game.validateMove(s, A, result(20_000, 0, []))).toBe(true);
+    expect(game.timeoutMove!(s, A, createRng(1))).toMatchObject({ splits: [] });
+  });
+
+  test.each([
+    ["24 czasy", even(20_000).slice(1)],
+    ["suma inna niż czas", even(19_000)],
+    ["ujemny czas", [-800, 1600, ...even(20_000).slice(2)]],
+    ["ułamek", [800.5, 799.5, ...even(20_000).slice(2)]],
+  ])("odrzucone: %s", (_, splits) => expect(game.validateMove(s, A, result(20_000, 0, splits))).toBe(false));
 });
