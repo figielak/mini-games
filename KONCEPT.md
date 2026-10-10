@@ -76,7 +76,7 @@ Po partii ekran podsumowania (`KampusSummary.tsx`): wykres majątku, zapłacone 
 
 - **Refleks**: dotknij pola, gdy zmieni kolor; 30 s, wynik = liczba trafień (remis: niższa średnia reakcja), falstart kosztuje czas.
 - **Sekwencja** (`simon`): powtarzanie rosnącej sekwencji 4 kolorów, wynik = najdłuższa seria.
-- **Stoper**: licznik znika po 3 s, dotknij przy dokładnie 10,00 s; wynik = odchyłka w ms (mniej lepiej).
+- **Stoper**: licznik znika po 3 s, dotknij dokładnie przy wylosowanym celu (6-14 s); wynik = odchyłka w ms (mniej lepiej).
 - **Tabela Schultego**: siatka 5×5 z liczbami 1-25, dotykasz po kolei; wynik = czas + 3 s za każdą pomyłkę.
 - **Kolory** (`stroop`): nazwa koloru napisana innym kolorem, wybierasz kolor liter; 30 s, wynik = trafienia (remis: niższa średnia).
 - **Liczenie**: 30 s działań (+, −, ×, :) z czterema odpowiedziami; wynik jak w Kolorach.
