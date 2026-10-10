@@ -134,10 +134,16 @@ Wspólne zasady w `quiz.ts`, wspólny ekran `Quiz.tsx`.
 - 10 rund, w każdej odcinek pod losowym kątem na kwadratowym polu; gracz dotyka jego środka.
 - Odcinki losowane: długość 0,25-0,7 boku pola, oba końce co najmniej 0,1 od krawędzi, środek w losowym miejscu
   (nie pokrywa się ze środkiem pola).
-- Jeden ruch z 10 punktami dotknięcia (`x`, `y` w 0-1, ułamki pola). Wynik liczy serwer w umownych px: pole ma bok 300 px
-  niezależnie od telefonu, odległość dotknięcia od środka w każdej rundzie ucięta do 150 px, suma zapisana w dziesiątych częściach (int).
-  Mniej lepiej.
-- Pusta lista = limit czasu = 10 × 150 px.
+- Jeden ruch z 10 punktami dotknięcia (`x`, `y` w ułamkach pola). Wynik liczy serwer w umownych px: pole ma bok 300 px
+  niezależnie od telefonu.
+- Dotknięcie jest rzutowane prostopadle na prostą odcinka i błąd rundy to odległość rzutu od środka, mierzona wzdłuż odcinka.
+  Odchylenie w bok nic nie kosztuje: liczy się tylko to, czy gracz dobrze ocenił połowę.
+- Strefa akceptacji: dotknięcie dalej niż 30 px od odcinka (od najbliższego punktu, także za końcami) nie jest odpowiedzią.
+  Ekran je ignoruje bez kary, serwer odrzuca cały ruch z takim punktem. Dzięki temu przypadkowe stuknięcie w puste pole nie psuje rundy,
+  a rzutowania nie da się nadużyć, stukając daleko obok.
+- Wynik = suma błędów z 10 rund, zapisana w dziesiątych częściach (int), mniej lepiej. Największy możliwy błąd rundy to pół odcinka plus strefa
+  (105 + 30 px), więc jedna wpadka nie kosztuje więcej.
+- Pusta lista = limit czasu = 10 × 150 px (więcej niż najgorsza uczciwa partia).
 - Ekran: kwadratowy kafel z odcinkiem (poprzeczne kreski na końcach). Liczy się miejsce podniesienia palca: punkt można przytrzymać
   i przesunąć, a przy dotyku nad kaflem jest lupa ok. 1,7× (mysz jej nie ma). Po puszczeniu przez 1 s widać własny punkt (kolor gracza),
   prawdziwy środek (pierścień), łączącą je linię i odległość; kolor według celności: do 5 px zielony z „Idealnie!”, do 20 px zwykły,
