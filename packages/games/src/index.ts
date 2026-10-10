@@ -1,5 +1,6 @@
 import type { GameDefinition } from "./core.ts";
 import { chinczyk } from "./chinczyk.ts";
+import { inny } from "./inny.ts";
 import { kampusTour } from "./kampus-tour.ts";
 import { kolo } from "./kolo.ts";
 import { kolor } from "./kolor.ts";
@@ -58,6 +59,7 @@ export { PENALTY_MS as SCHULTE_PENALTY_MS, SIZE as SCHULTE_SIZE, total as schult
 export { VISIBLE_MS as STOPER_VISIBLE_MS, type View as StoperView } from "./stoper.ts";
 export { COLORS as STROOP_COLORS, type View as StroopView } from "./stroop.ts";
 export type { View as LiczenieView } from "./liczenie.ts";
+export type { Symbol as InnySymbol, View as InnyView } from "./inny.ts";
 export { ATTEMPTS as KOLO_ATTEMPTS, judge as koloJudge, MAX_POINTS as KOLO_MAX_POINTS, type Point as KoloPoint, type View as KoloView } from "./kolo.ts";
 export { COUNT as KOLOR_COUNT, distance as kolorDistance, type Hsb, hints as kolorHints, hsbToRgb as kolorHsbToRgb, SHOW_MS as KOLOR_SHOW_MS, type View as KolorView } from "./kolor.ts";
 export { ROUNDS as KROPKI_ROUNDS, SHOW_MS as KROPKI_SHOW_MS, type View as KropkiView } from "./kropki.ts";
@@ -89,5 +91,6 @@ export const GAMES: Record<string, GameDefinition<any, any>> = Object.assign(Obj
   [srodek.id]: srodek,
   [stoj.id]: stoj,
   [sledzenie.id]: sledzenie,
+  [inny.id]: inny,
   [panstwaMiasta.id]: panstwaMiasta,
 });
