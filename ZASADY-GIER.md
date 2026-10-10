@@ -21,6 +21,7 @@ Reguły platformy (limit tury, rewanż, walkower, obserwatorzy) są w `KONCEPT.m
 | Odcień | `kolor` | 1-6 | 180 s | mini-gra |
 | Policz kropki | `kropki` | 1-6 | 120 s | mini-gra |
 | Środek | `srodek` | 1-6 | 60 s | mini-gra |
+| Stój! | `stoj` | 1-6 | 60 s | mini-gra |
 
 Nazwy w UI zmieniały się (2026-10-10), `id`, nazwy plików i typów zostały stare: Sekwencja = `simon`, Kolor liter = `stroop`,
 Odcień = `kolor`, Gomoku = `piec-w-rzedzie`. Ranking w SQLite jest po `id`, więc `id` nie wolno zmieniać.
@@ -153,6 +154,23 @@ Wspólne zasady w `quiz.ts`, wspólny ekran `Quiz.tsx`.
   Potem sama wskakuje następna runda; po dziesiątej wynik idzie na serwer.
 - Ekran końcowy: jedna tabela, rundy 1-10 w kolumnach, gracze w wierszach (kolejność rankingu). Liczby w kolorach celności,
   najlepszy w rundzie (bez remisu) ma tło w kolorze gracza.
+
+### Stój! (`stoj`)
+- 30 s. Jedno duże pole zapala się na zielono (dotknij) albo czerwono (nie wolno), potem na chwilę gaśnie i przychodzi następny bodziec.
+- Tempo rośnie: odstęp między bodźcami maleje liniowo z czasem partii od 1000 ms do 500 ms. Bodziec widać przez 0,6 odstępu,
+  ale dotknięcie liczy się aż do pojawienia się następnego. Harmonogram (`SCHEDULE`) wynika ze stałych, jest ten sam w każdej partii.
+- Losowe jest tylko to, które bodźce są czerwone: dokładnie co trzeci (`round(N / 3)`), w kolejności potasowanej na serwerze.
+- Jedno dotknięcie na bodziec. Zielony = trafienie, czerwony = błąd. Dotknięcie szybciej niż 100 ms od pojawienia się to zgadywanie:
+  ekran je ignoruje. Przepuszczony zielony nic nie kosztuje (brak punktu).
+- Jeden ruch z `taps`: czas reakcji na każdy bodziec w ms (int) albo `null`, gdy nie było dotknięcia. Wynik liczy serwer:
+  `times` (reakcje na zielone) i `errors` (dotknięte czerwone).
+- Wynik = trafienia − 2 × błędy, nie mniej niż 0, więcej lepiej. Przy remisie niższa średnia reakcji; dwa wyniki bez trafień to remis,
+  a zero punktów z trafieniami jest wyżej niż zero bez trafień.
+- Kara jest punktowa, nie blokadą 1 s jak w innych grach na czas: blokada zjadałaby kolejne bodźce, a −2 przy 1/3 czerwonych
+  i tak zeruje klepanie na oślep (N − 3 × czerwone ≈ 0).
+- Walidacja: najwyżej tyle czasów, ile bodźców, każdy od 100 ms do odstępu swojego bodźca. Pusta lista = limit czasu = 0 pkt.
+- Ekran: zielony z napisem „Dotknij”, czerwony z dłonią i „Stój!” (kolor nie jest jedynym sygnałem), bez przejścia. Trafienie gasi pole,
+  błąd to czerwony błysk z potrząśnięciem i wibracja 60. Ekran końcowy: tabela z punktami, trafieniami, średnim czasem i błędami.
 
 ## 2. Gomoku (`piec-w-rzedzie`)
 
