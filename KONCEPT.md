@@ -85,7 +85,7 @@ Po partii ekran podsumowania (`KampusSummary.tsx`): wykres majątku, zapłacone 
 - **Sekwencja** (`simon`): powtarzanie rosnącej sekwencji 4 kolorów, wynik = najdłuższa seria.
 - **Stoper**: licznik znika po 3 s, dotknij dokładnie przy wylosowanym celu (6-14 s); wynik = odchyłka w ms (mniej lepiej).
 - **Tabela Schultego**: siatka 5×5 z liczbami 1-25, dotykasz po kolei; wynik = czas + 3 s za każdą pomyłkę.
-  Tryby Klasyczna (liczby zostają widoczne) i Łatwa (znalezione gasną); postęp rywali widać w pigułkach graczy (ruch `progress`).
+  Znalezione liczby zostają widoczne; postęp rywali widać w pigułkach graczy (ruch `progress`).
 - **Kolor liter** (`stroop`): nazwa koloru napisana innym kolorem, wybierasz kolor liter; 30 s, wynik = trafienia (remis: niższa średnia).
 - **Liczenie**: 30 s działań (+, −, ×, :) z czterema odpowiedziami; wynik jak w Kolorze liter.
   W obu pomyłka blokuje na 1 s (inaczej losowe klepanie byłoby szybsze niż myślenie).
@@ -169,8 +169,11 @@ Wspólne pomocnicze w `core.ts`: `createRng` (mulberry32), `roomCode`, `rankResu
   Narysuj koło, Policz kropki i Kąt (120 s), Kolorze liter, Liczeniu, Innym elemencie i Obrocie (90 s); Państwa-miasta mają limit per faza, Statki 90 s na całe rozstawianie, Chińczyk w trybie Szybkim 20 s.
 - Gdy gracz z miejscem zniknie z pokoju w trakcie partii (wyjdzie sam albo nie wróci w 10 minut), partia się kończy:
   jeśli został jeden gracz, wygrywa walkowerem; przy większej liczbie kończy się bez zwycięzcy.
-- Lobby: gospodarz wybiera grę (i tryb, jeśli gra ma `modes`; zmiana trybu kasuje gotowość gości) i daje start, goście potwierdzają gotowość; każdy może zmienić swój kolor
+- Lobby: gospodarz wybiera grę i daje start, goście potwierdzają gotowość; każdy może zmienić swój kolor
   (poza partią); link `/?kod=ABCD` z przyciskiem udostępniania.
+- Gra główna (`minPlayers > 1`) po wybraniu otwiera u wszystkich ekran gry (`Setup.tsx`): opis, tryb (jeśli gra ma `modes`;
+  zmiana trybu kasuje gotowość gości), gracze i start; gospodarz wraca do listy gier przez `pickGame` z `null`.
+  Mini-gry startują prosto z listy i mają zasady narzucone z góry, bez trybów.
 - Limit 3 pokoi na IP, rate limit 10 wiadomości/s na klienta.
 
 **Platforma (skorupa)** jest wspólna dla wszystkich gier: pokoje z 4-znakowym kodem
@@ -208,7 +211,7 @@ mini-games/
 ├─ apps/
 │  ├─ server/src/  # index.ts, LobbyRoom.ts (pokój Colyseus), stats.ts + stats.test.ts (SQLite, GET /api/stats)
 │  └─ web/src/     # main.tsx, App.tsx, net.ts (połączenie, token, reconnect), Dev.tsx (tryb testowy),
-│                  # screens/ (Home, Lobby, Game, ui.tsx ze wspólnymi Screen/StickyBar/Scores),
+│                  # screens/ (Home, Lobby, Setup (ekran gry głównej przed partią), Game, ui.tsx ze wspólnymi Screen/StickyBar/Scores),
 │                  # games/<Gra>.tsx (UI każdej gry), index.css (klasy .tile .label .btn .field)
 ├─ .github/workflows/ci.yml
 ├─ Dockerfile, docker-compose.yml, cloudflared/

@@ -13,7 +13,7 @@ nie piszemy testów.
 - `id` (małe litery, myślniki). Jest kluczem rankingu w SQLite, więc **nie zmienia się nigdy**, nawet gdy zmieni się nazwa w UI.
 - Nazwa w UI: krótka, jedno lub dwa słowa, mieści się na kaflu w lobby.
 - Liczba graczy (`minPlayers`, `maxPlayers`). `minPlayers: 1` oznacza grę z grupy „Szybkie i refleksowe”.
-- Tryby (opcjonalnie): lista `modes` z `id`, nazwą i jednolinijkowym opisem, w kolejności wyświetlania; domyślny ma `default: true`. Tryb zmienia liczby
+- Tryby (opcjonalnie, tylko gry główne; mini-gra ma zasady narzucone z góry): lista `modes` z `id`, nazwą i jednolinijkowym opisem, w kolejności wyświetlania; domyślny ma `default: true`. Tryb zmienia liczby
   (plansza, flota, flagi zasad), nie mechanikę; wszystkie tryby liczą się do jednego rankingu (wzór: `statki.ts`).
 
 **Typ gry** (decyduje o całej reszcie)
