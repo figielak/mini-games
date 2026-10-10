@@ -324,6 +324,14 @@ body::before {
   }
 }
 
+/* Wieża: ucięty kawałek klocka spada i gaśnie. */
+@keyframes piece-fall {
+  to {
+    opacity: 0;
+    transform: translateY(250%);
+  }
+}
+
 /* Środek: delikatne potrząśnięcie odcinka, gdy dotknięcie wypadło poza strefą (bez błysku koloru, to nie kara). */
 @keyframes shake {
   20% {

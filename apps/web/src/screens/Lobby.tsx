@@ -25,6 +25,7 @@ import {
   ShareNetwork,
   SignOut,
   SquaresFour,
+  Stack,
   Timer,
 } from "@phosphor-icons/react";
 import { GAMES, type LobbyPlayer, MAX_PLAYERS, PLAYER_COLORS, type RoomView } from "@mini-games/games";
@@ -284,6 +285,7 @@ const ICONS: Record<string, Icon> = {
   srodek: LineSegment,
   stoj: HandPalm,
   sledzenie: CirclesThree,
+  wieza: Stack,
   inny: MagnifyingGlass,
 };
 
@@ -313,6 +315,7 @@ const BLURBS: Record<string, string> = {
   stoj: "Zielone pole dotykasz, czerwonego nie wolno. 30 s, tempo rośnie, błąd zabiera 2 punkty.",
   sledzenie: "Kulki lecą po polu, trzy z nich są celami. Widzisz je krótko, potem śledzisz ruch i wskazujesz te trzy.",
   inny: "Siatka identycznych symboli, jeden różni się obrotem, odcieniem, rozmiarem albo kształtem. 30 s, siatka rośnie po każdym trafieniu.",
+  wieza: "Klocek jeździ w poziomie, zatrzymujesz go nad poprzednim. To, co wystaje, zostaje ucięte. Liczy się wysokość wieży.",
 };
 
 /** Nazwy kolorów z PLAYER_COLORS (ta sama kolejność), dla czytników ekranu. */

@@ -1,5 +1,5 @@
 import { ArrowCounterClockwise, Check, Timer, Trophy, UsersThree } from "@phosphor-icons/react";
-import { CHINCZYK_TRACK, type ChinczykView, GAMES, type InnyView, type KampusTourView, type KolorView, type KoloView, type KropkiView, type LiczenieView, type MemoryView, type PanstwaMiastaView, type PiecWRzedzieView, QUIZ_DURATION_MS, type RefleksView, type RokView, type RoomView, type SledzenieView, KROPKI_ROUNDS, ROK_ROUNDS, SCHULTE_SIZE, type SchulteView, type SimonView, type SrodekView, type StatkiView, type StojView, type StoperView, type StroopView } from "@mini-games/games";
+import { CHINCZYK_TRACK, type ChinczykView, GAMES, type InnyView, type KampusTourView, type KolorView, type KoloView, type KropkiView, type LiczenieView, type MemoryView, type PanstwaMiastaView, type PiecWRzedzieView, QUIZ_DURATION_MS, type RefleksView, type RokView, type RoomView, type SledzenieView, KROPKI_ROUNDS, ROK_ROUNDS, SCHULTE_SIZE, type SchulteView, type SimonView, type SrodekView, type StatkiView, type StojView, type StoperView, type StroopView, WIEZA_LEVELS, type WiezaView } from "@mini-games/games";
 import { useEffect, useMemo, useState } from "react";
 import { Chinczyk } from "../games/Chinczyk.tsx";
 import { KampusTour } from "../games/KampusTour.tsx";
@@ -21,6 +21,7 @@ import { Inny } from "../games/Inny.tsx";
 import { Stoj } from "../games/Stoj.tsx";
 import { Stoper } from "../games/Stoper.tsx";
 import { Stroop } from "../games/Stroop.tsx";
+import { Wieza } from "../games/Wieza.tsx";
 import { IntroContext, Screen, type Send } from "./ui.tsx";
 
 interface Props {
@@ -83,6 +84,8 @@ export function Game({ view, me, dropped, send }: Props) {
   const schulte = def.id === "schulte" && view.phase === "playing" ? (game.view as SchulteView) : null;
   // Policz kropki tak samo: numer rundy każdego gracza.
   const kropki = def.id === "kropki" && view.phase === "playing" ? (game.view as KropkiView) : null;
+  // Wieża: wysokość wieży każdego gracza (po oddaniu wyniku ta z wyniku).
+  const wieza = def.id === "wieza" && view.phase === "playing" ? (game.view as WiezaView) : null;
   // Który rok? też.
   const rok = def.id === "rok" && view.phase === "playing" ? (game.view as RokView) : null;
   const myColor = view.players.find((p) => p.id === me)?.color;
@@ -175,6 +178,8 @@ export function Game({ view, me, dropped, send }: Props) {
                       <Progress done={id in schulte.results ? SCHULTE_LAST : (schulte.progress[id] ?? 0)} total={SCHULTE_LAST} color={p?.color} />
                     ) : kropki ? (
                       <Progress done={id in kropki.results ? KROPKI_ROUNDS : (kropki.progress[id] ?? 0)} total={KROPKI_ROUNDS} color={p?.color} />
+                    ) : wieza ? (
+                      <Progress done={wieza.results[id]?.height ?? wieza.progress[id] ?? 0} total={WIEZA_LEVELS} color={p?.color} />
                     ) : rok ? (
                       <Progress done={id in rok.results ? ROK_ROUNDS : (rok.progress[id] ?? 0)} total={ROK_ROUNDS} color={p?.color} />
                     ) : (
@@ -342,6 +347,17 @@ export function Game({ view, me, dropped, send }: Props) {
           />
         )}
 
+        {def.id === "wieza" && (
+          <Wieza
+            key={JSON.stringify((game.view as WiezaView).sides)}
+            view={game.view as WiezaView}
+            me={me}
+            players={view.players}
+            ranking={game.result?.ranking}
+            onMove={(move) => send("move", move)}
+          />
+        )}
+
         {def.id === "schulte" && (
           <Schulte
             key={(game.view as SchulteView).grid.join()}
@@ -440,7 +456,7 @@ export function Game({ view, me, dropped, send }: Props) {
   );
 }
 
-const MINI_GAMES = new Set(["refleks", "simon", "stoper", "schulte", "stroop", "liczenie", "kolo", "kolor", "kropki", "rok", "srodek", "stoj", "sledzenie", "inny", "panstwa-miasta"]);
+const MINI_GAMES = new Set(["refleks", "simon", "stoper", "schulte", "stroop", "liczenie", "kolo", "kolor", "kropki", "rok", "srodek", "stoj", "sledzenie", "wieza", "inny", "panstwa-miasta"]);
 
 const SCHULTE_LAST = SCHULTE_SIZE * SCHULTE_SIZE;
 
