@@ -271,6 +271,13 @@ body::before {
   }
 }
 
+/* Statki: zamiana plansz między turami, duża i mała przelatują na swoje miejsca. */
+::view-transition-group(statki-own),
+::view-transition-group(statki-enemy) {
+  animation-duration: 350ms;
+  animation-timing-function: ease-out;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

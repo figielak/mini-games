@@ -1,4 +1,4 @@
-import { ArrowCounterClockwise, Timer, UsersThree } from "@phosphor-icons/react";
+import { ArrowCounterClockwise, Check, Timer, UsersThree } from "@phosphor-icons/react";
 import { CHINCZYK_TRACK, type ChinczykView, GAMES, type KampusTourView, type KolorView, type KoloView, type KropkiView, type LiczenieView, type PanstwaMiastaView, type PiecWRzedzieView, type RefleksView, type RoomView, type SchulteView, type SimonView, type StatkiView, type StoperView, type StroopView } from "@mini-games/games";
 import { useEffect, useMemo, useState } from "react";
 import { Chinczyk } from "../games/Chinczyk.tsx";
@@ -66,8 +66,8 @@ export function Game({ view, me, dropped, send }: Props) {
 
   // Wspólny nagłówek: wyraźne „Twój ruch!” w kolorze gracza i pasek czasu. Chińczyk zamiast punktów pokazuje pionki w domu.
   const ludo = def.id === "chinczyk" ? (game.view as ChinczykView) : null;
-  // Statki w bitwie zamiast punktów pokazują pozostałą flotę.
-  const fleet = def.id === "statki" && (game.view as StatkiView).phase === "battle" ? (game.view as StatkiView) : null;
+  // Statki w trakcie partii zamiast punktów pokazują flotę (w bitwie: pozostałą).
+  const fleet = def.id === "statki" && view.phase === "playing" ? (game.view as StatkiView) : null;
   const myColor = view.players.find((p) => p.id === me)?.color;
   const winner = view.phase === "over" ? game.result?.winner : undefined;
   const winnerColor = view.players.find((p) => p.id === winner)?.color;
@@ -103,7 +103,9 @@ export function Game({ view, me, dropped, send }: Props) {
               {status}
             </h1>
           </div>
-          {view.phase === "playing" && <Countdown game={game} total={def.turnSeconds} color={myTurn ? myColor : undefined} />}
+          {view.phase === "playing" && (
+            <Countdown game={game} total={def.turn?.(game.view).seconds ?? def.turnSeconds} color={myTurn ? myColor : undefined} />
+          )}
           <ul className="flex flex-wrap gap-2">
             {view.seats.map((id) => {
               const p = view.players.find((pl) => pl.id === id);
@@ -119,6 +121,7 @@ export function Game({ view, me, dropped, send }: Props) {
                   <span className="size-2.5 rounded-full" style={{ backgroundColor: p?.color }} aria-hidden />
                   {nick(id)}
                   {id === me && " (ty)"}
+                  {fleet?.phase === "placing" && fleet.boards[id].ready && <Check size={14} weight="bold" aria-label="gotowy" />}
                   {ludo ? (
                     <span className="flex gap-1" aria-label={`W domu: ${ludo.pawns[id].filter((p) => p >= CHINCZYK_TRACK).length} z 4`}>
                       {[...ludo.pawns[id]].sort((a, b) => b - a).map((pos, i) => (
@@ -131,7 +134,7 @@ export function Game({ view, me, dropped, send }: Props) {
                       ))}
                     </span>
                   ) : fleet ? (
-                    <FleetLeft board={fleet.boards[id]} color={p?.color ?? "#8b8b92"} />
+                    <FleetLeft board={fleet.boards[id]} lengths={fleet.lengths} color={p?.color ?? "#8b8b92"} />
                   ) : (
                     // Klucz z wyniku: po wygranej liczba montuje się od nowa i wskakuje.
                     <span

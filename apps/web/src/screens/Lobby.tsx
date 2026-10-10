@@ -177,6 +177,36 @@ export function Lobby({ view, me, dropped, send, onLeave }: Props) {
           </section>
         ))}
 
+      {/* Tryb wybranej gry: gospodarz wybiera, goście widzą tylko wybrany. */}
+      {view && def?.modes && (
+        <section>
+          <h2 className="label mb-2 px-1">Tryb</h2>
+          <div className="flex flex-col gap-2" role="radiogroup" aria-label="Tryb">
+            {def.modes
+              .filter((m) => isHost || m.id === view.mode)
+              .map((m) => {
+                const picked = view.mode === m.id;
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={picked}
+                    disabled={!isHost}
+                    className={`flex min-h-12 flex-col items-start justify-center rounded-inset border px-3 py-2 text-left transition-colors ${
+                      picked ? "border-accent bg-accent-soft" : "border-line enabled:hover:border-line-hover"
+                    }`}
+                    onClick={() => send("pickMode", { mode: m.id })}
+                  >
+                    <span className="leading-tight">{m.name}</span>
+                    <span className="font-mono text-xs text-fg-muted">{m.hint}</span>
+                  </button>
+                );
+              })}
+          </div>
+        </section>
+      )}
+
       {view && (
         <StickyBar>
           {isHost ? (
