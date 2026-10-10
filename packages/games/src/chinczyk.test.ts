@@ -8,8 +8,12 @@ import { chinczyk as game, legalMoves, type Move, type State, type View } from "
 // - rzut: Math.floor(rng() * 6) + 1; wyjście tylko na 6; przy wszystkich pionkach w domku 3 próby,
 // - 6 daje kolejny rzut, trzecia szóstka z rzędu kończy turę,
 // - zbicie odsyła do domku, na własny pionek wejść nie można, do domku końcowego tylko dokładnie,
+// - pole startowe z pionkiem właściciela jest bezpieczne (rywal nie może na nim stanąć),
+// - w domku końcowym nie wolno przeskakiwać własnych pionków,
 // - brak ruchu oddaje turę; jeden możliwy ruch wykonuje się sam (pionki w domku startowym są nierozróżnialne),
-// - gra trwa do pełnego rankingu.
+// - gra trwa do pełnego rankingu,
+// - tryb Szybki: pionek na starcie, wyjście na 1 i 6, nadwyżka oczek przepada, dodatkowy rzut za zbicie i za wejście
+//   do domku, koniec po pierwszym graczu z 3 pionkami w domku, 20 s na turę.
 
 const A = "ania";
 const B = "bartek";
@@ -43,6 +47,7 @@ function move(s: State, player: string, pawn: number): State {
 }
 
 const two = () => game.setup([A, B], createRng(1));
+const quick = (players = [A, B]) => game.setup(players, createRng(1), "szybki");
 
 describe("setup", () => {
   test.each([2, 3, 4])("%i graczy: wszystkie pionki w domku, rzuca pierwszy", (n) => {
@@ -164,8 +169,29 @@ describe("ruch", () => {
     expect(s.pawns[B]).toEqual([-1, -1, -1, -1]);
   });
 
-  test("można zbić pionek stojący na swoim polu startowym", () => {
+  test("pole startowe z pionkiem właściciela jest bezpieczne: rywal nie może na nim stanąć", () => {
     const s = roll(put(two(), { [A]: [16, -1, -1, -1], [B]: [0, -1, -1, -1] }, A), A, 4); // pole 20
+    expect(s.pawns[A]).toEqual([16, -1, -1, -1]);
+    expect(s.pawns[B]).toEqual([0, -1, -1, -1]);
+    expect(view(s).last?.note).toBe("none");
+    expect(game.waitingFor(s)).toEqual([B]);
+  });
+
+  test("przy chronionym polu startowym rusza się inny pionek", () => {
+    const s = roll(put(two(), { [A]: [16, 10, -1, -1], [B]: [0, -1, -1, -1] }, A), A, 4);
+    expect(s.pawns[A]).toEqual([16, 14, -1, -1]);
+  });
+
+  test("chronione pole startowe wolno przeskoczyć", () => {
+    const s = roll(put(two(), { [A]: [16, -1, -1, -1], [B]: [0, -1, -1, -1] }, A), A, 5);
+    expect(s.pawns[A]).toEqual([21, -1, -1, -1]);
+    expect(s.pawns[B]).toEqual([0, -1, -1, -1]);
+  });
+
+  test("wychodzący pionek zbija obcego na swoim polu startowym", () => {
+    // Pozycja 20 u B to pole 0 toru, czyli start A.
+    const s = roll(put(two(), { [B]: [20, -1, -1, -1] }, A), A, 6);
+    expect(s.pawns[A]).toEqual([0, -1, -1, -1]);
     expect(s.pawns[B]).toEqual([-1, -1, -1, -1]);
   });
 
@@ -183,8 +209,8 @@ describe("ruch", () => {
 
 describe("domek końcowy", () => {
   test("wejście do domku dokładną liczbą oczek", () => {
-    const s = roll(put(two(), { [A]: [38, 40, 41, -1] }, A), A, 4);
-    expect(s.pawns[A]).toEqual([42, 40, 41, -1]);
+    const s = roll(put(two(), { [A]: [38, 43, -1, -1] }, A), A, 4);
+    expect(s.pawns[A]).toEqual([42, 43, -1, -1]);
   });
 
   test("przekroczenie domku i zajęte pole domku są niedozwolone", () => {
@@ -198,6 +224,19 @@ describe("domek końcowy", () => {
   test("w domku końcowym można się jeszcze przesunąć", () => {
     const s = roll(put(two(), { [A]: [40, 43, 42, -1] }, A), A, 1);
     expect(s.pawns[A]).toEqual([41, 43, 42, -1]);
+  });
+
+  test("w domku końcowym nie wolno przeskoczyć własnego pionka", () => {
+    // Pionek 0 musiałby minąć pole 41; pionek 1 ma wolną drogę.
+    const s = roll(put(two(), { [A]: [40, 41, -1, -1] }, A), A, 2);
+    expect(s.pawns[A]).toEqual([40, 43, -1, -1]);
+  });
+
+  test("wchodząc z toru też nie wolno przeskoczyć własnego pionka w domku", () => {
+    const s = roll(put(two(), { [A]: [38, 40, -1, -1] }, A), A, 4);
+    expect(s.pawns[A]).toEqual([38, 40, -1, -1]);
+    expect(view(s).last?.note).toBe("none");
+    expect(game.waitingFor(s)).toEqual([B]);
   });
 });
 
@@ -269,7 +308,7 @@ describe("koniec gry i ranking", () => {
 
   test("ostatni pionek wprowadzony szóstką: bez dodatkowego rzutu", () => {
     let s = game.setup([A, B, C], createRng(1));
-    s = roll(put(s, { [A]: [43, 42, 40, 35], [B]: [5, -1, -1, -1], [C]: [5, -1, -1, -1] }, A), A, 6);
+    s = roll(put(s, { [A]: [43, 42, 41, 34], [B]: [5, -1, -1, -1], [C]: [5, -1, -1, -1] }, A), A, 6);
     expect(view(s).ranking).toEqual([A]);
     expect(game.waitingFor(s)).toEqual([B]);
     expect(game.validateMove(s, A, { type: "roll" })).toBe(false);
@@ -357,8 +396,125 @@ describe("tura i limit czasu", () => {
     }
   });
 
-  test("limit czasu tury jest ustawiony", () => {
-    expect(game.turnSeconds).toBeGreaterThan(0);
+  test("limit tury: 60 s w Klasycznym, 20 s w Szybkim, także liczony z widoku", () => {
+    expect(game.turn!(two()).seconds).toBe(60);
+    expect(game.turn!(quick()).seconds).toBe(20);
+    expect(game.turn!(view(quick()) as unknown as State).seconds).toBe(20);
+  });
+
+  test("klucz limitu zmienia się po każdym rzucie i ruchu", () => {
+    const key = (s: State) => game.turn!(s).key;
+    const s0 = put(two(), { [A]: [5, 15, -1, -1] }, A);
+    const s1 = roll(s0, A, 3);
+    const s2 = move(s1, A, 0);
+    expect(new Set([key(s0), key(s1), key(s2)]).size).toBe(3);
+    // Rzut bez ruchu (kolejna próba na szóstkę) też odnawia limit.
+    expect(key(roll(two(), A, 2))).not.toBe(key(two()));
+  });
+});
+
+describe("tryby", () => {
+  test("dwa tryby, domyślny Klasyczny; nieznany tryb to Klasyczny", () => {
+    expect(game.modes?.map((m) => m.id)).toEqual(["klasyczny", "szybki"]);
+    expect(game.modes?.find((m) => m.default)?.id).toBe("klasyczny");
+    expect(view(two()).mode).toBe("klasyczny");
+    const s = game.setup([A, B], createRng(1), "cokolwiek");
+    expect(view(s).mode).toBe("klasyczny");
+    expect(s.pawns[A]).toEqual([-1, -1, -1, -1]);
+  });
+
+  test("widok podaje cel każdego możliwego pionka", () => {
+    const s = roll(put(two(), { [A]: [5, 15, 25, -1] }, A), A, 3);
+    expect(view(s).targets).toEqual({ 0: 8, 1: 18, 2: 28 });
+    expect(view(two()).targets).toEqual({});
+  });
+});
+
+describe("tryb Szybki", () => {
+  test("każdy zaczyna z jednym pionkiem na polu startowym", () => {
+    const s = quick([A, B, C]);
+    expect(view(s).mode).toBe("szybki");
+    for (const p of [A, B, C]) expect(s.pawns[p]).toEqual([0, -1, -1, -1]);
+    expect(game.waitingFor(s)).toEqual([A]);
+    expect(game.isOver(s)).toBeNull();
+  });
+
+  test("wyjście z domku startowego na 1, bez kolejnego rzutu", () => {
+    const s = roll(put(quick(), { [A]: [-1, -1, -1, -1] }, A), A, 1);
+    expect(s.pawns[A]).toEqual([0, -1, -1, -1]);
+    expect(game.waitingFor(s)).toEqual([B]);
+  });
+
+  test("wyjście na 6 daje kolejny rzut", () => {
+    const s = roll(put(quick(), { [A]: [-1, -1, -1, -1] }, A), A, 6);
+    expect(s.pawns[A]).toEqual([0, -1, -1, -1]);
+    expect(game.waitingFor(s)).toEqual([A]);
+  });
+
+  test("nadwyżka oczek przepada: pionek wchodzi na najdalsze wolne pole domku", () => {
+    const s = roll(put(quick(), { [A]: [39, 43, -1, -1] }, A), A, 5);
+    expect(s.pawns[A]).toEqual([42, 43, -1, -1]);
+  });
+
+  test("przy wyborze widok pokazuje cel z obciętą nadwyżką", () => {
+    const s = roll(put(quick(), { [A]: [38, 43, -1, -1] }, A), A, 6);
+    expect(view(s).targets).toEqual({ 0: 42, 2: 0 });
+  });
+
+  test("pionek w domku nie cofa się na wolne pole za sobą", () => {
+    const s = roll(put(quick(), { [A]: [42, 43, -1, -1] }, A), A, 5);
+    expect(s.pawns[A]).toEqual([42, 43, -1, -1]);
+    expect(view(s).last?.note).toBe("none");
+  });
+
+  test("własne pionki w domku wolno przeskakiwać", () => {
+    const s = roll(put(quick(), { [A]: [38, 40, -1, -1] }, A), A, 4);
+    expect(s.pawns[A]).toEqual([42, 40, -1, -1]);
+  });
+
+  test("zbicie daje dodatkowy rzut", () => {
+    const s = roll(put(quick(), { [A]: [5, -1, -1, -1], [B]: [28, -1, -1, -1] }, A), A, 3);
+    expect(s.pawns[B]).toEqual([-1, -1, -1, -1]);
+    expect(view(s).phase).toBe("roll");
+    expect(game.waitingFor(s)).toEqual([A]);
+  });
+
+  test("w Klasycznym zbicie nie daje dodatkowego rzutu", () => {
+    const s = roll(put(two(), { [A]: [5, -1, -1, -1], [B]: [28, -1, -1, -1] }, A), A, 3);
+    expect(game.waitingFor(s)).toEqual([B]);
+  });
+
+  test("wejście pionka z toru do domku daje dodatkowy rzut", () => {
+    const s = roll(put(quick(), { [A]: [38, -1, -1, -1] }, A), A, 3);
+    expect(s.pawns[A]).toEqual([41, -1, -1, -1]);
+    expect(game.waitingFor(s)).toEqual([A]);
+  });
+
+  test("ruch wewnątrz domku nie daje dodatkowego rzutu", () => {
+    const s = roll(put(quick(), { [A]: [40, -1, -1, -1] }, A), A, 2);
+    expect(s.pawns[A]).toEqual([42, -1, -1, -1]);
+    expect(game.waitingFor(s)).toEqual([B]);
+  });
+
+  test("dwa pionki w domku jeszcze nie kończą gry", () => {
+    const s = roll(put(quick(), { [A]: [43, 39, 5, -1] }, A), A, 2);
+    expect(game.isOver(s)).toBeNull();
+  });
+
+  test("trzeci pionek w domku kończy partię od razu; reszta według pionków w domku, potem sumy pozycji", () => {
+    let s = quick([A, B, C, D]);
+    s = put(s, { [A]: [5, -1, -1, -1], [B]: [43, 5, 6, -1], [C]: [43, 42, 39, -1], [D]: [43, 20, 6, -1] }, C);
+    s = roll(s, C, 2);
+    expect(game.isOver(s)).toEqual({ winner: C, ranking: [C, D, B, A] });
+    expect(game.waitingFor(s)).toEqual([]);
+    expect(view(s).turn).toBeNull();
+    expect(game.validateMove(s, D, { type: "roll" })).toBe(false);
+  });
+
+  test("po limicie ruch jest dozwolony", () => {
+    const s = roll(put(quick(), { [A]: [5, 15, -1, -1] }, A), A, 1);
+    expect(view(s).phase).toBe("move");
+    for (let seed = 0; seed < 30; seed++) expect(game.validateMove(s, A, game.timeoutMove!(s, A, createRng(seed)))).toBe(true);
   });
 });
 
