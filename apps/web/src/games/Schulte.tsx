@@ -1,6 +1,6 @@
 import { type LobbyPlayer, SCHULTE_PENALTY_MS, SCHULTE_SIZE, type SchulteView, schulteTotal } from "@mini-games/games";
 import { useEffect, useRef, useState } from "react";
-import { Scores, Stats } from "../screens/ui.tsx";
+import { Intro, Scores, Stats } from "../screens/ui.tsx";
 
 interface Props {
   view: SchulteView;
@@ -12,6 +12,27 @@ interface Props {
 
 const LAST = SCHULTE_SIZE * SCHULTE_SIZE;
 const seconds = (ms: number) => (ms / 1000).toFixed(1).replace(".", ",");
+
+/** Podgląd na ekranie instrukcji: kolejne liczby podświetlają się po kolei. */
+function Preview() {
+  return (
+    <div className="grid grid-cols-3 gap-1">
+      {[5, 2, 8, 1, 9, 3, 7, 4, 6].map((n) => (
+        <span key={n} className="relative flex size-8 items-center justify-center rounded-inset border border-line bg-surface font-mono text-sm font-semibold">
+          {n}
+          {n <= 3 && (
+            <span
+              className="absolute -inset-px flex animate-[preview-quarter_2.4s_linear_infinite] items-center justify-center rounded-inset bg-success text-bg opacity-0"
+              style={{ animationDelay: `${(n - 1) * 0.6 - 2.4}s` }}
+            >
+              {n}
+            </span>
+          )}
+        </span>
+      ))}
+    </div>
+  );
+}
 
 type Phase = "intro" | "run" | "sent";
 
@@ -87,22 +108,17 @@ export function Schulte({ view, me, players, ranking, onMove }: Props) {
 
   if (phase === "intro") {
     return (
-      <section className="tile flex flex-col gap-4 p-4">
-        <p>
-          Dotykaj liczby od 1 do 25 po kolei, jak najszybciej. Każda pomyłka to {SCHULTE_PENALTY_MS / 1000} s kary.
-        </p>
-        <button
-          type="button"
-          className="btn btn-primary w-full"
-          onClick={() => {
-            start.current = performance.now();
-            setNow(start.current);
-            setPhase("run");
-          }}
-        >
-          Start
-        </button>
-      </section>
+      <Intro
+        preview={<Preview />}
+        time="Stoper rusza po Starcie"
+        task="Dotykaj liczby od 1 do 25 po kolei"
+        score={`Wygrywa najkrótszy czas, każda pomyłka to +${SCHULTE_PENALTY_MS / 1000} s`}
+        onStart={() => {
+          start.current = performance.now();
+          setNow(start.current);
+          setPhase("run");
+        }}
+      />
     );
   }
 

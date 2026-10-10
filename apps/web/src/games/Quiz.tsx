@@ -1,7 +1,7 @@
 import { type LobbyPlayer, QUIZ_DURATION_MS, type QuizMove } from "@mini-games/games";
 import { Trophy } from "@phosphor-icons/react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { Stats } from "../screens/ui.tsx";
+import { Intro, Stats } from "../screens/ui.tsx";
 
 /** Wspólny przebieg Stroopa i Szybkiego liczenia: 30 s pytań, cztery odpowiedzi, pomyłka blokuje na chwilę. */
 interface Props {
@@ -10,7 +10,9 @@ interface Props {
   players: LobbyPlayer[];
   ranking?: string[];
   winner?: string;
-  intro: string;
+  /** Ekran instrukcji: co zrobić i podgląd; czas i punktacja są wspólne. */
+  task: string;
+  preview: ReactNode;
   /** Pytanie i cztery odpowiedzi dla pytania nr i; correct to indeks dobrej. */
   question: (i: number) => { prompt: ReactNode; options: ReactNode[]; correct: number };
   onMove: (move: QuizMove) => void;
@@ -114,7 +116,26 @@ function Results({ view, me, players, ranking, winner }: Pick<Props, "view" | "m
   );
 }
 
-export function Quiz({ view, me, players, ranking, winner, intro, question, onMove, onRound }: Props) {
+/** Podgląd na ekranie instrukcji: pytanie i odpowiedzi, dobra co chwilę się zaznacza. */
+export function QuizPreview({ prompt, options, correct }: { prompt: ReactNode; options: ReactNode[]; correct: number }) {
+  return (
+    <div className="flex flex-col items-center gap-3">
+      {prompt}
+      <div className="flex gap-2">
+        {options.map((option, i) => (
+          <span key={i} className="relative rounded-inset border border-line bg-surface px-2 py-1 text-sm font-semibold">
+            {option}
+            {i === correct && (
+              <span className="absolute -inset-px animate-[preview-half_2.4s_linear_infinite] rounded-inset border-2 border-success opacity-0 [animation-delay:-1.2s]" />
+            )}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function Quiz({ view, me, players, ranking, winner, task, preview, question, onMove, onRound }: Props) {
   const playing = view.players.includes(me) && !(me in view.results);
   const [phase, setPhase] = useState<Phase>("intro");
   const [index, setIndex] = useState(0);
@@ -176,12 +197,13 @@ export function Quiz({ view, me, players, ranking, winner, intro, question, onMo
 
   if (phase === "intro") {
     return (
-      <section className="tile flex flex-col gap-4 p-4">
-        <p>{intro}</p>
-        <button type="button" className="btn btn-primary w-full" onClick={start}>
-          Start
-        </button>
-      </section>
+      <Intro
+        preview={preview}
+        time={`${QUIZ_DURATION_MS / 1000} sekund`}
+        task={task}
+        score="Liczą się trafienia, pomyłka blokuje na sekundę"
+        onStart={start}
+      />
     );
   }
 

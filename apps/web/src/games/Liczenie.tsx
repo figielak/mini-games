@@ -1,5 +1,5 @@
 import type { LiczenieView, LobbyPlayer, QuizMove } from "@mini-games/games";
-import { Quiz } from "./Quiz.tsx";
+import { Quiz, QuizPreview } from "./Quiz.tsx";
 
 interface Props {
   view: LiczenieView;
@@ -16,7 +16,8 @@ export function Liczenie({ view, ...props }: Props) {
     <Quiz
       {...props}
       view={view}
-      intro="Licz w pamięci i wybierz dobry wynik. Masz 30 sekund, pomyłka blokuje na sekundę."
+      task="Licz w pamięci i wybierz dobry wynik"
+      preview={<QuizPreview prompt={<span className="font-mono text-3xl font-semibold">7 × 6</span>} options={[36, 42, 48, 54].map((n) => <span className="font-mono">{n}</span>)} correct={1} />}
       question={(i) => {
         const p = view.problems[i % view.problems.length];
         return {

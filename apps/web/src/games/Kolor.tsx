@@ -1,6 +1,6 @@
 import { type Hsb, KOLOR_COUNT, KOLOR_SHOW_MS, kolorDistance, kolorHints, kolorHsbToRgb, type KolorView, type LobbyPlayer } from "@mini-games/games";
 import { useEffect, useState } from "react";
-import { Scores } from "../screens/ui.tsx";
+import { Intro, Scores } from "../screens/ui.tsx";
 
 interface Props {
   view: KolorView;
@@ -49,6 +49,25 @@ function Pairs({ targets, guesses }: { targets: Hsb[]; guesses: Hsb[] }) {
           </div>
           <span className="font-mono text-xs text-fg-muted">{match(t, guesses[i])}</span>
         </div>
+      ))}
+    </div>
+  );
+}
+
+/** Podgląd na ekranie instrukcji: wzór znika, potem pojawia się odtworzony kolor. */
+function Preview() {
+  return (
+    <div className="flex gap-6 text-xs text-fg-muted">
+      {(
+        [
+          ["Wzór", "#2f8fd8", ""],
+          ["Twój kolor", "#3f7fe6", "opacity-0 [animation-delay:-1.5s]"],
+        ] as const
+      ).map(([label, color, late]) => (
+        <span key={label} className="flex flex-col items-center gap-1">
+          <span className={`size-16 animate-[preview-half_3s_linear_infinite] rounded-inset ${late}`} style={{ backgroundColor: color }} />
+          {label}
+        </span>
       ))}
     </div>
   );
@@ -112,15 +131,13 @@ export function Kolor({ view, me, players, ranking, onMove }: Props) {
 
   if (phase === "intro") {
     return (
-      <section className="tile flex flex-col gap-4 p-4">
-        <p>
-          Zobaczysz {KOLOR_COUNT} kolorów, każdy przez 2 sekundy. Po każdym odtwórz go suwakami barwy, nasycenia i jasności. Liczy się średnia
-          zgodność z oryginałami: więcej znaczy lepiej.
-        </p>
-        <button type="button" className="btn btn-primary w-full" onClick={() => setPhase("show")}>
-          Start
-        </button>
-      </section>
+      <Intro
+        preview={<Preview />}
+        time={`${KOLOR_COUNT} kolorów, każdy widać przez ${KOLOR_SHOW_MS / 1000} sekundy`}
+        task="Odtwórz kolor suwakami barwy, nasycenia i jasności"
+        score="Liczy się średnia zgodność z oryginałami, więcej znaczy lepiej"
+        onStart={() => setPhase("show")}
+      />
     );
   }
 

@@ -1,14 +1,12 @@
 import { type LobbyPlayer, STOPER_VISIBLE_MS, type StoperView } from "@mini-games/games";
-import { type ReactNode, useEffect, useRef, useState } from "react";
-import { Scores } from "../screens/ui.tsx";
+import { useEffect, useRef, useState } from "react";
+import { Intro, Scores } from "../screens/ui.tsx";
 
 interface Props {
   view: StoperView;
   me: string;
   players: LobbyPlayer[];
   ranking?: string[];
-  /** Limit tury: widać go tylko przed startem, w trakcie liczenia zdradzałby upływ sekund. */
-  timer?: ReactNode;
   onMove: (move: { type: "result"; deviation: number }) => void;
 }
 
@@ -17,9 +15,26 @@ const COUNT_MS = 3000;
 
 const seconds = (ms: number) => (ms / 1000).toFixed(2).replace(".", ",");
 
+/** Podgląd na ekranie instrukcji: licznik biegnie, potem znika. */
+function Preview() {
+  return (
+    <>
+      {["1,00", "2,00", "3,00", "?,??"].map((text, i) => (
+        <span
+          key={text}
+          className={`absolute animate-[preview-quarter_4s_linear_infinite] text-4xl font-semibold tabular-nums ${i ? "opacity-0" : ""}`}
+          style={{ animationDelay: `${i - 4}s` }}
+        >
+          {text}
+        </span>
+      ))}
+    </>
+  );
+}
+
 type Phase = "intro" | "run" | "sent";
 
-export function Stoper({ view, me, players, ranking, timer, onMove }: Props) {
+export function Stoper({ view, me, players, ranking, onMove }: Props) {
   const playing = view.players.includes(me) && !(me in view.results);
   const [phase, setPhase] = useState<Phase>("intro");
   // Ujemne w trakcie odliczania przed startem.
@@ -74,24 +89,20 @@ export function Stoper({ view, me, players, ranking, timer, onMove }: Props) {
 
   if (phase === "intro") {
     return (
-      <section className="tile flex flex-col gap-4 p-4">
-        <div className="flex flex-col items-center gap-1">
-          <span className="label">Cel</span>
-          <span className="text-5xl font-semibold tabular-nums">{goal}</span>
-        </div>
-        <p>Po odliczaniu 3, 2, 1 stoper rusza od zera i po 3 sekundach znika. Dotknij, gdy uznasz, że minęło dokładnie {goal}. Liczy się odchyłka.</p>
-        {timer}
-        <button
-          type="button"
-          className="btn btn-primary w-full"
-          onClick={() => {
-            start.current = performance.now() + COUNT_MS;
-            setPhase("run");
-          }}
-        >
-          Start
-        </button>
-      </section>
+      <Intro
+        preview={<Preview />}
+        time={`Po odliczaniu 3, 2, 1 stoper rusza od zera i po ${STOPER_VISIBLE_MS / 1000} sekundach znika`}
+        task={
+          <>
+            Dotknij, gdy uznasz, że minęło dokładnie <span className="font-semibold tabular-nums">{goal}</span>
+          </>
+        }
+        score="Liczy się odchyłka od celu, mniej znaczy lepiej"
+        onStart={() => {
+          start.current = performance.now() + COUNT_MS;
+          setPhase("run");
+        }}
+      />
     );
   }
 

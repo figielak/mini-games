@@ -1,7 +1,7 @@
 import { Circle, type Icon, Square, Star, Triangle } from "@phosphor-icons/react";
 import type { LobbyPlayer, SimonView } from "@mini-games/games";
 import { useEffect, useRef, useState } from "react";
-import { Scores, Stats } from "../screens/ui.tsx";
+import { Intro, Scores, Stats } from "../screens/ui.tsx";
 
 interface Props {
   view: SimonView;
@@ -20,6 +20,24 @@ const PADS: { color: string; icon: Icon }[] = [
 ];
 const LIT_MS = 450;
 const GAP_MS = 150;
+
+/** Podgląd na ekranie instrukcji: pola zapalają się po kolei. */
+const PREVIEW_ORDER = [0, 3, 1, 2];
+
+function Preview() {
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      {PADS.map(({ color }, i) => (
+        <span key={color} className="relative size-12 rounded-inset" style={{ backgroundColor: `color-mix(in srgb, ${color} 22%, var(--color-bg))` }}>
+          <span
+            className="absolute inset-0 animate-[preview-quarter_2.4s_linear_infinite] rounded-inset opacity-0"
+            style={{ backgroundColor: color, animationDelay: `${PREVIEW_ORDER.indexOf(i) * 0.6 - 2.4}s` }}
+          />
+        </span>
+      ))}
+    </div>
+  );
+}
 
 type Phase = "intro" | "show" | "input" | "sent";
 
@@ -71,12 +89,13 @@ export function Simon({ view, me, players, ranking, onMove }: Props) {
 
   if (phase === "intro") {
     return (
-      <section className="tile flex flex-col gap-4 p-4">
-        <p>Zapamiętaj sekwencję i powtórz ją. Co rundę dochodzi jeden krok, pierwsza pomyłka kończy grę.</p>
-        <button type="button" className="btn btn-primary w-full" onClick={() => show(1)}>
-          Start
-        </button>
-      </section>
+      <Intro
+        preview={<Preview />}
+        time="Bez pośpiechu: co rundę dochodzi jeden krok"
+        task="Zapamiętaj sekwencję i powtórz ją"
+        score="Liczy się najdłuższa seria, pierwsza pomyłka kończy grę"
+        onStart={() => show(1)}
+      />
     );
   }
 

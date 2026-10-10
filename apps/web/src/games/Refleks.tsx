@@ -1,7 +1,7 @@
 import { type LobbyPlayer, REFLEKS_DURATION_MS, type RefleksView } from "@mini-games/games";
 import { Trophy } from "@phosphor-icons/react";
 import { useEffect, useRef, useState } from "react";
-import { Stats } from "../screens/ui.tsx";
+import { Intro, Stats } from "../screens/ui.tsx";
 
 type Move = { type: "result"; times: number[]; falseStarts: number };
 
@@ -120,6 +120,18 @@ function Results({ view, me, players, ranking, winner }: Omit<Props, "onMove">) 
   );
 }
 
+/** Podgląd na ekranie instrukcji: pole co chwilę zmienia kolor. */
+function Preview() {
+  return (
+    <>
+      <span className="font-semibold text-fg-muted">Czekaj…</span>
+      <span className="absolute inset-0 flex animate-[preview-quarter_2.4s_linear_infinite] items-center justify-center bg-accent font-semibold text-accent-fg opacity-0 [animation-delay:-1.2s]">
+        Teraz!
+      </span>
+    </>
+  );
+}
+
 export function Refleks({ view, me, players, ranking, winner, onMove }: Props) {
   const playing = view.players.includes(me) && !(me in view.results);
   const [phase, setPhase] = useState<Phase>("intro");
@@ -177,15 +189,13 @@ export function Refleks({ view, me, players, ranking, winner, onMove }: Props) {
 
   if (phase === "intro") {
     return (
-      <section className="tile flex flex-col gap-4 p-4">
-        <p>
-          Dotknij pola, gdy zmieni kolor. Masz 30 sekund: im szybciej reagujesz, tym więcej trafień. Dotknięcie przed
-          zmianą to falstart i strata czasu.
-        </p>
-        <button type="button" className="btn btn-primary w-full" onClick={start}>
-          Start
-        </button>
-      </section>
+      <Intro
+        preview={<Preview />}
+        time={`${REFLEKS_DURATION_MS / 1000} sekund`}
+        task="Dotknij pola, gdy zmieni kolor"
+        score="Liczą się trafienia; dotknięcie przed zmianą to falstart i strata czasu"
+        onStart={start}
+      />
     );
   }
 
