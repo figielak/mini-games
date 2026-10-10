@@ -20,7 +20,7 @@ export type View = State;
 // ponytail: pomiar na kliencie, da się podrobić; między znajomymi wystarczy.
 export const stoper: GameDefinition<State, Move> = {
   id: "stoper",
-  name: "Stoper 10 s",
+  name: "Stoper",
   minPlayers: 1,
   maxPlayers: 6,
   turnSeconds: 60,

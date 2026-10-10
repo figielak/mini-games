@@ -40,7 +40,7 @@ function scatter(rng: () => number, count: number): Dot[] {
 // ponytail: kropki są w widoku od startu (jak cele w Kolorze), da się podejrzeć; między znajomymi wystarczy.
 export const kropki: GameDefinition<State, Move> = {
   id: "kropki",
-  name: "Ile kropek?",
+  name: "Policz kropki",
   minPlayers: 1,
   maxPlayers: 6,
   turnSeconds: 120,

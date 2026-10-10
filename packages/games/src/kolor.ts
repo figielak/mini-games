@@ -59,7 +59,7 @@ const valid = ({ h, s, b }: Hsb) =>
 // ponytail: cele są w widoku od startu (jak sekwencja w Simonie), da się podejrzeć; między znajomymi wystarczy.
 export const kolor: GameDefinition<State, Move> = {
   id: "kolor",
-  name: "Kolor z pamięci",
+  name: "Odcień",
   minPlayers: 1,
   maxPlayers: 6,
   turnSeconds: 180,

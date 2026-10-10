@@ -42,7 +42,7 @@ export function problem(rng: Rng): Problem {
 
 export const liczenie: GameDefinition<State, Move> = {
   id: "liczenie",
-  name: "Szybkie liczenie",
+  name: "Liczenie",
   minPlayers: 1,
   maxPlayers: 6,
   turnSeconds: 60,
