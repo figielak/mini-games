@@ -49,8 +49,10 @@ Odcień = `kolor`, Gomoku = `piec-w-rzedzie`. Ranking w SQLite jest po `id`, wi�
 - Wynik: `score` = najdłuższa powtórzona seria, więcej lepiej. Walidacja: 0-100. Limit czasu: 0.
 
 ### Stoper (`stoper`)
-- Licznik biegnie od 0, po 3 s znika, gracz dotyka przy 10,00 s. Klient sam kończy po 20 s.
-- Wynik: `deviation` = odchyłka w ms (int, 0-10000), mniej lepiej. Limit czasu: 10000.
+- Po „Start” odliczanie 3, 2, 1 (dotknięcia ignorowane), potem licznik biegnie od 0, po 3 s znika, gracz dotyka przy celu. Klient sam kończy po dwukrotności celu.
+- Cel (`target`) losuje serwer: pełne sekundy 6-14 s, ten sam dla wszystkich w partii.
+- Grający nie widzi limitu tury po starcie (tykający pasek zdradzałby czas); po dotknięciu: odkryty czas i odchyłka ze znakiem.
+- Wynik: `deviation` = odchyłka w ms (int, od 0 do celu), mniej lepiej. Limit czasu: odchyłka równa celowi.
 
 ### Tabela Schultego (`schulte`)
 - Siatka 5×5 z liczbami 1-25 w losowym układzie, dotykasz po kolei od 1.
