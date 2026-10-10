@@ -1,4 +1,4 @@
-import { byScoreThenAverage, type GameDefinition, type PlayerId, rankResults } from "./core.ts";
+import { byScoreThenAverage, type GameDefinition, type PlayerId, ranked } from "./core.ts";
 import { QUESTIONS, type QuizMove, quizMoveSchema, type QuizResult, validQuiz } from "./quiz.ts";
 
 /** Klocków w figurze: od MIN na pierwszych parach, o jeden więcej co STEP par, do MAX. */
@@ -81,7 +81,7 @@ export const obrot: GameDefinition<State, Move> = {
 
   playerView: (state): View => state,
 
-  isOver: (state) => rankResults(state.players, state.results, byScoreThenAverage(score)),
+  ...ranked((state: State) => state.results, byScoreThenAverage(score)),
 
   waitingFor: (state) => state.players.filter((p) => !(p in state.results)),
 

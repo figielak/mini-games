@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { type GameDefinition, type PlayerId, rankResults } from "./core.ts";
+import { type GameDefinition, type PlayerId, ranked } from "./core.ts";
 
 export const ROUNDS = 10;
 export const MIN = 8;
@@ -81,7 +81,7 @@ export const kropki: GameDefinition<State, Move> = {
 
   playerView: (state): View => state,
 
-  isOver: (state) => rankResults(state.players, state.results, (a, b) => a - b),
+  ...ranked((state: State) => state.results, (a, b) => a - b),
 
   waitingFor: (state) => state.players.filter((p) => !(p in state.results)),
 

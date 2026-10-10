@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { byScoreThenAverage, type GameDefinition, type PlayerId, rankResults, shuffle } from "./core.ts";
+import { byScoreThenAverage, type GameDefinition, type PlayerId, ranked, shuffle } from "./core.ts";
 
 export const DURATION_MS = 30_000;
 /** Odstęp między bodźcami maleje liniowo z czasem partii: to jest „tempo rośnie”. */
@@ -77,7 +77,7 @@ export const stoj: GameDefinition<State, Move> = {
 
   playerView: (state): View => state,
 
-  isOver: (state) => rankResults(state.players, state.results, byScoreThenAverage(score)),
+  ...ranked((state: State) => state.results, byScoreThenAverage(score)),
 
   waitingFor: (state) => state.players.filter((p) => !(p in state.results)),
 

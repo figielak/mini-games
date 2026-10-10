@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { type GameDefinition, type PlayerId, rankResults, shuffle } from "./core.ts";
+import { type GameDefinition, type PlayerId, ranked, shuffle } from "./core.ts";
 import { CITIES } from "./mapa-dane.ts";
 
 export const ROUNDS = 10;
@@ -86,7 +86,7 @@ export const mapa: GameDefinition<State, Move> = {
 
   playerView: (state): View => state,
 
-  isOver: (state) => rankResults(state.players, state.results, (a, b) => a - b),
+  ...ranked((state: State) => state.results, (a, b) => a - b),
 
   waitingFor: (state) => state.players.filter((p) => !(p in state.results)),
 

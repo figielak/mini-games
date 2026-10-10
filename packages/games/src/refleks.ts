@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { byHitsThenAverage, type GameDefinition, type PlayerId, rankResults } from "./core.ts";
+import { byHitsThenAverage, type GameDefinition, type PlayerId, ranked } from "./core.ts";
 
 export const DURATION_MS = 30_000;
 const MIN_REACTION_MS = 100;
@@ -52,7 +52,7 @@ export const refleks: GameDefinition<State, Move> = {
 
   playerView: (state): View => state,
 
-  isOver: (state) => rankResults(state.players, state.results, byHitsThenAverage),
+  ...ranked((state: State) => state.results, byHitsThenAverage),
 
   waitingFor: (state) => state.players.filter((p) => !(p in state.results)),
 
