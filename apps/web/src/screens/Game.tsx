@@ -1,5 +1,5 @@
 import { ArrowCounterClockwise, Check, Timer, UsersThree } from "@phosphor-icons/react";
-import { CHINCZYK_TRACK, type ChinczykView, GAMES, type KampusTourView, type KolorView, type KoloView, type KropkiView, type LiczenieView, type PanstwaMiastaView, type PiecWRzedzieView, type RefleksView, type RoomView, SCHULTE_SIZE, type SchulteView, type SimonView, type StatkiView, type StoperView, type StroopView } from "@mini-games/games";
+import { CHINCZYK_TRACK, type ChinczykView, GAMES, type KampusTourView, type KolorView, type KoloView, type KropkiView, type LiczenieView, type PanstwaMiastaView, type PiecWRzedzieView, type RefleksView, type RoomView, KROPKI_ROUNDS, SCHULTE_SIZE, type SchulteView, type SimonView, type StatkiView, type StoperView, type StroopView } from "@mini-games/games";
 import { useEffect, useMemo, useState } from "react";
 import { Chinczyk } from "../games/Chinczyk.tsx";
 import { KampusTour } from "../games/KampusTour.tsx";
@@ -72,6 +72,8 @@ export function Game({ view, me, dropped, send }: Props) {
   const fleet = def.id === "statki" && view.phase === "playing" ? (game.view as StatkiView) : null;
   // Tabela Schultego w trakcie partii zamiast punktów pokazuje postęp każdego gracza.
   const schulte = def.id === "schulte" && view.phase === "playing" ? (game.view as SchulteView) : null;
+  // Policz kropki tak samo: numer rundy każdego gracza.
+  const kropki = def.id === "kropki" && view.phase === "playing" ? (game.view as KropkiView) : null;
   const myColor = view.players.find((p) => p.id === me)?.color;
   const winner = view.phase === "over" ? game.result?.winner : undefined;
   const winnerColor = view.players.find((p) => p.id === winner)?.color;
@@ -143,7 +145,9 @@ export function Game({ view, me, dropped, send }: Props) {
                   ) : fleet ? (
                     <FleetLeft board={fleet.boards[id]} lengths={fleet.lengths} color={p?.color ?? "#8b8b92"} />
                   ) : schulte ? (
-                    <SchulteProgress found={id in schulte.results ? SCHULTE_LAST : (schulte.progress[id] ?? 0)} color={p?.color} />
+                    <Progress done={id in schulte.results ? SCHULTE_LAST : (schulte.progress[id] ?? 0)} total={SCHULTE_LAST} color={p?.color} />
+                  ) : kropki ? (
+                    <Progress done={id in kropki.results ? KROPKI_ROUNDS : (kropki.progress[id] ?? 0)} total={KROPKI_ROUNDS} color={p?.color} />
                   ) : (
                     // Klucz z wyniku: po wygranej liczba montuje się od nowa i wskakuje.
                     <span
@@ -341,15 +345,15 @@ const MINI_GAMES = new Set(["refleks", "simon", "stoper", "schulte", "stroop", "
 
 const SCHULTE_LAST = SCHULTE_SIZE * SCHULTE_SIZE;
 
-/** Cienki pasek i licznik znalezionych liczb w pigułce gracza. */
-function SchulteProgress({ found, color }: { found: number; color?: string }) {
+/** Cienki pasek i licznik postępu (znalezione liczby, rundy) w pigułce gracza. */
+function Progress({ done, total, color }: { done: number; total: number; color?: string }) {
   return (
     <>
       <span className="h-1 w-10 overflow-hidden rounded-full bg-line" aria-hidden>
-        <span className="block h-full rounded-full transition-[width] duration-200" style={{ width: `${(found / SCHULTE_LAST) * 100}%`, backgroundColor: color }} />
+        <span className="block h-full rounded-full transition-[width] duration-200" style={{ width: `${(done / total) * 100}%`, backgroundColor: color }} />
       </span>
       <span className="font-mono text-xs text-fg tabular-nums">
-        {found}/{SCHULTE_LAST}
+        {done}/{total}
       </span>
     </>
   );
