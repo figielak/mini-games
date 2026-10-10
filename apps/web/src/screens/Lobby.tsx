@@ -21,7 +21,7 @@ import {
   SquaresFour,
   Timer,
 } from "@phosphor-icons/react";
-import { GAMES, MAX_PLAYERS, PLAYER_COLORS, type RoomView } from "@mini-games/games";
+import { GAMES, type LobbyPlayer, MAX_PLAYERS, PLAYER_COLORS, type RoomView } from "@mini-games/games";
 import { useState } from "react";
 import { Screen, type Send, StickyBar } from "./ui.tsx";
 
@@ -51,7 +51,7 @@ export function Lobby({ view, me, dropped, send, onLeave }: Props) {
 
   return (
     <Screen dropped={dropped}>
-      {view ? <Code code={view.code} /> : <div className="tile h-36 animate-pulse" aria-label="Wczytywanie" />}
+      {view ? <Code code={view.code} onLeave={onLeave} /> : <div className="tile h-36 animate-pulse" aria-label="Wczytywanie" />}
 
       <section className="tile">
         <div className="mb-3 flex items-baseline justify-between">
@@ -63,56 +63,69 @@ export function Lobby({ view, me, dropped, send, onLeave }: Props) {
           )}
         </div>
         {view ? (
-          <ul className="flex flex-col gap-1">
-            {view.players.map((p) => {
-              const seated = view.seats.includes(p.id);
-              const row = (
-                <>
-                  <span className="size-3 shrink-0 rounded-full" style={{ backgroundColor: p.color }} aria-hidden />
-                  <span className="truncate">
-                    {p.nick}
-                    {p.id === me && <span className="text-fg-muted"> (ty)</span>}
-                  </span>
-                  <span className="ml-auto flex items-center gap-2 text-sm text-fg-muted">
-                    {!p.connected && "rozłączony"}
-                    {def &&
-                      (!seated ? (
-                        "ogląda"
-                      ) : p.ready || p.id === view.hostId ? (
-                        <span className="flex items-center gap-1 text-fg">
-                          <Check size={14} weight="bold" aria-hidden />
-                          gotowy
+          ((def
+            ? [
+                [`Grają ${view.seats.length}/${def.maxPlayers}`, view.seats.map((id) => view.players.find((p) => p.id === id)!)],
+                ["Oglądają", view.players.filter((p) => !view.seats.includes(p.id))],
+              ]
+            : [["", view.players]]
+          ) as [string, LobbyPlayer[]][]
+          )
+            .filter(([, players]) => players.length > 0)
+            .map(([title, players]) => (
+              <div key={title} className="mt-2 first:mt-0">
+                {title && <h3 className="mb-1 px-1 text-sm text-fg-muted">{title}</h3>}
+                <ul className="flex flex-col gap-1">
+                  {players.map((p) => {
+                    const seated = view.seats.includes(p.id);
+                    const row = (
+                      <>
+                        <span className="size-3 shrink-0 rounded-full" style={{ backgroundColor: p.color }} aria-hidden />
+                        <span className="truncate">
+                          {p.nick}
+                          {p.id === me && <span className="text-fg-muted"> (ty)</span>}
                         </span>
-                      ) : (
-                        "niegotowy"
-                      ))}
-                    {p.id === view.hostId && <Crown size={18} weight="fill" aria-label="Gospodarz" />}
-                  </span>
-                </>
-              );
-              const className = `flex w-full min-h-11 items-center gap-3 rounded-inset px-3 text-left transition-opacity ${p.connected ? "" : "opacity-50"}`;
-              const style = { backgroundColor: `color-mix(in srgb, ${p.color} ${seated || !def ? 10 : 4}%, transparent)` };
-              return (
-                <li key={p.id}>
-                  {isHost && def ? (
-                    <button
-                      type="button"
-                      className={className}
-                      style={style}
-                      aria-pressed={seated}
-                      onClick={() => send("toggleSeat", { id: p.id })}
-                    >
-                      {row}
-                    </button>
-                  ) : (
-                    <div className={className} style={style}>
-                      {row}
-                    </div>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
+                        <span className="ml-auto flex items-center gap-2 text-sm text-fg-muted">
+                          {!p.connected && "rozłączony"}
+                          {def &&
+                            seated &&
+                            (p.ready || p.id === view.hostId ? (
+                              <span className="flex items-center gap-1 text-fg">
+                                <Check size={14} weight="bold" aria-hidden />
+                                gotowy
+                              </span>
+                            ) : (
+                              "niegotowy"
+                            ))}
+                          {p.id === view.hostId && <Crown size={18} weight="fill" aria-label="Gospodarz" />}
+                        </span>
+                      </>
+                    );
+                    const className = `flex w-full min-h-11 items-center gap-3 rounded-inset px-3 text-left transition-opacity ${p.connected ? "" : "opacity-50"}`;
+                    const style = { backgroundColor: `color-mix(in srgb, ${p.color} ${seated || !def ? 10 : 4}%, transparent)` };
+                    return (
+                      <li key={p.id}>
+                        {isHost && def ? (
+                          <button
+                            type="button"
+                            className={className}
+                            style={style}
+                            aria-pressed={seated}
+                            onClick={() => send("toggleSeat", { id: p.id })}
+                          >
+                            {row}
+                          </button>
+                        ) : (
+                          <div className={className} style={style}>
+                            {row}
+                          </div>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))
         ) : (
           <div className="h-11 animate-pulse rounded-inset bg-surface-inset" />
         )}
@@ -121,17 +134,17 @@ export function Lobby({ view, me, dropped, send, onLeave }: Props) {
           <p className="mt-3 text-sm text-fg-muted">Podaj znajomym kod pokoju, żeby dołączyli.</p>
         )}
         {isHost && def && view!.players.length > 1 && (
-          <p className="mt-3 text-sm text-fg-muted">Dotknij gracza, żeby zmienić, kto gra.</p>
+          <p className="mt-3 text-sm text-fg-muted">Dotknij gracza, żeby przenieść go między grającymi a oglądającymi.</p>
         )}
       </section>
 
       {view &&
-        GROUPS.map(([title, quick]) => (
+        (isHost ? GROUPS : def ? ([["Wybrana gra", null]] as const) : []).map(([title, quick]) => (
           <section key={title}>
             <h2 className="label mb-2 px-1">{title}</h2>
             <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label={title}>
               {Object.values(GAMES)
-                .filter((g) => (g.minPlayers === 1) === quick)
+                .filter((g) => (quick === null ? g === def : (g.minPlayers === 1) === quick))
                 .map((g) => {
                   const Icon = ICONS[g.id] ?? Play;
                   const tooMany = view.players.length > g.maxPlayers;
@@ -163,11 +176,6 @@ export function Lobby({ view, me, dropped, send, onLeave }: Props) {
             </div>
           </section>
         ))}
-
-      <button type="button" className="btn btn-ghost mt-auto w-full" onClick={onLeave}>
-        <SignOut size={18} aria-hidden />
-        Wyjdź z pokoju
-      </button>
 
       {view && (
         <StickyBar>
@@ -258,7 +266,7 @@ function ColorPicker({ view, me, send }: { view: RoomView; me: string; send: Sen
   );
 }
 
-function Code({ code }: { code: string }) {
+function Code({ code, onLeave }: { code: string; onLeave: () => void }) {
   const [copied, setCopied] = useState(false);
   const url = `${location.origin}/?kod=${code}`;
 
@@ -280,14 +288,22 @@ function Code({ code }: { code: string }) {
   }
 
   return (
-    <section className="tile flex items-end justify-between gap-4">
-      <button type="button" className="text-left" onClick={copy} aria-label={`Kod pokoju ${code}, kopiuj`}>
+    <section className="tile">
+      <div className="flex items-center justify-between">
         <h2 className="label">{copied ? "Skopiowano!" : "Kod pokoju"}</h2>
-        <p className="mt-1 font-mono text-6xl font-medium tracking-[0.12em]">{code}</p>
-      </button>
-      <button type="button" className="btn btn-ghost size-12 shrink-0 p-0" onClick={share} aria-label="Udostępnij link">
-        {copied ? <Check size={20} weight="bold" aria-hidden /> : <ShareNetwork size={20} weight="bold" aria-hidden />}
-      </button>
+        <button type="button" className="-m-2 flex items-center gap-1.5 p-2 text-sm text-fg-muted" onClick={onLeave}>
+          <SignOut size={16} aria-hidden />
+          Wyjdź
+        </button>
+      </div>
+      <div className="mt-1 flex items-end justify-between gap-4">
+        <button type="button" className="text-left" onClick={copy} aria-label={`Kod pokoju ${code}, kopiuj`}>
+          <span className="font-mono text-6xl font-medium tracking-[0.12em]">{code}</span>
+        </button>
+        <button type="button" className="btn btn-ghost size-12 shrink-0 p-0" onClick={share} aria-label="Udostępnij link">
+          {copied ? <Check size={20} weight="bold" aria-hidden /> : <ShareNetwork size={20} weight="bold" aria-hidden />}
+        </button>
+      </div>
     </section>
   );
 }
