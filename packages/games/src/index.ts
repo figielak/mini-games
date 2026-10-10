@@ -49,7 +49,7 @@ export type { View as PiecWRzedzieView } from "./piec-w-rzedzie.ts";
 export { DURATION_MS as REFLEKS_DURATION_MS, type View as RefleksView } from "./refleks.ts";
 export type { View as SimonView } from "./simon.ts";
 export { PENALTY_MS as SCHULTE_PENALTY_MS, SIZE as SCHULTE_SIZE, total as schulteTotal, type View as SchulteView } from "./schulte.ts";
-export { TARGET_MS as STOPER_TARGET_MS, VISIBLE_MS as STOPER_VISIBLE_MS, type View as StoperView } from "./stoper.ts";
+export { VISIBLE_MS as STOPER_VISIBLE_MS, type View as StoperView } from "./stoper.ts";
 export { COLORS as STROOP_COLORS, type View as StroopView } from "./stroop.ts";
 export type { View as LiczenieView } from "./liczenie.ts";
 export { ATTEMPTS as KOLO_ATTEMPTS, judge as koloJudge, MAX_POINTS as KOLO_MAX_POINTS, type Point as KoloPoint, type View as KoloView } from "./kolo.ts";
