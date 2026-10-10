@@ -48,6 +48,7 @@ export class LobbyRoom extends Room {
 
   private phase: Phase = "lobby";
   private gameId: string | null = null;
+  private mode: string | null = null;
   private seats: string[] = [];
   private scores: Record<string, number> = {};
   private match: Match | null = null;
@@ -65,7 +66,16 @@ export class LobbyRoom extends Room {
       const def = GAMES[gameId];
       if (!this.isHost(client) || this.phase !== "lobby" || !def) return;
       this.gameId = gameId;
+      this.mode = (def.modes?.find((m) => m.default) ?? def.modes?.[0])?.id ?? null;
       this.seats = [...this.players.keys()].slice(0, def.maxPlayers);
+      this.resetReady();
+    });
+
+    // Zmiana trybu kasuje gotowość: goście zgodzili się na co innego.
+    this.on("pickMode", (client, { mode }) => {
+      const def = this.gameId ? GAMES[this.gameId] : undefined;
+      if (!this.isHost(client) || this.phase !== "lobby" || !def?.modes?.some((m) => m.id === mode)) return;
+      this.mode = mode;
       this.resetReady();
     });
 
@@ -234,7 +244,7 @@ export class LobbyRoom extends Room {
 
   private startMatch(def: GameDefinition<unknown, unknown>) {
     const rng = createRng(crypto.getRandomValues(new Uint32Array(1))[0]);
-    this.match = { def, state: def.setup(this.seats, rng), rng, result: null };
+    this.match = { def, state: def.setup(this.seats, rng, this.mode ?? undefined), rng, result: null };
     this.phase = "playing";
     this.startTurnTimer();
   }
@@ -309,6 +319,7 @@ export class LobbyRoom extends Room {
       players: [...this.players.values()],
       phase: this.phase,
       gameId: this.gameId,
+      mode: this.mode,
       seats: this.seats,
       scores: this.scores,
       game: match && {

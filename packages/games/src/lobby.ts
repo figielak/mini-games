@@ -24,6 +24,8 @@ export interface RoomView {
   players: LobbyPlayer[];
   phase: Phase;
   gameId: string | null;
+  /** Tryb wybranej gry (id z `modes`); null, gdy gra nie ma trybów. */
+  mode: string | null;
   /** Kto gra w wybranej grze, w kolejności ruchów. Reszta ogląda. */
   seats: PlayerId[];
   /** Wygrane partie w tym pokoju. */
@@ -48,6 +50,7 @@ export function cleanNick(raw: unknown): string | null {
 /** Schematy wiadomości od klienta do pokoju; serwer odrzuca wszystko, co do nich nie pasuje. */
 export const ROOM_MESSAGES = {
   pickGame: z.object({ gameId: z.string() }),
+  pickMode: z.object({ mode: z.string() }),
   toggleSeat: z.object({ id: z.string() }),
   pickColor: z.object({ color: z.enum(PLAYER_COLORS) }),
   ready: z.object({ ready: z.boolean() }),

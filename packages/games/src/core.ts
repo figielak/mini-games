@@ -14,7 +14,10 @@ export interface GameDefinition<State, Move> {
   maxPlayers: number;
   /** Kształt ruchu przychodzącego z sieci; reguły sprawdza dopiero validateMove. */
   moveSchema: z.ZodType<Move>;
-  setup(players: PlayerId[], rng: Rng): State;
+  /** Tryby do wyboru w lobby, w kolejności wyświetlania; domyślny ma `default` (bez flagi: pierwszy). Gra bez trybów pomija to pole. */
+  modes?: { id: string; name: string; hint: string; default?: boolean }[];
+  /** `mode` to id z `modes` wybrane przez gospodarza; nieznane albo brak oznacza tryb domyślny. */
+  setup(players: PlayerId[], rng: Rng, mode?: string): State;
   validateMove(state: State, player: PlayerId, move: Move): boolean;
   applyMove(state: State, player: PlayerId, move: Move, rng: Rng): State;
   /** Widok stanu dla konkretnego gracza: tu ukrywamy informacje. Obserwator dostaje widok dla "". */
