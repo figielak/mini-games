@@ -111,3 +111,6 @@ export const GAMES: Record<string, GameDefinition<any, any>> = Object.assign(Obj
   [kat.id]: kat,
   [panstwaMiasta.id]: panstwaMiasta,
 });
+
+/** Id mini-gier (gry solo, minPlayers 1): pula turnieju i lista na ekranie mini-gier. */
+export const MINI_GAME_IDS = Object.keys(GAMES).filter((id) => GAMES[id].minPlayers === 1);
