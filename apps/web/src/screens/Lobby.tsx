@@ -18,6 +18,7 @@ import {
   type Icon,
   Lightning,
   LineSegment,
+  MagnifyingGlass,
   NumberSquareOne,
   Palette,
   Play,
@@ -283,6 +284,7 @@ const ICONS: Record<string, Icon> = {
   srodek: LineSegment,
   stoj: HandPalm,
   sledzenie: CirclesThree,
+  inny: MagnifyingGlass,
 };
 
 function seats(g: { minPlayers: number; maxPlayers: number }) {
@@ -310,6 +312,7 @@ const BLURBS: Record<string, string> = {
   srodek: "Odcinek pod losowym kątem, dotykasz dokładnie jego środka. 10 rund, wygrywa najmniejsza suma błędów.",
   stoj: "Zielone pole dotykasz, czerwonego nie wolno. 30 s, tempo rośnie, błąd zabiera 2 punkty.",
   sledzenie: "Kulki lecą po polu, trzy z nich są celami. Widzisz je krótko, potem śledzisz ruch i wskazujesz te trzy.",
+  inny: "Siatka identycznych symboli, jeden różni się obrotem, odcieniem, rozmiarem albo kształtem. 30 s, siatka rośnie po każdym trafieniu.",
 };
 
 /** Nazwy kolorów z PLAYER_COLORS (ta sama kolejność), dla czytników ekranu. */

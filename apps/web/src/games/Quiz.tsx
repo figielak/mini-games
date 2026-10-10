@@ -13,11 +13,16 @@ interface Props {
   /** Ekran instrukcji: co zrobić i podgląd; czas i punktacja są wspólne. */
   task: string;
   preview: ReactNode;
-  /** Pytanie i cztery odpowiedzi dla pytania nr i; correct to indeks dobrej. */
-  question: (i: number) => { prompt: ReactNode; options: ReactNode[]; correct: number };
+  /**
+   * Pytanie i cztery odpowiedzi dla pytania nr i; correct to indeks dobrej.
+   * Z `cols` (Inny element) nie ma kafla z pytaniem, a odpowiedzi to siatka o tylu kolumnach z linią `status` pod spodem.
+   */
+  question: (i: number) => { prompt?: ReactNode; options: ReactNode[]; correct: number; cols?: number; status?: ReactNode };
+  /** Po pomyłce wraca to samo pytanie zamiast następnego; czas trafienia liczy się od pierwszego pokazania. */
+  retry?: boolean;
   onMove: (move: QuizMove) => void;
-  /** Trwa runda: ekran gry chowa wtedy limit platformy, żeby nie było dwóch zegarów. */
-  onRound?: (on: boolean) => void;
+  /** Start rundy (ile ms potrwa) i jej koniec (null): nagłówek pokazuje wtedy czas rundy zamiast limitu platformy. */
+  onRound?: (msLeft: number | null) => void;
 }
 
 /** Bez kary losowe klepanie byłoby szybsze niż myślenie. */
@@ -146,14 +151,13 @@ export function QuizPreview({ prompt, options, correct }: { prompt: ReactNode; o
   );
 }
 
-export function Quiz({ view, me, players, ranking, winner, task, preview, question, onMove, onRound }: Props) {
+export function Quiz({ view, me, players, ranking, winner, task, preview, question, retry, onMove, onRound }: Props) {
   const playing = view.players.includes(me) && !(me in view.results);
   const [phase, setPhase] = useState<Phase>("intro");
   const [index, setIndex] = useState(0);
-  const [now, setNow] = useState(0);
   /** Ostatnio dotknięta odpowiedź: zielony błysk przy trafieniu, czerwony z potrząśnięciem przy pomyłce. */
   const [flash, setFlash] = useState<{ i: number; ok: boolean; id: number } | null>(null);
-  const run = useRef({ start: 0, shownAt: 0, times: [] as number[], errors: 0, timer: 0 });
+  const run = useRef({ start: 0, shownAt: 0, times: [] as number[], errors: 0, streak: 0, timer: 0 });
 
   function next() {
     run.current.shownAt = performance.now();
@@ -163,8 +167,7 @@ export function Quiz({ view, me, players, ranking, winner, task, preview, questi
 
   function start() {
     const t = performance.now();
-    run.current = { start: t, shownAt: t, times: [], errors: 0, timer: 0 };
-    setNow(t);
+    run.current = { start: t, shownAt: t, times: [], errors: 0, streak: 0, timer: 0 };
     setPhase("play");
   }
 
@@ -175,23 +178,24 @@ export function Quiz({ view, me, players, ranking, winner, task, preview, questi
     const ok = option === question(index).correct;
     setFlash((f) => ({ i: option, ok, id: (f?.id ?? 0) + 1 }));
     if (ok) {
+      r.streak++;
       // ponytail: odpowiedź po 5 s liczona jako 5 s, szybsza niż 150 ms przepada (serwer by ją odrzucił)
       if (took >= MIN_ANSWER) r.times.push(Math.min(took, MAX_ANSWER));
       next();
     } else {
       r.errors++;
+      r.streak = 0;
       navigator.vibrate?.(60);
       setPhase("wrong");
-      r.timer = window.setTimeout(next, BLOCK_MS);
+      r.timer = window.setTimeout(retry ? () => setPhase("play") : next, BLOCK_MS);
     }
   }
 
-  // Zegar gry: odświeża licznik i kończy partię po 30 s.
+  // Zegar gry: kończy partię po 30 s (czas do końca pokazuje nagłówek).
   useEffect(() => {
     if (phase === "intro" || phase === "sent") return;
     const id = setInterval(() => {
       const r = run.current;
-      setNow(performance.now());
       if (performance.now() - r.start < QUIZ_DURATION_MS) return;
       clearTimeout(r.timer);
       setPhase("sent");
@@ -202,7 +206,8 @@ export function Quiz({ view, me, players, ranking, winner, task, preview, questi
 
   useEffect(() => () => clearTimeout(run.current.timer), []);
 
-  useEffect(() => onRound?.(phase === "play" || phase === "wrong"), [phase]);
+  const idle = phase === "intro" || phase === "sent";
+  useEffect(() => onRound?.(idle ? null : QUIZ_DURATION_MS), [idle]);
 
   if (!playing || phase === "sent") return <Results view={view} me={me} players={players} ranking={ranking} winner={winner} />;
 
@@ -219,20 +224,21 @@ export function Quiz({ view, me, players, ranking, winner, task, preview, questi
   }
 
   const q = question(index);
-  const left = Math.max(0, Math.ceil((QUIZ_DURATION_MS - (now - run.current.start)) / 1000));
   return (
     <div className="flex flex-1 flex-col gap-3">
       <Stats
         items={[
           { label: "Trafienia", value: run.current.times.length },
           { label: "Błędy", value: run.current.errors, warn: run.current.errors > 0 },
-          { label: "Do końca", value: `${left} s` },
+          { label: "Seria", value: run.current.streak },
         ]}
       />
-      <div className="tile flex min-h-32 flex-1 items-center justify-center p-4">
-        {phase === "wrong" ? <span className="text-2xl font-semibold text-warning">Źle!</span> : q.prompt}
-      </div>
-      <div className="grid grid-cols-2 gap-3">
+      {!q.cols && (
+        <div className="tile flex min-h-32 flex-1 items-center justify-center p-4">
+          {phase === "wrong" ? <span className="text-2xl font-semibold text-warning">Źle!</span> : q.prompt}
+        </div>
+      )}
+      <div className={q.cols ? "grid gap-2" : "grid grid-cols-2 gap-3"} style={q.cols ? { gridTemplateColumns: `repeat(${q.cols}, 1fr)` } : undefined}>
         {q.options.map((option, i) => (
           <button
             // Klucz z błysku: przycisk montuje się od nowa i animacja startuje jeszcze raz.
@@ -240,7 +246,7 @@ export function Quiz({ view, me, players, ranking, winner, task, preview, questi
             type="button"
             disabled={phase !== "play"}
             onPointerDown={() => answer(i)}
-            className={`flex min-h-24 touch-none select-none items-center justify-center gap-2 rounded-tile border bg-surface text-xl font-semibold ${
+            className={`flex touch-none select-none items-center justify-center border bg-surface ${q.cols ? "aspect-square rounded-inset" : "min-h-24 gap-2 rounded-tile text-xl font-semibold"} ${
               phase !== "wrong" ? "border-line" : i === flash?.i ? "border-warning" : "border-line opacity-40"
             } ${i === flash?.i ? (flash.ok ? "animate-[tile-hit_0.35s_ease-out]" : "animate-[tile-miss_0.35s_ease-out]") : ""}`}
           >
@@ -248,6 +254,11 @@ export function Quiz({ view, me, players, ranking, winner, task, preview, questi
           </button>
         ))}
       </div>
+      {q.cols && (
+        <p role="status" className={`flex h-6 items-center justify-center ${phase === "wrong" ? "font-semibold text-warning" : "text-fg-muted"}`}>
+          {phase === "wrong" ? "Źle!" : q.status}
+        </p>
+      )}
     </div>
   );
 }

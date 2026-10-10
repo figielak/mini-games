@@ -1,5 +1,5 @@
 import { ArrowCounterClockwise, Check, Timer, UsersThree } from "@phosphor-icons/react";
-import { CHINCZYK_TRACK, type ChinczykView, GAMES, type KampusTourView, type KolorView, type KoloView, type KropkiView, type LiczenieView, type MemoryView, type PanstwaMiastaView, type PiecWRzedzieView, type RefleksView, type RokView, type RoomView, type SledzenieView, KROPKI_ROUNDS, ROK_ROUNDS, SCHULTE_SIZE, type SchulteView, type SimonView, type SrodekView, type StatkiView, type StojView, type StoperView, type StroopView } from "@mini-games/games";
+import { CHINCZYK_TRACK, type ChinczykView, GAMES, type InnyView, type KampusTourView, type KolorView, type KoloView, type KropkiView, type LiczenieView, type MemoryView, type PanstwaMiastaView, type PiecWRzedzieView, QUIZ_DURATION_MS, type RefleksView, type RokView, type RoomView, type SledzenieView, KROPKI_ROUNDS, ROK_ROUNDS, SCHULTE_SIZE, type SchulteView, type SimonView, type SrodekView, type StatkiView, type StojView, type StoperView, type StroopView } from "@mini-games/games";
 import { useEffect, useMemo, useState } from "react";
 import { Chinczyk } from "../games/Chinczyk.tsx";
 import { KampusTour } from "../games/KampusTour.tsx";
@@ -17,6 +17,7 @@ import { Simon } from "../games/Simon.tsx";
 import { Sledzenie } from "../games/Sledzenie.tsx";
 import { Srodek } from "../games/Srodek.tsx";
 import { FleetLeft, Statki } from "../games/Statki.tsx";
+import { Inny } from "../games/Inny.tsx";
 import { Stoj } from "../games/Stoj.tsx";
 import { Stoper } from "../games/Stoper.tsx";
 import { Stroop } from "../games/Stroop.tsx";
@@ -42,8 +43,9 @@ export function Game({ view, me, dropped, send }: Props) {
     if (myTurn) navigator.vibrate?.(40);
   }, [myTurn]);
 
-  // Quizy (Kolor liter, Liczenie) mają w rundzie własny zegar „Do końca”; limit platformy obok niego tylko myli.
-  const [inRound, setInRound] = useState(false);
+  // Quizy (Kolor liter, Liczenie, Inny element): w rundzie pasek w nagłówku pokazuje jej 30 s zamiast limitu platformy.
+  const [round, setRound] = useState<{ msLeft: number } | null>(null);
+  const onRound = (msLeft: number | null) => setRound(msLeft === null ? null : { msLeft });
   // Poświata tła w kolorze gracza, na którego czekamy; poza turą jednej osoby zostaje akcent.
   const turnColor = view.phase === "playing" && game.waitingFor.length === 1 ? view.players.find((p) => p.id === game.waitingFor[0])?.color : undefined;
   useEffect(() => {
@@ -128,8 +130,13 @@ export function Game({ view, me, dropped, send }: Props) {
               </h1>
             </div>
             {/* Na ekranie instrukcji limit jeszcze nie ruszył. Stoper: tykający limit zdradzałby upływ sekund, więc grający go nie widzi. */}
-            {view.phase === "playing" && !game.intro && !(def.id === "stoper" && myTurn) && !inRound && (
-              <Countdown game={game} total={def.turn?.(game.view).seconds ?? def.turnSeconds} color={myTurn ? myColor : undefined} label={MINI_GAMES.has(def.id) ? "Limit" : undefined} />
+            {view.phase === "playing" && !game.intro && !(def.id === "stoper" && myTurn) && (
+              <Countdown
+                game={round ?? game}
+                total={round ? QUIZ_DURATION_MS / 1000 : (def.turn?.(game.view).seconds ?? def.turnSeconds)}
+                color={myTurn ? myColor : undefined}
+                label={round ? "Czas" : MINI_GAMES.has(def.id) ? "Limit" : undefined}
+              />
             )}
             <ul className="flex flex-wrap gap-2">
               {view.seats.map((id) => {
@@ -336,6 +343,19 @@ export function Game({ view, me, dropped, send }: Props) {
           />
         )}
 
+        {def.id === "inny" && (
+          <Inny
+            key={(game.view as InnyView).trials.map((t) => t.odd).join()}
+            view={game.view as InnyView}
+            me={me}
+            players={view.players}
+            ranking={game.result?.ranking}
+            winner={winner}
+            onMove={(move) => send("move", move)}
+            onRound={onRound}
+          />
+        )}
+
         {def.id === "stroop" && (
           <Stroop
             key={(game.view as StroopView).trials.map((t) => t.word * 4 + t.ink).join("")}
@@ -345,7 +365,7 @@ export function Game({ view, me, dropped, send }: Props) {
             ranking={game.result?.ranking}
             winner={winner}
             onMove={(move) => send("move", move)}
-            onRound={setInRound}
+            onRound={onRound}
           />
         )}
 
@@ -358,7 +378,7 @@ export function Game({ view, me, dropped, send }: Props) {
             ranking={game.result?.ranking}
             winner={winner}
             onMove={(move) => send("move", move)}
-            onRound={setInRound}
+            onRound={onRound}
           />
         )}
 
@@ -410,7 +430,7 @@ export function Game({ view, me, dropped, send }: Props) {
   );
 }
 
-const MINI_GAMES = new Set(["refleks", "simon", "stoper", "schulte", "stroop", "liczenie", "kolo", "kolor", "kropki", "rok", "srodek", "stoj", "sledzenie", "panstwa-miasta"]);
+const MINI_GAMES = new Set(["refleks", "simon", "stoper", "schulte", "stroop", "liczenie", "kolo", "kolor", "kropki", "rok", "srodek", "stoj", "sledzenie", "inny", "panstwa-miasta"]);
 
 const SCHULTE_LAST = SCHULTE_SIZE * SCHULTE_SIZE;
 
@@ -468,7 +488,7 @@ function OverActions({ view, me, send }: { view: RoomView; me: string; send: Sen
  * `color`: pasek w kolorze gracza (moja tura). Czerwień i tak przychodzi na ostatnie 10 s.
  * `label`: podpis przed paskiem (mini-gry mają własny zegar partii, więc limit platformy musi być nazwany).
  */
-function Countdown({ game, total, tense, color, label }: { game: NonNullable<RoomView["game"]>; total?: number; tense?: boolean; color?: string; label?: string }) {
+function Countdown({ game, total, tense, color, label }: { game: { msLeft: number | null }; total?: number; tense?: boolean; color?: string; label?: string }) {
   const deadline = useMemo(() => (game.msLeft === null ? null : Date.now() + game.msLeft), [game]);
   const [now, setNow] = useState(Date.now);
 
