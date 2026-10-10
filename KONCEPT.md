@@ -87,6 +87,8 @@ Po partii ekran podsumowania (`KampusSummary.tsx`): wykres majątku, zapłacone 
 - **Policz kropki**: 10 rund, w każdej 8-40 kropek widocznych przez 1,5 s, potem wpisujesz ich liczbę; wynik = suma błędów (mniej lepiej), liczona na serwerze. Po każdej odpowiedzi kropki wracają z prawdziwą liczbą i różnicą; numer rundy rywali widać w pigułkach graczy (ruch `progress`).
 - 1-6 graczy naraz, każdy gra u siebie to samo wyzwanie (wylosowane na serwerze), na końcu ranking.
   Partia toczy się na kliencie (opóźnienie Wi-Fi zepsułoby pomiar), serwer dostaje tylko wynik i odrzuca nierealne wartości.
+- Każda mini-gra zaczyna od ekranu instrukcji (`Intro` w ui.tsx: animowany podgląd, trzy punkty z ikonami, „Start”). Każdy klika „Start” osobno i gra od razu;
+  po 15 s (`INTRO_SECONDS`) gra rusza sama. Limit platformy startuje dopiero, gdy wystartuje ostatni gracz (wiadomość pokoju `begin`); na ekranie widać, kto już gra, a kto czyta zasady.
 - Każda mini-gra ma jeden typ ruchu `result` (Narysuj koło wysyła go po każdej próbie, Tabela Schultego i Policz kropki mają jeszcze `progress`); ranking liczy wspólne `rankResults` (core.ts), zwycięzca tylko przy 2+ graczach bez remisu.
   Kolor liter i Liczenie dzielą `quiz.ts` i `Quiz.tsx`. Pasek statystyk w trakcie partii to wspólne `Stats` (ui.tsx). Odświeżenie w trakcie = partia od nowa.
 
@@ -145,6 +147,7 @@ Wspólne pomocnicze w `core.ts`: `createRng` (mulberry32), `roomCode`, `rankResu
   gdy zmienia się `waitingFor` (albo `key` z `turn`) lub ten sam gracz ma kolejny ruch.
 - Gracze bez miejsca oglądają partię. Nowy gracz dostaje miejsce sam, jeśli gra wybrana i jest wolne.
 - Rewanż po zgodzie wszystkich grających, kolejność miejsc rotuje; do lobby może wrócić każdy.
+- W mini-grach (gry solo, `minPlayers: 1`) limit rusza po ekranie instrukcji: gdy wszyscy klikną „Start” albo po 15 s.
 - Limit tury: 60 s w większości gier; dłużej w Sekwencji (300 s), Tabeli Schultego i Odcieniu (180 s),
   Narysuj koło i Policz kropki (120 s), Kolorze liter i Liczeniu (90 s); Państwa-miasta mają limit per faza, Statki 90 s na całe rozstawianie, Chińczyk w trybie Szybkim 20 s.
 - Gdy gracz z miejscem zniknie z pokoju w trakcie partii (wyjdzie sam albo nie wróci w 10 minut), partia się kończy:

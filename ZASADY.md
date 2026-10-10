@@ -122,7 +122,9 @@ Ekran gry to jeden plik `apps/web/src/games/<Gra>.tsx`. Dostaje `view`, `me`, `p
 **Reguły**
 - **Kolor gracza, nie czerwień**, dla wszystkiego, co jest „moje” lub „czyjeś”: pionki, kamienie, podświetlenie mojej tury.
   Czerwień akcentu zostaje dla głównego przycisku i ostrzeżeń (`warning` na ostatnie 10 s).
-- Mini-gra zaczyna od ekranu z opisem w jednym lub dwóch zdaniach i przyciskiem „Start”. Nic nie rusza samo.
+- Mini-gra zaczyna od ekranu instrukcji: komponent `Intro` (ui.tsx) z animowanym podglądem gry (mały komponent `Preview` w pliku gry,
+  sama animacja CSS w pętli), trzema krótkimi punktami (`time`: czas, `task`: co zrobić, `score`: jak liczone są punkty) i przyciskiem „Start”.
+  Limit gry jeszcze wtedy nie tyka; po `INTRO_SECONDS` (15 s) gra rusza sama. Pod przyciskiem widać, kto już gra, a kto czyta zasady.
 - Pola dotykowe co najmniej 48 px (tyle ma `.btn`), a pola gry na czas mają `touch-none select-none` i reagują na `onPointerDown`.
 - Ekran mieści się na 360×640 bez poziomego przewijania; plansza skaluje się do szerokości, nie ma stałych pikseli.
 - Teksty po polsku, krótkie, bez em-dashy, przecinek dziesiętny („10,00 s”), te same słowa co w innych grach
@@ -138,7 +140,8 @@ animacja tylko go dogania na ekranie.
 - **Mechanizm**: keyframes w `index.css` z komentarzem, do czego służą, użyte przez `animate-[nazwa_czas_easing]`.
   Zmiany stanu (kolor, obwódka) przez `transition-colors`. Nowej biblioteki nie dodajemy.
 - **Najpierw istniejące**: `stone-pop` (coś pojawia się na planszy), `ring-pulse` (to można wybrać),
-  `dice-tumble` (rzut kośćmi), `card-in` (karta lub okno na środku), `float-up` (zmiana liczby), `set-glow` (świeże osiągnięcie).
+  `dice-tumble` (rzut kośćmi), `card-in` (karta lub okno na środku), `float-up` (zmiana liczby), `set-glow` (świeże osiągnięcie),
+  `preview-half` i `preview-quarter` (podgląd na ekranie instrukcji; kolejność ustawia ujemny `animation-delay`).
   Ta sama sytuacja w nowej grze używa tej samej animacji.
 - **Czasy**:
 
