@@ -1,5 +1,5 @@
 import { ArrowCounterClockwise, Check, Timer, UsersThree } from "@phosphor-icons/react";
-import { CHINCZYK_TRACK, type ChinczykView, GAMES, type KampusTourView, type KolorView, type KoloView, type KropkiView, type LiczenieView, type PanstwaMiastaView, type PiecWRzedzieView, type RefleksView, type RokView, type RoomView, type SledzenieView, KROPKI_ROUNDS, ROK_ROUNDS, SCHULTE_SIZE, type SchulteView, type SimonView, type SrodekView, type StatkiView, type StojView, type StoperView, type StroopView } from "@mini-games/games";
+import { CHINCZYK_TRACK, type ChinczykView, GAMES, type KampusTourView, type KolorView, type KoloView, type KropkiView, type LiczenieView, type MemoryView, type PanstwaMiastaView, type PiecWRzedzieView, type RefleksView, type RokView, type RoomView, type SledzenieView, KROPKI_ROUNDS, ROK_ROUNDS, SCHULTE_SIZE, type SchulteView, type SimonView, type SrodekView, type StatkiView, type StojView, type StoperView, type StroopView } from "@mini-games/games";
 import { useEffect, useMemo, useState } from "react";
 import { Chinczyk } from "../games/Chinczyk.tsx";
 import { KampusTour } from "../games/KampusTour.tsx";
@@ -7,6 +7,7 @@ import { Kolo } from "../games/Kolo.tsx";
 import { Kolor } from "../games/Kolor.tsx";
 import { Kropki } from "../games/Kropki.tsx";
 import { Liczenie } from "../games/Liczenie.tsx";
+import { Memory } from "../games/Memory.tsx";
 import { PanstwaMiasta } from "../games/PanstwaMiasta.tsx";
 import { PiecWRzedzie } from "../games/PiecWRzedzie.tsx";
 import { Refleks } from "../games/Refleks.tsx";
@@ -72,6 +73,8 @@ export function Game({ view, me, dropped, send }: Props) {
 
   // Wspólny nagłówek: wyraźne „Twój ruch!” w kolorze gracza i pasek czasu. Chińczyk zamiast punktów pokazuje pionki w domu.
   const ludo = def.id === "chinczyk" ? (game.view as ChinczykView) : null;
+  // Memory zamiast punktów pokazuje zebrane pary.
+  const memory = def.id === "memory" ? (game.view as MemoryView) : null;
   // Statki w trakcie partii zamiast punktów pokazują flotę (w bitwie: pozostałą).
   const fleet = def.id === "statki" && view.phase === "playing" ? (game.view as StatkiView) : null;
   // Tabela Schultego w trakcie partii zamiast punktów pokazuje postęp każdego gracza.
@@ -155,6 +158,10 @@ export function Game({ view, me, dropped, send }: Props) {
                           />
                         ))}
                       </span>
+                    ) : memory ? (
+                      <span className="text-base font-semibold text-fg tabular-nums" aria-label={`Pary: ${memory.owner.filter((o) => o === id).length / 2}`}>
+                        {memory.owner.filter((o) => o === id).length / 2}
+                      </span>
                     ) : fleet ? (
                       <FleetLeft board={fleet.boards[id]} lengths={fleet.lengths} color={p?.color ?? "#8b8b92"} />
                     ) : schulte ? (
@@ -213,6 +220,8 @@ export function Game({ view, me, dropped, send }: Props) {
             onMove={(move) => send("move", move)}
           />
         )}
+
+        {def.id === "memory" && <Memory view={game.view as MemoryView} players={view.players} canMove={myTurn} onMove={(move) => send("move", move)} />}
 
         {/* Klucz z wylosowanego wyzwania: rewanż montuje grę od nowa, bez stanu poprzedniej partii. */}
         {def.id === "refleks" && (
@@ -482,7 +491,8 @@ function Countdown({ game, total, tense, color, label }: { game: NonNullable<Roo
             style={{ width: `${Math.min(1, left) * 100}%`, backgroundColor: seconds > 10 ? color : undefined }}
           />
         </div>
-        <span className={`w-10 text-right text-sm font-medium tabular-nums ${seconds <= 10 ? "text-warning" : "text-fg"}`}>{seconds} s</span>
+        {/* Twarda spacja i min-w: trzycyfrowy limit („173 s”) nie ściska się ani nie łamie w wąskim polu. */}
+        <span className={`min-w-10 text-right text-sm font-medium whitespace-nowrap tabular-nums ${seconds <= 10 ? "text-warning" : "text-fg"}`}>{seconds}{"\u00a0"}s</span>
       </div>
     );
   }
