@@ -88,15 +88,19 @@ Wspólne zasady w `quiz.ts`, wspólny ekran `Quiz.tsx`.
 ### Narysuj koło (`kolo`)
 - Limit przez `turn(state)`: 120 s na wszystkie próby gracza (także solo); licznik rusza od nowa tylko, gdy ktoś skończy próby.
 - Do 10 prób palcem, liczy się najlepsza. Punkty rysunku w układzie 0-1 względem kwadratowego płótna.
+- Na środku płótna jest mała kropka (pomoc w wyobrażeniu sobie koła); ocena nie zależy od położenia rysunku.
 - Każda próba to osobny ruch `result` z `points` (20-1000 punktów, wszystkie w 0-1). Pusta lista kończy pozostałe próby
   (zostaje dotychczasowa najlepsza); to też ruch po limicie czasu.
 - Ocenę liczy serwer (`judge`), klient woła tę samą funkcję przed wysłaniem i niedokończonego koła nie wysyła, więc nie zużywa próby.
 - `judge`: obcina rysunek po pełnym obrocie (zakładka nie liczy się), dopasowuje okrąg (metoda Kåsy), potem:
   - poniżej 0,9 obrotu albo mniej niż 20 punktów: `unfinished`, 0 pkt,
   - promień poniżej 0,15: `small`, 0 pkt,
-  - inaczej `score = 1000 × (1 − 5 × średni błąd promienia / r)² × (1 − przerwa)`, gdzie przerwa między początkiem
+  - inaczej `score = 1000 × (1 − 4 × średni błąd promienia / r)² × (1 − przerwa)`, gdzie przerwa między początkiem
     a końcem liczona w częściach obwodu, pierwsze 3% za darmo.
-- Wynik 0-1000 (dziesiąte części procenta), więcej lepiej. Stan trzyma `best` i `worst` każdego gracza (oba pokazywane na końcu).
+- `judge` zwraca też dopasowany okrąg (`circle`). Po próbie klient pokazuje go przerywaną linią, rysunek koloruje według
+  odchylenia od niego (zielony blisko, czerwony od 10% promienia), a na środku płótna wynik z porównaniem do najlepszej próby.
+- Wynik 0-1000 (dziesiąte części procenta), więcej lepiej. Stan trzyma `best` i `worst` każdego gracza.
+- Ekran końcowy: karta na gracza w kolejności rankingu (nick, duży najlepszy wynik), pod nią miniatury „Najlepsza” (z przerywanym idealnym okręgiem) i „Najgorsza”; bez osobnej tabeli wyników.
 - Koniec, gdy każdy ma 10 prób.
 
 ### Odcień (`kolor`)
