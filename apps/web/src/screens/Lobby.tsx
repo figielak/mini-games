@@ -22,7 +22,7 @@ import {
   Timer,
 } from "@phosphor-icons/react";
 import { GAMES, type LobbyPlayer, MAX_PLAYERS, PLAYER_COLORS, type RoomView } from "@mini-games/games";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { Screen, type Send, StickyBar } from "./ui.tsx";
 
 interface Props {
@@ -38,16 +38,20 @@ export function Lobby({ view, me, dropped, send, onLeave }: Props) {
   const def = view?.gameId ? GAMES[view.gameId] : undefined;
   const hostNick = view?.players.find((p) => p.id === view.hostId)?.nick ?? "gospodarz";
   const guests = view?.seats.filter((id) => id !== view.hostId) ?? [];
-  const readyCount = guests.filter((id) => view!.players.find((p) => p.id === id)?.ready).length;
+  const unready = view?.players.filter((p) => guests.includes(p.id) && !p.ready) ?? [];
+  const DefIcon = (def && ICONS[def.id]) || Play;
+  const mode = def?.modes?.find((m) => m.id === view!.mode);
   const meSeated = !!view?.seats.includes(me);
   const meReady = !!view?.players.find((p) => p.id === me)?.ready;
   const startBlocker = !def
     ? "Wybierz grę"
     : view!.seats.length < def.minPlayers
       ? `Zaznacz ${def.minPlayers} graczy do gry`
-      : readyCount < guests.length
-        ? `Czekamy na gotowość (${readyCount}/${guests.length})`
-        : null;
+      : unready.length === 1
+        ? `Czekamy na: ${unready[0].nick}`
+        : unready.length > 1
+          ? `Czekamy na gotowość (${guests.length - unready.length}/${guests.length})`
+          : null;
 
   return (
     <Screen dropped={dropped}>
@@ -58,14 +62,14 @@ export function Lobby({ view, me, dropped, send, onLeave }: Props) {
           <h2 className="label">Gracze</h2>
           {view && (
             <span className="font-mono text-sm text-fg-muted">
-              {view.players.length}/{MAX_PLAYERS}
+              W pokoju {view.players.length}/{MAX_PLAYERS}
             </span>
           )}
         </div>
         {view ? (
           ((def
             ? [
-                [`Grają ${view.seats.length}/${def.maxPlayers}`, view.seats.map((id) => view.players.find((p) => p.id === id)!)],
+                [`Grają ${view.seats.length}/${def.maxPlayers} (limit gry)`, view.seats.map((id) => view.players.find((p) => p.id === id)!)],
                 ["Oglądają", view.players.filter((p) => !view.seats.includes(p.id))],
               ]
             : [["", view.players]]
@@ -92,10 +96,10 @@ export function Lobby({ view, me, dropped, send, onLeave }: Props) {
                             (p.ready || p.id === view.hostId ? (
                               <span className="flex items-center gap-1 text-fg">
                                 <Check size={14} weight="bold" aria-hidden />
-                                gotowy
+                                gotowe
                               </span>
                             ) : (
-                              "niegotowy"
+                              "czeka"
                             ))}
                           {p.id === view.hostId && <Crown size={18} weight="fill" aria-label="Gospodarz" />}
                         </span>
@@ -138,79 +142,92 @@ export function Lobby({ view, me, dropped, send, onLeave }: Props) {
         )}
       </section>
 
+      {/* Gospodarz: siatka gier, tryby rozwijają się pod wybraną grą (grid-flow-dense domyka wiersz). */}
       {view &&
-        (isHost ? GROUPS : def ? ([["Wybrana gra", null]] as const) : []).map(([title, quick]) => (
+        isHost &&
+        GROUPS.map(([title, quick]) => (
           <section key={title}>
             <h2 className="label mb-2 px-1">{title}</h2>
-            <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label={title}>
+            <div className="grid grid-flow-dense grid-cols-2 gap-2" role="radiogroup" aria-label={title}>
               {Object.values(GAMES)
-                .filter((g) => (quick === null ? g === def : (g.minPlayers === 1) === quick))
+                .filter((g) => (g.minPlayers === 1) === quick)
                 .map((g) => {
                   const Icon = ICONS[g.id] ?? Play;
                   const tooMany = view.players.length > g.maxPlayers;
                   const picked = view.gameId === g.id;
                   return (
-                    <button
-                      key={g.id}
-                      type="button"
-                      role="radio"
-                      aria-checked={picked}
-                      disabled={!isHost || tooMany}
-                      className={`flex min-h-20 flex-col items-start gap-1 rounded-inset border p-3 text-left transition-colors ${
-                        picked ? "border-accent bg-accent-soft" : "border-line enabled:hover:border-line-hover"
-                      } ${tooMany ? "opacity-40" : ""}`}
-                      onClick={() => send("pickGame", { gameId: g.id })}
-                    >
-                      <Icon size={22} weight={picked ? "fill" : "regular"} aria-hidden />
-                      <span className="leading-tight">{g.name}</span>
-                      <span className="font-mono text-xs text-fg-muted">
-                        {tooMany
-                          ? `max ${g.maxPlayers} os.`
-                          : g.minPlayers === g.maxPlayers
-                            ? `${g.minPlayers} os.`
-                            : `${g.minPlayers}-${g.maxPlayers} os.`}
-                      </span>
-                    </button>
+                    <Fragment key={g.id}>
+                      <button
+                        type="button"
+                        role="radio"
+                        aria-checked={picked}
+                        disabled={tooMany}
+                        className={`flex min-h-20 flex-col items-start gap-1 rounded-inset border p-3 text-left transition-colors ${
+                          picked ? "border-accent bg-accent-soft" : "border-line enabled:hover:border-line-hover"
+                        } ${tooMany ? "opacity-40" : ""}`}
+                        onClick={() => send("pickGame", { gameId: g.id })}
+                      >
+                        <Icon size={22} weight={picked ? "fill" : "regular"} aria-hidden />
+                        <span className="leading-tight">{g.name}</span>
+                        <span className="font-mono text-xs text-fg-muted">
+                          {tooMany ? (g.minPlayers === g.maxPlayers ? "tylko " : "max ") + `${g.maxPlayers} os.` : seats(g)}
+                        </span>
+                      </button>
+                      {picked && g.modes && (
+                        <div className="col-span-2 flex flex-col gap-2" role="radiogroup" aria-label={`Tryb: ${g.name}`}>
+                          <h3 className="px-1 text-sm text-fg-muted">Tryb: {g.name}</h3>
+                          {g.modes.map((m) => {
+                            const on = view.mode === m.id;
+                            return (
+                              <button
+                                key={m.id}
+                                type="button"
+                                role="radio"
+                                aria-checked={on}
+                                className={`flex min-h-12 flex-col items-start justify-center rounded-inset border px-3 py-2 text-left transition-colors ${
+                                  on ? "border-accent bg-accent-soft" : "border-line hover:border-line-hover"
+                                }`}
+                                onClick={() => send("pickMode", { mode: m.id })}
+                              >
+                                <span className="leading-tight">{m.name}</span>
+                                <span className="font-mono text-xs text-fg-muted">{m.hint}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </Fragment>
                   );
                 })}
             </div>
           </section>
         ))}
 
-      {/* Tryb wybranej gry: gospodarz wybiera, goście widzą tylko wybrany. */}
-      {view && def?.modes && (
-        <section>
-          <h2 className="label mb-2 px-1">Tryb</h2>
-          <div className="flex flex-col gap-2" role="radiogroup" aria-label="Tryb">
-            {def.modes
-              .filter((m) => isHost || m.id === view.mode)
-              .map((m) => {
-                const picked = view.mode === m.id;
-                return (
-                  <button
-                    key={m.id}
-                    type="button"
-                    role="radio"
-                    aria-checked={picked}
-                    disabled={!isHost}
-                    className={`flex min-h-12 flex-col items-start justify-center rounded-inset border px-3 py-2 text-left transition-colors ${
-                      picked ? "border-accent bg-accent-soft" : "border-line enabled:hover:border-line-hover"
-                    }`}
-                    onClick={() => send("pickMode", { mode: m.id })}
-                  >
-                    <span className="leading-tight">{m.name}</span>
-                    <span className="font-mono text-xs text-fg-muted">{m.hint}</span>
-                  </button>
-                );
-              })}
+      {/* Gość: jedna karta na całą szerokość z opisem gry i wybranym trybem. */}
+      {view && !isHost && def && (
+        <section className="tile">
+          <h2 className="label mb-3">Wybrana gra</h2>
+          <div className="flex items-center gap-3">
+            <DefIcon size={28} weight="fill" className="shrink-0" aria-hidden />
+            <div className="min-w-0">
+              <p className="leading-tight">{def.name}</p>
+              <p className="font-mono text-xs text-fg-muted">{seats(def)}</p>
+            </div>
           </div>
+          <p className="mt-3 text-sm text-fg-muted">{BLURBS[def.id]}</p>
+          {mode && (
+            <p className="mt-3 rounded-inset border border-line px-3 py-2">
+              <span className="block leading-tight">Tryb: {mode.name}</span>
+              <span className="font-mono text-xs text-fg-muted">{mode.hint}</span>
+            </p>
+          )}
         </section>
       )}
 
       {view && (
         <StickyBar>
           {isHost ? (
-            <button type="button" className="btn btn-primary w-full" disabled={!!startBlocker} onClick={() => send("start")}>
+            <button type="button" className={`btn w-full ${startBlocker ? "btn-ghost" : "btn-primary"}`} disabled={!!startBlocker} onClick={() => send("start")}>
               {!startBlocker && <Play size={18} weight="fill" aria-hidden />}
               <span className="truncate">{startBlocker ?? `Zagraj: ${def!.name}`}</span>
             </button>
@@ -222,7 +239,7 @@ export function Lobby({ view, me, dropped, send, onLeave }: Props) {
               onClick={() => send("ready", { ready: !meReady })}
             >
               {meReady ? <Check size={18} weight="bold" aria-hidden /> : <HandWaving size={18} weight="fill" aria-hidden />}
-              <span className="truncate">{meReady ? `Gotowy, czekamy na ${hostNick}` : `Jestem gotowy: ${def.name}`}</span>
+              <span className="truncate">{meReady ? `Gotowe, czekamy na ${hostNick}` : `Zgłaszam gotowość: ${def.name}`}</span>
             </button>
           ) : (
             <p className="flex min-h-12 w-full items-center justify-center text-center text-sm text-fg-muted">
@@ -258,10 +275,32 @@ const ICONS: Record<string, Icon> = {
   kropki: DotsNine,
 };
 
+function seats(g: { minPlayers: number; maxPlayers: number }) {
+  return g.minPlayers === g.maxPlayers ? `${g.minPlayers} os.` : `${g.minPlayers}-${g.maxPlayers} os.`;
+}
+
+/** Jedno zdanie o grze dla gościa, zanim zgłosi gotowość. */
+const BLURBS: Record<string, string> = {
+  "piec-w-rzedzie": "Na zmianę stawiacie kamienie na planszy 15×15. Wygrywa pięć lub więcej w linii.",
+  statki: "Rozstawiasz flotę, potem strzelacie na zmianę. Trafienie daje kolejny strzał, wygrywa ten, kto zatopi wszystko.",
+  chinczyk: "Rzucasz kostką i prowadzisz pionki dookoła planszy do domku. Stając na pionku rywala, odsyłasz go na start.",
+  "kampus-tour": "Planszówka ekonomiczna: rzut dwiema kośćmi, kupujesz pola kampusu, rozbudowujesz je i zbierasz czynsz. Wygrywa ostatni wypłacalny albo najbogatszy po 20 rundach.",
+  "panstwa-miasta": "5 rund, każda na inną literę i 6 kategorii. Kto pierwszy odda kartkę, daje STOP, potem głosujecie nad odpowiedziami.",
+  refleks: "Dotknij pola, gdy zmieni kolor. 30 s, liczy się liczba trafień, falstart kosztuje czas.",
+  simon: "Powtarzasz coraz dłuższą sekwencję 4 kolorów. Liczy się najdłuższa seria.",
+  stoper: "Licznik znika po 3 s. Dotknij dokładnie w wylosowanej sekundzie, wygrywa najmniejsza odchyłka.",
+  schulte: "Siatka 5×5 z liczbami 1-25, dotykasz po kolei. Liczy się czas, pomyłka dodaje 3 s.",
+  stroop: "Nazwa koloru napisana innym kolorem. Wybierasz kolor liter, nie słowo. 30 s.",
+  liczenie: "30 s szybkich działań z czterema odpowiedziami. Pomyłka blokuje na sekundę.",
+  kolo: "Rysujesz palcem koło, do 10 prób. Liczy się najlepsza, wynik to procent idealności.",
+  kolor: "Widzisz kolor przez 2 s, potem odtwarzasz go suwakami. 5 kolorów, wygrywa najmniejszy błąd.",
+  kropki: "Kropki migają przez 1,5 s, wpisujesz, ile ich było. 10 rund, wygrywa najmniejsza suma błędów.",
+};
+
 /** Nazwy kolorów z PLAYER_COLORS (ta sama kolejność), dla czytników ekranu. */
 const COLOR_NAMES = ["niebieski", "żółty", "zielony", "fioletowy", "morski", "różowy"];
 
-/** Wybór własnego koloru: zajęte przez innych są przygaszone i nieaktywne. */
+/** Wybór własnego koloru: zajęte przez innych są przygaszone, nieaktywne i podpisane inicjałem właściciela. */
 function ColorPicker({ view, me, send }: { view: RoomView; me: string; send: Send }) {
   const mine = view.players.find((p) => p.id === me)?.color;
   return (
@@ -279,14 +318,15 @@ function ColorPicker({ view, me, send }: { view: RoomView; me: string; send: Sen
               aria-checked={color === mine}
               aria-label={taken ? `${COLOR_NAMES[i]}, zajęty: ${owner.nick}` : COLOR_NAMES[i]}
               disabled={taken}
-              className="grid size-10 place-items-center rounded-full disabled:opacity-25"
+              className="grid size-10 place-items-center rounded-full"
               onClick={() => send("pickColor", { color })}
             >
               <span
-                className={`grid size-7 place-items-center rounded-full ${color === mine ? "outline-2 outline-offset-2 outline-fg" : ""}`}
-                style={{ backgroundColor: color }}
+                className={`grid size-7 place-items-center rounded-full font-mono text-xs text-fg-muted ${color === mine ? "outline-2 outline-offset-2 outline-fg" : ""}`}
+                style={{ backgroundColor: taken ? `color-mix(in srgb, ${color} 25%, transparent)` : color }}
               >
                 {color === mine && <Check size={14} weight="bold" className="text-bg" aria-hidden />}
+                {taken && <span aria-hidden>{owner.nick.charAt(0).toUpperCase()}</span>}
               </span>
             </button>
           );

@@ -59,7 +59,7 @@ Po partii ekran podsumowania (`KampusSummary.tsx`): wykres majątku, zapłacone 
 - Statki również wymagają ukrywania stanu (plansza przeciwnika).
 - Statki: cztery tryby do wyboru w lobby: Klasyczny (10×10, flota 1×4, 2×3, 3×2, 4×1 bez stykania, także rogami),
   Szybki (8×8, flota 4-3-2-2, partia na kilka minut),
-  Hasbro (10×10, flota 5-4-3-3-2, statki mogą się stykać, bez X wokół zatopionego) i Flota wojenna (12×12, flota 6-5-4-4-3-3-2-2).
+  Amerykański (`hasbro`, 10×10, flota 5-4-3-3-2, statki mogą się stykać, bez X wokół zatopionego) i Flota wojenna (12×12, flota 6-5-4-4-3-3-2-2).
 - Statki: losowe ustawienie
   na start z przenoszeniem (przeciąganie albo dotknięcie) i obracaniem, trafienie = kolejny strzał, X wokół zatopionego.
   Gotowość w rozstawianiu można cofnąć; całe rozstawianie ma jeden limit 90 s.

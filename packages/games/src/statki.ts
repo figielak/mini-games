@@ -15,8 +15,8 @@ export interface Rules {
 /** Tryby do wyboru w lobby, od najkrótszej partii do najdłuższej (po liczbie pól floty). */
 export const MODES: Rules[] = [
   { id: "szybki", name: "Szybki", hint: "8×8, 4 statki, partia na kilka minut", size: 8, lengths: [4, 3, 2, 2], touching: false },
-  { id: "hasbro", name: "Hasbro", hint: "10×10, 5 statków, mogą się stykać", size: 10, lengths: [5, 4, 3, 3, 2], touching: true },
-  { id: "klasyczny", name: "Klasyczny", hint: "10×10, 10 statków, dużo jedynek", size: 10, lengths: [4, 3, 3, 2, 2, 2, 1, 1, 1, 1], touching: false, default: true },
+  { id: "hasbro", name: "Amerykański", hint: "10×10, 5 statków, mogą się stykać", size: 10, lengths: [5, 4, 3, 3, 2], touching: true },
+  { id: "klasyczny", name: "Klasyczny", hint: "10×10, 10 statków, w tym 4 jednomasztowce", size: 10, lengths: [4, 3, 3, 2, 2, 2, 1, 1, 1, 1], touching: false, default: true },
   { id: "flota", name: "Flota wojenna", hint: "12×12, 8 dużych statków, długa partia", size: 12, lengths: [6, 5, 4, 4, 3, 3, 2, 2], touching: false },
 ];
 const DEFAULT = MODES.find((m) => m.default)!;
