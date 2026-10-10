@@ -7,7 +7,7 @@ Reguły platformy (limit tury, rewanż, walkower, obserwatorzy) są w `KONCEPT.m
 | Nazwa w UI | `id` / plik | Gracze | Limit tury | Typ |
 |---|---|---|---|---|
 | Kampus Tour | `kampus-tour` | 2-4 | 60 s | planszowa, po kolei |
-| Chińczyk | `chinczyk` | 2-4 | 60 s | planszowa, po kolei |
+| Chińczyk | `chinczyk` | 2-4 | 60 s (Szybki 20 s) | planszowa, po kolei |
 | Statki | `statki` | 2 | 90 s rozstawianie, 60 s strzał | ukryty stan |
 | Gomoku | `piec-w-rzedzie` | 2 | 60 s | po kolei |
 | Państwa-miasta | `panstwa-miasta` | 2-6 | zależny od fazy | równoczesna |
@@ -134,14 +134,27 @@ Wspólne zasady w `quiz.ts`, wspólny ekran `Quiz.tsx`.
   naprzeciw siebie (0 i 20).
 - Jedna kostka. Wyjście z domku startowego tylko na 6 (na pozycję 0).
 - Ruch musi zmieścić się w torze: nie wolno przeskoczyć pozycji 43. Nie wolno stanąć na własnym pionku (także w domku końcowym).
-- Zbicie: pionki przeciwników stojące na tym samym polu toru wracają do domku startowego. Nie ma pól bezpiecznych.
+- W domku końcowym nie wolno przeskakiwać własnych pionków, także wchodząc z toru: żaden własny pionek nie może stać
+  na polach 40-43 między pozycją startową a docelową.
+- Zbicie: pionki przeciwników stojące na tym samym polu toru wracają do domku startowego.
+- Pole startowe jest bezpieczne, gdy stoi na nim pionek właściciela (jego pozycja 0): rywal nie może na nim stanąć
+  (ruch niedozwolony, przeskoczyć wolno). Obcy pionek na cudzym polu startowym nie jest chroniony, więc wychodzący go zbija.
 - Szóstka daje kolejny rzut, także wtedy, gdy nie było możliwego ruchu. Trzecia szóstka z rzędu kończy turę bez ruchu.
 - Gdy gracz nie ma żadnego pionka na torze i nie może się ruszyć, ma do 3 rzutów w turze.
 - Jedyny możliwy ruch wykonuje się sam; faza `move` (wybór pionka) jest tylko przy 2+ możliwościach.
   Pionki w domku startowym są nierozróżnialne: ruszyć można tylko pierwszym.
 - Gracz kończy, gdy wszystkie 4 pionki są w domku końcowym; trafia do `ranking` i wypada z kolejki (bez dodatkowego rzutu,
   nawet po szóstce). Gra toczy się do pełnego rankingu: gdy zostaje jeden gracz, dopisywany jest na końcu.
-- Limit czasu: rzut albo losowy z możliwych pionków.
+- Limit czasu: rzut albo losowy z możliwych pionków. Limit przez `turn(state)`: klucz zmienia się po każdym rzucie i ruchu.
+
+**Tryby** (`MODES`): powyżej opisany jest **Klasyczny** (`klasyczny`, domyślny, 60 s). **Szybki** (`szybki`, 20 s, partia na około 10 minut) zmienia:
+- Start: jeden pionek stoi już na pozycji 0, trzy w domku startowym.
+- Wyjście z domku startowego na 1 albo 6 (kolejny rzut dalej tylko po szóstce).
+- Bez dokładnego rzutu: gdy pozycja + oczka przekracza 43, pionek wchodzi na najdalsze wolne pole domku końcowego
+  dalsze niż jego pozycja (gdy takiego nie ma, ruchu nie ma). Własne pionki w domku wolno przeskakiwać.
+- Zbicie daje dodatkowy rzut. Wejście pionka z toru do domku końcowego też (zawsze jeden dodatkowy rzut, także po szóstce).
+- Koniec: pierwszy gracz z 3 pionkami w domku końcowym wygrywa i partia kończy się od razu. Reszta rankingu:
+  więcej pionków w domku końcowym, potem większa suma pozycji.
 
 ## 5. Państwa-miasta (`panstwa-miasta`)
 
