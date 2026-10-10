@@ -138,9 +138,7 @@ export function Schulte({ view, me, players, ranking, onMove }: Props) {
             key={n === flash?.n ? `${n}-${flash.id}` : n}
             type="button"
             onPointerDown={() => press(n)}
-            className={`touch-none select-none rounded-inset border font-mono text-2xl font-semibold ${
-              n < target && view.mode === "latwa" ? "border-transparent bg-surface-inset text-fg-subtle" : "border-line bg-surface"
-            } ${n === flash?.n ? (flash.ok ? "animate-[tile-hit_0.35s_ease-out]" : "animate-[tile-miss_0.35s_ease-out]") : ""}`}
+            className={`touch-none select-none rounded-inset border border-line bg-surface font-mono text-2xl font-semibold ${n === flash?.n ? (flash.ok ? "animate-[tile-hit_0.35s_ease-out]" : "animate-[tile-miss_0.35s_ease-out]") : ""}`}
           >
             {n}
           </button>
