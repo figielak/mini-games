@@ -4,8 +4,10 @@ import { type GameDefinition, type PlayerId, rankResults } from "./core.ts";
 export const ROUNDS = 10;
 /** Bok pola w umownych px: wynik nie zależy od rozmiaru telefonu. */
 export const FIELD = 300;
-/** Większy błąd i tak znaczy „zupełnie obok” (pół pola). */
+/** Kara za rundę po limicie czasu; więcej niż najgorsza uczciwa runda (MAX_LEN / 2 × FIELD + ACCEPT_PX). */
 export const MAX_DISTANCE = 150;
+/** Strefa akceptacji: dotknięcie dalej od odcinka nie jest odpowiedzią (przypadkowe stuknięcie, próba nadużycia rzutowania). */
+export const ACCEPT_PX = 30;
 /** Długość odcinka i odstęp końców od krawędzi, w ułamkach boku pola. */
 export const MIN_LEN = 0.25;
 export const MAX_LEN = 0.7;
@@ -15,22 +17,42 @@ export const MARGIN = 0.1;
 export type Point = { x: number; y: number };
 export type Segment = { a: Point; b: Point };
 
-/** Pusta lista = limit czasu (kara jak za same dotknięcia zupełnie obok). */
+/** Pusta lista = limit czasu (MAX_DISTANCE za każdą rundę). */
 export type Move = { type: "result"; taps: Point[] };
 
 export interface State {
   players: PlayerId[];
   segments: Segment[];
-  /** Suma odległości w dziesiątych częściach px (int). */
+  /** Suma błędów w dziesiątych częściach px (int). */
   results: Record<PlayerId, number>;
   taps: Record<PlayerId, Point[]>;
 }
 
 export type View = State;
 
-/** Odległość dotknięcia od środka odcinka w umownych px, ucięta do MAX_DISTANCE. */
-export function distance({ a, b }: Segment, tap: Point): number {
-  return Math.min(MAX_DISTANCE, Math.hypot((a.x + b.x) / 2 - tap.x, (a.y + b.y) / 2 - tap.y) * FIELD);
+/** Punkt prostej odcinka dla parametru t (0 = a, 1 = b). */
+const along = ({ a, b }: Segment, t: number): Point => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+
+/** Parametr rzutu prostopadłego dotknięcia na prostą odcinka. */
+function param({ a, b }: Segment, tap: Point): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  return ((tap.x - a.x) * dx + (tap.y - a.y) * dy) / (dx * dx + dy * dy);
+}
+
+/** Rzut prostopadły dotknięcia na prostą odcinka (może wypaść tuż za końcem). */
+export const project = (segment: Segment, tap: Point): Point => along(segment, param(segment, tap));
+
+/** Błąd rundy w umownych px: odległość rzutu od środka, wzdłuż odcinka. Odchylenie w bok nic nie kosztuje. */
+export function distance(segment: Segment, tap: Point): number {
+  const { a, b } = segment;
+  return Math.abs(param(segment, tap) - 0.5) * Math.hypot(b.x - a.x, b.y - a.y) * FIELD;
+}
+
+/** Odległość dotknięcia od najbliższego punktu odcinka w umownych px (do strefy akceptacji). */
+export function offset(segment: Segment, tap: Point): number {
+  const nearest = along(segment, Math.min(1, Math.max(0, param(segment, tap))));
+  return Math.hypot(tap.x - nearest.x, tap.y - nearest.y) * FIELD;
 }
 
 // Losowy środek, kąt i długość; odrzucane, dopóki któryś koniec wychodzi poza margines (średnio kilka prób).
@@ -47,7 +69,6 @@ function segment(rng: () => number): Segment {
   }
 }
 
-const valid = ({ x, y }: Point) => [x, y].every((v) => Number.isFinite(v) && v >= 0 && v <= 1);
 
 // ponytail: odcinki są w widoku od startu (jak kropki w Policz kropki), da się podejrzeć; między znajomymi wystarczy.
 export const srodek: GameDefinition<State, Move> = {
@@ -69,7 +90,8 @@ export const srodek: GameDefinition<State, Move> = {
   }),
 
   validateMove: (state, player, { taps }) =>
-    state.players.includes(player) && !(player in state.results) && (taps.length === 0 || (taps.length === ROUNDS && taps.every(valid))),
+    state.players.includes(player) && !(player in state.results) && // NaN i nieskończoność też tu odpadają: porównanie z NaN jest fałszywe.
+    (taps.length === 0 || (taps.length === ROUNDS && taps.every((t, i) => offset(state.segments[i], t) <= ACCEPT_PX))),
 
   applyMove: (state, player, { taps }) => {
     const sum = taps.length ? state.segments.reduce((s, seg, i) => s + distance(seg, taps[i]), 0) : ROUNDS * MAX_DISTANCE;
