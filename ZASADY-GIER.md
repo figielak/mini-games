@@ -28,6 +28,7 @@ Reguły platformy (limit tury, rewanż, walkower, obserwatorzy) są w `KONCEPT.m
 | Wieża | `wieza` | 1-6 | 180 s | mini-gra |
 | Rytm | `rytm` | 1-6 | 60 s | mini-gra |
 | Inny element | `inny` | 1-6 | 90 s | mini-gra |
+| Obrót | `obrot` | 1-6 | 90 s | mini-gra |
 
 Nazwy w UI zmieniały się (2026-10-10), `id`, nazwy plików i typów zostały stare: Sekwencja = `simon`, Kolor liter = `stroop`,
 Odcień = `kolor`, Gomoku = `piec-w-rzedzie`. Ranking w SQLite jest po `id`, więc `id` nie wolno zmieniać.
@@ -81,7 +82,7 @@ Odcień = `kolor`, Gomoku = `piec-w-rzedzie`. Ranking w SQLite jest po `id`, wi�
 - Ekran: trafiony kafelek błyska na zielono, pomyłka na czerwono z potrząśnięciem; lokalny zegar ma etykietę „Twój czas”.
 
 ### Kolor liter (`stroop`) i Liczenie (`liczenie`)
-Wspólne zasady w `quiz.ts`, wspólny ekran `Quiz.tsx` (dzieli je też Inny element).
+Wspólne zasady w `quiz.ts`, wspólny ekran `Quiz.tsx` (dzielą je też Inny element i Obrót).
 - 30 s pytań z czterema odpowiedziami; serwer losuje 200 pytań (starczy przy 150 ms na odpowiedź).
 - Pomyłka blokuje na 1 s (inaczej losowe klepanie byłoby szybsze niż myślenie).
 - Wynik: `times` (czasy poprawnych) i `errors`. Ranking jak w Refleksie: trafienia, potem niższa średnia. `errors` nie wpływa na ranking, ale jest widoczne w pasku statystyk i w wynikach.
@@ -283,6 +284,25 @@ Wynik, walidacja, ranking i ekran końcowy jak w Kolorze liter (`quiz.ts`, `Quiz
 - Pomyłka blokuje na 1 s i plansza zostaje (numer planszy = liczba trafień). Czas trafienia liczy się od pierwszego pokazania planszy;
   szukanie dłuższe niż 5 s liczy się jak 5 s.
 - Limit czasu: zero trafień.
+
+### Obrót (`obrot`)
+Przebieg, walidacja i ekran końcowy jak w Kolorze liter (`quiz.ts`, `Quiz.tsx`); inne są plansze i punktacja.
+- 30 s. Dwie figury z klocków obok siebie i dwie odpowiedzi: „Ta sama” (druga figura to pierwsza po obrocie) albo „Lustro”
+  (druga to lustrzane odbicie pierwszej, też obrócone).
+- Serwer losuje 200 par, te same dla wszystkich. Para `{ a, b, mirror }`: `a` i `b` to listy pól `[x, y]` dosunięte do rogu (0, 0);
+  ekran niczego nie liczy, tylko rysuje.
+- Figura `a` to losowo rosnące poliomino (każdy klocek styka się bokiem z innym) z `min(4 + floor(i / 3), 7)` klocków:
+  4 w parach 0-2, potem o jeden więcej co 3 pary, od pary 9 zawsze 7 (`MIN_CELLS`, `MAX_CELLS`).
+- Figura jest zawsze chiralna (jej odbicie nie jest żadnym z jej czterech obrotów), inaczej pytanie nie miałoby odpowiedzi;
+  niechiralna jest losowana od nowa.
+- `b` to `a` (albo odbicie `a`, gdy `mirror`) obrócone o losowe 90, 180 albo 270°, zawsze tak, żeby wyglądało inaczej niż przed obrotem
+  (figura, która po 180° wygląda tak samo, dostaje 90 albo 270°). `mirror` losowane po równo.
+- Pomyłka blokuje na 1 s i zabiera punkt, potem przychodzi następna para (druga próba przy dwóch odpowiedziach byłaby darmowa).
+  Sama kara punktowa nie wystarcza: klepanie na oślep daje średnio 0, ale z dużym rozrzutem, blokada go zmniejsza.
+- Wynik = trafienia − pomyłki, nie mniej niż 0, więcej lepiej. Przy remisie niższa średnia czasu trafień; dwa wyniki bez trafień to remis.
+  Liczy go klient jak w Kolorze liter (serwer zna `mirror`, więc mógłby liczyć sam z listy odpowiedzi, gdyby ktoś zaczął oszukiwać).
+- Limit czasu: zero trafień i zero pomyłek.
+- Ekran końcowy: tabela z punktami, średnim czasem i błędami (jak w Stój!).
 
 ## 2. Gomoku (`piec-w-rzedzie`)
 
