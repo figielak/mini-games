@@ -1,6 +1,7 @@
 import {
   Boat,
   Buildings,
+  CalendarBlank,
   Calculator,
   Check,
   CircleDashed,
@@ -276,6 +277,7 @@ const ICONS: Record<string, Icon> = {
   kolo: CircleDashed,
   kolor: Eyedropper,
   kropki: DotsNine,
+  rok: CalendarBlank,
   srodek: LineSegment,
   stoj: HandPalm,
   sledzenie: CirclesThree,
@@ -301,6 +303,7 @@ const BLURBS: Record<string, string> = {
   kolo: "Rysujesz palcem koło, do 10 prób. Liczy się najlepsza, wynik to procent idealności.",
   kolor: "Widzisz kolor przez 2 s, potem odtwarzasz go suwakami. 5 kolorów, wygrywa najmniejszy błąd.",
   kropki: "Kropki migają przez 1,5 s, wpisujesz, ile ich było. 10 rund, wygrywa najmniejsza suma błędów.",
+  rok: "Widzisz wydarzenie, ustawiasz jego rok suwakiem. 10 rund, wygrywa najmniejsza suma odchylek.",
   srodek: "Odcinek pod losowym kątem, dotykasz dokładnie jego środka. 10 rund, wygrywa najmniejsza suma błędów.",
   stoj: "Zielone pole dotykasz, czerwonego nie wolno. 30 s, tempo rośnie, błąd zabiera 2 punkty.",
   sledzenie: "Kulki lecą po polu, trzy z nich są celami. Widzisz je krótko, potem śledzisz ruch i wskazujesz te trzy.",
