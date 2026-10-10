@@ -145,10 +145,13 @@ Wspólne zasady w `quiz.ts`, wspólny ekran `Quiz.tsx`.
   (105 + 30 px), więc jedna wpadka nie kosztuje więcej.
 - Pusta lista = limit czasu = 10 × 150 px (więcej niż najgorsza uczciwa partia).
 - Ekran: kwadratowy kafel z odcinkiem (poprzeczne kreski na końcach). Liczy się miejsce podniesienia palca: punkt można przytrzymać
-  i przesunąć, a przy dotyku nad kaflem jest lupa ok. 1,7× (mysz jej nie ma). Po puszczeniu przez 1 s widać własny punkt (kolor gracza),
-  prawdziwy środek (pierścień), łączącą je linię i odległość; kolor według celności: do 5 px zielony z „Idealnie!”, do 20 px zwykły,
-  dalej ostrzegawczy. Potem sama wskakuje następna runda; po dziesiątej wynik idzie na serwer.
-  Na końcu odległości z każdej rundy u wszystkich graczy, w tych samych kolorach.
+  i przesunąć, a przy dotyku nad kaflem jest lupa ok. 1,7× (mysz jej nie ma). W trakcie celowania pierścień pokazuje rzut na odcinek
+  (tylko w strefie akceptacji). Puszczenie poza strefą: potrząśnięcie odcinka, wibracja 60 i „Dotknij na odcinku”, runda trwa dalej.
+  Po puszczeniu przez 1 s widać własny punkt na odcinku (kolor gracza), prawdziwy środek (pierścień), odcinek błędu między nimi
+  i błąd w px; kolor według celności: do 5 px zielony z „Idealnie!”, do 20 px zwykły, dalej ostrzegawczy.
+  Potem sama wskakuje następna runda; po dziesiątej wynik idzie na serwer.
+- Ekran końcowy: jedna tabela, rundy 1-10 w kolumnach, gracze w wierszach (kolejność rankingu). Liczby w kolorach celności,
+  najlepszy w rundzie (bez remisu) ma tło w kolorze gracza.
 
 ## 2. Gomoku (`piec-w-rzedzie`)
 

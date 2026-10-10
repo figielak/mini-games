@@ -85,7 +85,7 @@ Po partii ekran podsumowania (`KampusSummary.tsx`): wykres majątku, zapłacone 
 - **Narysuj koło**: do 10 prób palcem, liczy się najlepsza (można zakończyć wcześniej), wynik = % idealności liczony na serwerze z punktów rysunku (dopasowanie okręgu, zakładka obcinana, poniżej 0,9 obrotu albo za małe = 0). Niedokończone koło nie zużywa próby; na końcu najlepsze i najgorsze koło każdego gracza.
 - **Odcień** (`kolor`): 5 kolorów, każdy widać 2 s, potem odtwarzasz go suwakami barwy, nasycenia i jasności; wynik = suma odległości ΔE (Lab, każda ucięta do 100, mniej lepiej), liczona na serwerze.
 - **Policz kropki**: 10 rund, w każdej 8-40 kropek widocznych przez 1,5 s, potem wpisujesz ich liczbę; wynik = suma błędów (mniej lepiej), liczona na serwerze. Po każdej odpowiedzi kropki wracają z prawdziwą liczbą i różnicą; numer rundy rywali widać w pigułkach graczy (ruch `progress`).
-- **Środek**: 10 rund, w każdej odcinek pod losowym kątem, dotykasz jego środka; wynik = suma odległości w umownych px (pole ma bok 300 px niezależnie od telefonu, każda ucięta do 150, mniej lepiej), liczona na serwerze. Liczy się miejsce podniesienia palca (punkt można przesunąć, nad kaflem lupa); potem przez 1 s widać prawdziwy środek i odległość.
+- **Środek**: 10 rund, w każdej odcinek pod losowym kątem, dotykasz go w połowie długości; dotknięcie jest rzutowane na odcinek, błąd liczy się wzdłuż niego w umownych px (pole ma bok 300 px niezależnie od telefonu), wynik = suma błędów (mniej lepiej), liczona na serwerze. Dotknięcie dalej niż 30 px od odcinka jest ignorowane bez kary. Liczy się miejsce podniesienia palca (punkt można przesunąć, nad kaflem lupa); potem przez 1 s widać prawdziwy środek i błąd. Na końcu jedna tabela rund z wyróżnionym najlepszym w każdej.
 - 1-6 graczy naraz, każdy gra u siebie to samo wyzwanie (wylosowane na serwerze), na końcu ranking.
   Partia toczy się na kliencie (opóźnienie Wi-Fi zepsułoby pomiar), serwer dostaje tylko wynik i odrzuca nierealne wartości.
 - Każda mini-gra zaczyna od ekranu instrukcji (`Intro` w ui.tsx: animowany podgląd, trzy punkty z ikonami, „Start”). Każdy klika „Start” osobno i gra od razu;
@@ -147,7 +147,7 @@ Wspólne pomocnicze w `core.ts`: `createRng` (mulberry32), `roomCode`, `rankResu
 - Po limicie tury serwer wykonuje `timeoutMove` (losowy ruch), nie przegraną. Limit odnawia się tylko,
   gdy zmienia się `waitingFor` (albo `key` z `turn`) lub ten sam gracz ma kolejny ruch.
 - Gracze bez miejsca oglądają partię. Nowy gracz dostaje miejsce sam, jeśli gra wybrana i jest wolne.
-- Rewanż po zgodzie wszystkich grających, kolejność miejsc rotuje; do lobby może wrócić każdy.
+- Rewanż po zgodzie wszystkich grających, kolejność miejsc rotuje (poza mini-grami, gdzie wszyscy grają naraz); do lobby może wrócić każdy.
 - W mini-grach (gry solo, `minPlayers: 1`) limit rusza po ekranie instrukcji: gdy wszyscy klikną „Start” albo po 15 s.
 - Limit tury: 60 s w większości gier; dłużej w Sekwencji (300 s), Tabeli Schultego i Odcieniu (180 s),
   Narysuj koło i Policz kropki (120 s), Kolorze liter i Liczeniu (90 s); Państwa-miasta mają limit per faza, Statki 90 s na całe rozstawianie, Chińczyk w trybie Szybkim 20 s.

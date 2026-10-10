@@ -324,6 +324,22 @@ body::before {
   }
 }
 
+/* Środek: delikatne potrząśnięcie odcinka, gdy dotknięcie wypadło poza strefą (bez błysku koloru, to nie kara). */
+@keyframes shake {
+  20% {
+    transform: translateX(-4px);
+  }
+  40% {
+    transform: translateX(4px);
+  }
+  60% {
+    transform: translateX(-2px);
+  }
+  80% {
+    transform: translateX(2px);
+  }
+}
+
 /* Statki: zamiana plansz między turami, duża i mała przelatują na swoje miejsca. */
 ::view-transition-group(statki-own),
 ::view-transition-group(statki-enemy) {
