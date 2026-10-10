@@ -10,6 +10,7 @@ Reguły platformy (limit tury, rewanż, walkower, obserwatorzy) są w `KONCEPT.m
 | Chińczyk | `chinczyk` | 2-4 | 60 s (Szybki 20 s) | planszowa, po kolei |
 | Statki | `statki` | 2 | 90 s rozstawianie, 60 s strzał | ukryty stan |
 | Gomoku | `piec-w-rzedzie` | 2 | 60 s | po kolei |
+| Memory | `memory` | 2-6 | 60 s | po kolei, ukryty stan |
 | Państwa-miasta | `panstwa-miasta` | 2-6 | zależny od fazy | równoczesna |
 | Refleks | `refleks` | 1-6 | 60 s | mini-gra |
 | Sekwencja | `simon` | 1-6 | 300 s | mini-gra |
@@ -386,3 +387,25 @@ Wspólne zasady w `quiz.ts`, wspólny ekran `Quiz.tsx`.
   `card` odkrycie; `sell` najtańsze pole; w pozostałych rzut (czyli Bilet MPK przepada).
 - `playerView` ukrywa kolejność talii (zostaje `deckSize`). `events` to 4 ostatnie zdarzenia, UI zamienia je na tekst.
 - `stats` (majątek co rundę, zapłacony czynsz, dochód z pól, dublety) służy tylko ekranowi podsumowania.
+
+## 7. Memory (`memory`)
+
+- 2-6 graczy, wspólna plansza zakrytych kart, na każdej jeden z 18 symboli (`SYMBOLS`), każdy symbol dokładnie na dwóch kartach.
+- Tryb wybiera gospodarz w lobby (`MODES` w `memory.ts`); nieznany albo brak = `srednia`. Ranking liczy wszystkie tryby razem.
+
+  | Tryb | Plansza | Pary |
+  |---|---|---|
+  | `mala` (Mała) | 4×4 | 8 |
+  | `srednia` (Średnia) | 4 kolumny × 6 rzędów | 12 |
+  | `duza` (Duża) | 6×6 | 18 |
+
+- `setup` losuje z 18 symboli tyle, ile par, i tasuje karty. Zaczyna `players[0]`.
+- Jeden ruch `{ card }` (indeks karty): odkrycie zakrytej karty. Nie można odkryć karty zebranej ani drugi raz pierwszej karty tury.
+- Pierwsza karta tury zostaje odkryta (`first`). Druga karta:
+  - **para**: obie karty zostają odkryte u gracza (`owner`), ten sam gracz rusza dalej,
+  - **pudło**: tura od razu przechodzi na następnego gracza, a `miss` trzyma indeksy obu kart do następnego odkrycia (ich symbole są wtedy w `faces`).
+    Ekran pokazuje je przez 1,5 s (`MISS_MS` w `Memory.tsx`) albo krócej, jeśli następny gracz odkryje kartę wcześniej.
+- Koniec, gdy wszystkie pary są zebrane. Wygrywa najwięcej par (`rankResults`); remis na pierwszym miejscu = bez zwycięzcy.
+- Limit 60 s na każde odkrycie. Limit czasu: losowa zakryta karta.
+- **Ukrywanie stanu**: `playerView` jest taki sam dla wszystkich (także obserwatora) i zawiera symbole tylko kart zebranych,
+  `first` i `miss`. Symbol z `miss` zostaje w widoku także po zakryciu kart na ekranie (każdy go już widział).
