@@ -8,6 +8,7 @@ import { liczenie } from "./liczenie.ts";
 import { panstwaMiasta } from "./panstwa-miasta.ts";
 import { piecWRzedzie } from "./piec-w-rzedzie.ts";
 import { refleks } from "./refleks.ts";
+import { rok } from "./rok.ts";
 import { schulte } from "./schulte.ts";
 import { simon } from "./simon.ts";
 import { sledzenie } from "./sledzenie.ts";
@@ -58,6 +59,7 @@ export type { View as LiczenieView } from "./liczenie.ts";
 export { ATTEMPTS as KOLO_ATTEMPTS, judge as koloJudge, MAX_POINTS as KOLO_MAX_POINTS, type Point as KoloPoint, type View as KoloView } from "./kolo.ts";
 export { COUNT as KOLOR_COUNT, distance as kolorDistance, type Hsb, hints as kolorHints, hsbToRgb as kolorHsbToRgb, SHOW_MS as KOLOR_SHOW_MS, type View as KolorView } from "./kolor.ts";
 export { ROUNDS as KROPKI_ROUNDS, SHOW_MS as KROPKI_SHOW_MS, type View as KropkiView } from "./kropki.ts";
+export { MAX_YEAR as ROK_MAX_YEAR, MIN_YEAR as ROK_MIN_YEAR, REVEAL_MS as ROK_REVEAL_MS, ROUND_MS as ROK_ROUND_MS, ROUNDS as ROK_ROUNDS, type Event as RokEvent, type View as RokView } from "./rok.ts";
 export { BALLS, MOVE_MS, RADIUS, ROUNDS, SHOW_MS, SPEED_START, SPEED_STEP, TARGETS, position as sledzeniePosition, type Ball as SledzenieBall, type Move as SledzenieMove, type Result as SledzenieResult, type State as SledzenieState, type View as SledzenieView } from "./sledzenie.ts";
 export { ACCEPT_PX as SRODEK_ACCEPT_PX, error as srodekError, offset as srodekOffset, type Point as SrodekPoint, project as srodekProject, ROUNDS as SRODEK_ROUNDS, type View as SrodekView } from "./srodek.ts";
 export { DURATION_MS as STOJ_DURATION_MS, SCHEDULE as STOJ_SCHEDULE, score as stojScore, VISIBLE as STOJ_VISIBLE, type View as StojView } from "./stoj.ts";
@@ -80,6 +82,7 @@ export const GAMES: Record<string, GameDefinition<any, any>> = Object.assign(Obj
   [kolo.id]: kolo,
   [kolor.id]: kolor,
   [kropki.id]: kropki,
+  [rok.id]: rok,
   [srodek.id]: srodek,
   [stoj.id]: stoj,
   [sledzenie.id]: sledzenie,
