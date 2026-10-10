@@ -88,14 +88,15 @@ Te rzeczy działają tak samo w każdej grze. Odstępstwo wymaga wpisu w `ZASADY
 
 - **Po limicie tury jest ruch, nie przegrana.** `timeoutMove` wybiera ruch neutralny albo losowy dozwolony;
   w mini-grze jest to najgorszy możliwy wynik.
-- **Remis nie ma zwycięzcy.** `isOver` zwraca wtedy samo `ranking`. Mini-gry używają `rankResults` i nie liczą remisu ani gry solo do statystyk.
+- **Remis nie ma zwycięzcy.** `isOver` zwraca wtedy samo `ranking`. Mini-gry używają `ranked` (czyli `rankResults` i `places` z jednego komparatora) i nie liczą remisu ani gry solo do statystyk;
+  bez `places` mini-gra nie przejdzie testu kontraktu, bo turniej liczy z niego punkty.
 - **Kto zaczyna**: pierwszy z `players`. Kolejność miejsc rotuje platforma przy rewanżu, gra nie losuje startu sama.
 - **Losowość tylko z `rng`** przekazanego do `setup` i `applyMove`. Żadnego `Math.random` ani `Date.now` w zasadach.
 - **Stan to zwykły obiekt** dający się zapisać do JSON, a `applyMove` zwraca nowy.
 - **`validateMove` jest jedynym strażnikiem.** Ekran może blokować przyciski, ale serwer niczego nie zakłada.
 - **Mini-gra ma jeden ruch `result`** i pole odróżniające partie (wyzwanie albo `nonce`), po którym ekran montuje się od nowa przy rewanżu.
 - **Kara za pomyłkę w grach na czas** to blokada 1 s albo doliczony czas, nigdy koniec partii (inaczej losowe klepanie wygrywa albo jedna pomyłka psuje zabawę).
-- **Wspólne funkcje z `core.ts`** zamiast własnych: `shuffle`, `rankResults`, `average`, `byHitsThenAverage`.
+- **Wspólne funkcje z `core.ts`** zamiast własnych: `shuffle`, `rankResults`, `ranked`, `average`, `byHitsThenAverage`.
   Dwie gry o tej samej mechanice dzielą moduł (jak `quiz.ts` dla Kolorów i Liczenia).
 - **Limity tury**: 60 s na ruch w grach po kolei; w mini-grze tyle, ile trwa najdłuższa uczciwa partia plus zapas.
 - **Obserwator** dostaje widok dla `""` i zawsze widzi coś sensownego.
