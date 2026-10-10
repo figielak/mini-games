@@ -15,8 +15,8 @@ Reguły platformy (limit tury, rewanż, walkower, obserwatorzy) są w `KONCEPT.m
 | Sekwencja | `simon` | 1-6 | 300 s | mini-gra |
 | Stoper | `stoper` | 1-6 | 60 s | mini-gra |
 | Tabela Schultego | `schulte` | 1-6 | 180 s | mini-gra |
-| Kolor liter | `stroop` | 1-6 | 60 s | mini-gra |
-| Liczenie | `liczenie` | 1-6 | 60 s | mini-gra |
+| Kolor liter | `stroop` | 1-6 | 90 s | mini-gra |
+| Liczenie | `liczenie` | 1-6 | 90 s | mini-gra |
 | Narysuj koło | `kolo` | 1-6 | 120 s | mini-gra |
 | Odcień | `kolor` | 1-6 | 180 s | mini-gra |
 | Policz kropki | `kropki` | 1-6 | 120 s | mini-gra |
@@ -81,8 +81,9 @@ Wspólne zasady w `quiz.ts`, wspólny ekran `Quiz.tsx`.
 - **Kolor liter**: nazwa koloru (CZERWONY, NIEBIESKI, ŻÓŁTY, ZIELONY) napisana kolorem liter; odpowiedź to kolor liter, nie słowo.
   W 25% plansz słowo zgadza się z kolorem (żeby nie dało się grać „zawsze inny”).
 - **Liczenie**: działania losowane po równo z czterech typów: `a + b` (10-99), `a − b` (a 20-99, b 10-a, wynik ≥ 0),
-  `a × b` (2-9 × 2-12), `a : b` (dzielnik 2-9, wynik 2-12, zawsze bez reszty). Złe odpowiedzi leżą blisko poprawnej
-  (±1, ±2, ±10, przy mnożeniu także ±a, ±b), nieujemne i bez powtórek.
+  `a × b` (2-9 × 2-12), `a : b` (dzielnik 2-9, wynik 2-12, zawsze bez reszty). Złe odpowiedzi to typowe pomyłki
+  blisko poprawnej: ±1, ±2, ±10, ±20 przy dodawaniu i odejmowaniu, ±1, ±2, ±a, ±b przy mnożeniu, ±1, ±2, ±3 przy dzieleniu;
+  dodatnie i bez powtórek. Liczby z działania nie ma wśród opcji: działanie z wynikiem równym `a` albo `b` (49 : 7) jest losowane od nowa.
 
 ### Narysuj koło (`kolo`)
 - Limit przez `turn(state)`: 120 s na wszystkie próby gracza (także solo); licznik rusza od nowa tylko, gdy ktoś skończy próby.
