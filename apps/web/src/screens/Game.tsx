@@ -87,7 +87,9 @@ export function Game({ view, me, dropped, send }: Props) {
       : myTurn
         ? (game.view as { phase?: string }).phase === "placing"
           ? "Ustaw statki"
-          : "Twój ruch!"
+          : MINI_GAMES.has(def.id)
+            ? def.name // wszyscy grają naraz, więc to nie jest niczyj „ruch”
+            : "Twój ruch!"
         : `Czekamy na: ${waitingNicks}`;
 
   return (
@@ -103,7 +105,8 @@ export function Game({ view, me, dropped, send }: Props) {
               {status}
             </h1>
           </div>
-          {view.phase === "playing" && (
+          {/* Stoper: tykający limit tury zdradzałby upływ sekund, więc grający widzi go tylko przed startem. */}
+          {view.phase === "playing" && !(def.id === "stoper" && myTurn) && (
             <Countdown game={game} total={def.turn?.(game.view).seconds ?? def.turnSeconds} color={myTurn ? myColor : undefined} />
           )}
           <ul className="flex flex-wrap gap-2">
@@ -205,6 +208,7 @@ export function Game({ view, me, dropped, send }: Props) {
           me={me}
           players={view.players}
           ranking={game.result?.ranking}
+          timer={<Countdown game={game} total={def.turnSeconds} color={myColor} />}
           onMove={(move) => send("move", move)}
         />
       )}
