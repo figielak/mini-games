@@ -22,6 +22,7 @@ Reguły platformy (limit tury, rewanż, walkower, obserwatorzy) są w `KONCEPT.m
 | Policz kropki | `kropki` | 1-6 | 120 s | mini-gra |
 | Środek | `srodek` | 1-6 | 60 s | mini-gra |
 | Stój! | `stoj` | 1-6 | 60 s | mini-gra |
+| Śledzenie | `sledzenie` | 1-6 | 300 s | mini-gra |
 
 Nazwy w UI zmieniały się (2026-10-10), `id`, nazwy plików i typów zostały stare: Sekwencja = `simon`, Kolor liter = `stroop`,
 Odcień = `kolor`, Gomoku = `piec-w-rzedzie`. Ranking w SQLite jest po `id`, więc `id` nie wolno zmieniać.
@@ -32,7 +33,7 @@ Odcień = `kolor`, Gomoku = `piec-w-rzedzie`. Ranking w SQLite jest po `id`, wi�
   więc nic nie jest ukryte (da się podejrzeć; świadoma decyzja, komentarze `ponytail:`).
 - Partia toczy się na kliencie. Każdy gracz wysyła jeden ruch `{ type: "result", ... }`; drugi ruch tego samego gracza jest odrzucany.
   Wyjątki: Narysuj koło (do 10 ruchów na gracza) oraz Tabela Schultego i Policz kropki (dodatkowy ruch `progress` po każdym trafieniu albo rundzie).
-- Serwer odrzuca tylko nierealne wartości. Wynik liczy serwer tam, gdzie się da (Narysuj koło, Odcień, Policz kropki, Środek, Stój!),
+- Serwer odrzuca tylko nierealne wartości. Wynik liczy serwer tam, gdzie się da (Narysuj koło, Odcień, Policz kropki, Środek, Stój!, Śledzenie),
   w reszcie ufa klientowi.
 - Partia zaczyna się ekranem instrukcji (platforma, nie zasady gry): każdy klika „Start” osobno (wiadomość pokoju `begin`) i gra od razu,
   po `INTRO_SECONDS` (15 s) gra rusza sama. Limit tury startuje, gdy wystartują wszyscy albo minie 15 s; wynik oddany wcześniej go nie uruchamia.
@@ -171,6 +172,28 @@ Wspólne zasady w `quiz.ts`, wspólny ekran `Quiz.tsx`.
 - Walidacja: najwyżej tyle czasów, ile bodźców, każdy od 100 ms do odstępu swojego bodźca. Pusta lista = limit czasu = 0 pkt.
 - Ekran: zielony z napisem „Dotknij”, czerwony z dłonią i „Stój!” (kolor nie jest jedynym sygnałem), bez przejścia. Trafienie gasi pole,
   błąd to czerwony błysk z potrząśnięciem i wibracja 60. Ekran końcowy: tabela z punktami, średnim czasem i błędami (wspólna z `Quiz.tsx`).
+
+### Śledzenie (`sledzenie`)
+- Do 20 rund. W każdej 8 identycznych kulek na kwadratowym polu, 3 z nich (cele) są podświetlone przez 1,5 s, potem wszystkie
+  ruszają się przez 5 s i stają; gracz wskazuje 3 kulki.
+- Pierwsza pomyłka kończy partię (jak w Sekwencji): runda jest zaliczona tylko z kompletem 3 celów.
+- Tempo rośnie: prędkość kulek to 0,3 boku pola na sekundę w pierwszej rundzie i o 0,06 więcej w każdej następnej (w dwudziestej ok. 1,45).
+  Wszystkie kulki w rundzie mają tę samą prędkość.
+- Ruch: każda kulka leci po prostej i odbija się od krawędzi pola, kulki przenikają przez siebie (mijanie się jest tym trudnym momentem).
+  Pozycja to wzór od czasu (`position(ball, round, t)`, fala trójkątna na każdej osi), bez symulacji krokowej: ta sama funkcja
+  na serwerze i w ekranie, więc u wszystkich ruch jest identyczny.
+- Serwer losuje dla każdej rundy 8 kulek: start (`x`, `y`) i kierunek (`angle`). Celami są kulki o indeksach 0-2 (pozycje są losowe,
+  więc osobne losowanie indeksów nic by nie dało). Na starcie i po zatrzymaniu kulki się nie nakładają
+  (promień 0,06 boku, odstęp środków co najmniej 0,14), w trakcie ruchu mogą.
+- Jeden ruch z `picks`: wskazania z kolejnych rozegranych rund, w każdej dokładnie 3 różne indeksy kulek (int 0-7), kolejność bez znaczenia.
+  Wynik liczy serwer: `rounds` = liczba rund od początku z kompletem celów, `hits` = trafione cele (0-2) w pierwszej rundzie z błędem.
+  Wszystko po pierwszym błędzie jest ignorowane.
+- Ranking: więcej rund wyżej, przy równych więcej `hits` („prawie się udało” wygrywa z pudłem); równe oba to remis.
+- Walidacja: najwyżej 20 rund, każda to 3 różne liczby całkowite 0-7. Pusta lista = limit czasu = 0 rund i 0 trafionych.
+- Bez ruchu `progress`: rywale nie widzą numeru rundy (jak w Sekwencji).
+- Ekran: kwadratowy kafel z kulkami; cele podświetlone kolorem gracza, w ruchu wszystkie jednakowe. Po zatrzymaniu dotknięcie zaznacza kulkę
+  (ponowne odznacza), trzecie zatwierdza. Potem przez 1 s widać prawdziwe cele; pomyłka to wibracja 60.
+  Ruch kulek jest treścią gry, więc działa także przy `prefers-reduced-motion`.
 
 ## 2. Gomoku (`piec-w-rzedzie`)
 
