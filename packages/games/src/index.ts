@@ -5,6 +5,7 @@ import { kolo } from "./kolo.ts";
 import { kolor } from "./kolor.ts";
 import { kropki } from "./kropki.ts";
 import { liczenie } from "./liczenie.ts";
+import { memory } from "./memory.ts";
 import { panstwaMiasta } from "./panstwa-miasta.ts";
 import { piecWRzedzie } from "./piec-w-rzedzie.ts";
 import { refleks } from "./refleks.ts";
@@ -50,6 +51,7 @@ export {
   type View as PanstwaMiastaView,
 } from "./panstwa-miasta.ts";
 export type { View as PiecWRzedzieView } from "./piec-w-rzedzie.ts";
+export { SYMBOLS as MEMORY_SYMBOLS, type View as MemoryView } from "./memory.ts";
 export { DURATION_MS as REFLEKS_DURATION_MS, type View as RefleksView } from "./refleks.ts";
 export type { View as SimonView } from "./simon.ts";
 export { PENALTY_MS as SCHULTE_PENALTY_MS, SIZE as SCHULTE_SIZE, total as schulteTotal, type View as SchulteView } from "./schulte.ts";
@@ -73,6 +75,7 @@ export const GAMES: Record<string, GameDefinition<any, any>> = Object.assign(Obj
   [statki.id]: statki,
   [chinczyk.id]: chinczyk,
   [kampusTour.id]: kampusTour,
+  [memory.id]: memory,
   [refleks.id]: refleks,
   [simon.id]: simon,
   [stoper.id]: stoper,
