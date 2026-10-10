@@ -198,12 +198,11 @@ body::before {
   }
 }
 
-/* Chińczyk: pionek, którym można się ruszyć, pulsuje obwódką. */
+/* Chińczyk: pionek, którym można się ruszyć, pulsuje obwódką w kolorze gracza (outline-color z elementu). */
 @keyframes ring-pulse {
   0%,
   100% {
     outline-offset: 1px;
-    outline-color: var(--color-accent);
   }
   50% {
     outline-offset: 4px;

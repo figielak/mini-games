@@ -94,7 +94,7 @@ export function Simon({ view, me, players, ranking, onMove }: Props) {
             aria-label={`Pole ${i + 1}`}
             disabled={phase !== "input"}
             onPointerDown={() => press(i)}
-            className="flex touch-none select-none items-center justify-center rounded-[20px] transition-colors duration-100"
+            className="flex touch-none select-none items-center justify-center rounded-tile transition-colors duration-100"
             style={{
               backgroundColor: lit === i ? color : `color-mix(in srgb, ${color} 22%, var(--color-bg))`,
               color: lit === i ? "var(--color-accent-fg)" : color,

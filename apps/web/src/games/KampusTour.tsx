@@ -378,6 +378,8 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
   };
   const player = (id: string) => players.find((p) => p.id === id);
   const color = (id: string) => player(id)?.color ?? "#8b8b92";
+  // Akcje gracza w jego kolorze, nie w czerwieni akcentu.
+  const mine = { backgroundColor: color(me), color: "var(--color-bg)" };
   const nick = (id: string) => player(id)?.nick ?? "Gracz";
   const seat = (id: string) => view.players.indexOf(id);
   const over = result !== null;
@@ -674,7 +676,7 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
         {sellable && (
           <button
             type="button"
-            className="btn btn-primary self-start"
+            style={mine} className="btn self-start"
             onClick={() => {
               onMove({ type: "sell", tile: i });
               setSelected(null);
@@ -686,7 +688,7 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
         {festive && owner === me && (
           <button
             type="button"
-            className="btn btn-primary self-start"
+            style={mine} className="btn self-start"
             onClick={() => {
               onMove({ type: "juwenalia", tile: i });
               setSelected(null);
@@ -698,7 +700,7 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
         {traveling && i !== view.positions[me] && (
           <button
             type="button"
-            className="btn btn-primary self-start"
+            style={mine} className="btn self-start"
             onClick={() => {
               onMove({ type: "travel", tile: i });
               setSelected(null);
@@ -867,7 +869,7 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
                   {/* Przy budowie kostki ustępują miejsca przyciskom poziomów. */}
                   {view.dice && !over && !(settled && canMove && view.phase === "build") && <Dice values={view.dice} rolling={rolling} />}
                   {settled && canMove && view.phase === "roll" && (
-                    <button type="button" className="btn btn-primary" onClick={() => onMove({ type: "roll" })}>
+                    <button type="button" style={mine} className="btn" onClick={() => onMove({ type: "roll" })}>
                       {!view.kolokwium.includes(me)
                         ? "Rzuć kośćmi"
                         : (view.passes[me] ?? 0) > 0
@@ -877,7 +879,7 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
                   )}
                   {settled && canMove && view.phase === "buy" && (
                     <>
-                      <button type="button" className="btn btn-primary" onClick={() => onMove({ type: "buy" })}>
+                      <button type="button" style={mine} className="btn" onClick={() => onMove({ type: "buy" })}>
                         Kup {SHORT[here] ?? BOARD[here].name} za {price(here)} zł
                       </button>
                       <button type="button" className="btn btn-ghost" onClick={() => onMove({ type: "skip" })}>
@@ -892,7 +894,7 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
                         <button
                           key={l}
                           type="button"
-                          className="btn btn-primary min-h-11 flex-col gap-0 px-3 text-sm leading-tight"
+                          style={mine} className="btn min-h-11 flex-col gap-0 px-3 text-sm leading-tight"
                           onClick={() => onMove({ type: "build", level: l })}
                         >
                           {l === LANDMARK ? "Landmark" : `Poziom ${l}`}
@@ -908,7 +910,7 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
                   )}
                   {settled && canMove && view.phase === "buyout" && (
                     <>
-                      <button type="button" className="btn btn-primary" onClick={() => onMove({ type: "buyout" })}>
+                      <button type="button" style={mine} className="btn" onClick={() => onMove({ type: "buyout" })}>
                         Wykup {SHORT[here] ?? BOARD[here].name} za {2 * value(here)} zł
                       </button>
                       <button type="button" className="btn btn-ghost" onClick={() => onMove({ type: "skip" })}>
@@ -921,7 +923,7 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
                   {settled && !over && view.phase === "juwenalia" && (
                     <p className="text-center text-sm">
                       {canMove
-                        ? `Juwenalia! Stuknij swoje pole: czynsz ×${nextFactor}`
+                        ? `Juwenalia! Dotknij swoje pole: czynsz ×${nextFactor}`
                         : `${nick(view.turn!)} wybiera pole na Juwenalia (×${nextFactor})`}
                     </p>
                   )}
@@ -933,7 +935,7 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
                     2× wartość pola · pieniądze dostaje {nick(owners[here])}
                   </p>
                 )}
-                {traveling && <p className="text-center text-sm font-medium">Masz Bilet MPK: stuknij dowolne pole i jedź albo rzuć kośćmi</p>}
+                {traveling && <p className="text-center text-sm font-medium">Masz Bilet MPK: dotknij dowolne pole i jedź albo rzuć kośćmi</p>}
                 {settled && canMove && view.phase === "build" && (
                   <p className="text-center text-sm font-medium">
                     Budujesz: {BOARD[here].name}
@@ -944,7 +946,7 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
                 {!over && view.phase === "sell" && view.debt && (
                   <p className="text-center text-sm">
                     {selling
-                      ? `Brakuje ${view.debt.amount - view.cash[me]} zł. Stuknij swoje pole i sprzedaj je za pół ceny.`
+                      ? `Brakuje ${view.debt.amount - view.cash[me]} zł. Dotknij swoje pole i sprzedaj je za pół ceny.`
                       : `${nick(view.turn!)} sprzedaje pola, żeby spłacić ${view.debt.amount} zł`}
                   </p>
                 )}
@@ -1038,7 +1040,7 @@ export function KampusTour({ view, me, players, dropped, canMove, result, onMove
                 <h2 className="text-lg font-semibold">{CARDS[view.card].title}</h2>
                 <p className="text-sm text-fg-muted">{CARDS[view.card].text}</p>
                 {canMove ? (
-                  <button type="button" className="btn btn-primary mt-2" autoFocus onClick={() => onMove({ type: "card" })}>
+                  <button type="button" style={mine} className="btn mt-2" autoFocus onClick={() => onMove({ type: "card" })}>
                     OK
                   </button>
                 ) : (

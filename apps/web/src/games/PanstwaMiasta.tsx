@@ -27,7 +27,7 @@ export function PanstwaMiasta({ view, me, players, waitingFor, ranking, timer, o
       {timer && (
         <header className="flex items-center gap-4">
           <span
-            className="flex size-24 shrink-0 items-center justify-center rounded-[20px] border border-line-hover bg-surface text-7xl font-semibold"
+            className="flex size-24 shrink-0 items-center justify-center rounded-tile border border-line-hover bg-surface text-7xl font-semibold"
             aria-label={`Litera ${letter}`}
           >
             {letter}
@@ -284,7 +284,7 @@ function Answers({
                 <Row
                   key={id}
                   {...(canToggle && { type: "button" as const, onClick: () => onToggle(key), "aria-pressed": rejected?.has(key) })}
-                  className={`flex min-h-10 items-center gap-3 rounded-[10px] px-2 text-left ${canToggle ? "active:bg-surface" : ""}`}
+                  className={`flex min-h-10 items-center gap-3 rounded-inset px-2 text-left ${canToggle ? "active:bg-surface" : ""}`}
                 >
                   <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: player(id)?.color }} aria-label={player(id)?.nick} />
                   <span className={`flex-1 ${struck ? "text-fg-subtle line-through" : ""}`}>{answer || "brak"}</span>

@@ -105,12 +105,12 @@ export function Refleks({ view, me, players, ranking, onMove }: Props) {
     <div className="flex flex-1 flex-col gap-3">
       <div className="flex justify-between font-mono text-sm text-fg-muted">
         <span>Trafienia: {run.current.times.length}</span>
-        <span>{left}s</span>
+        <span>{left} s</span>
       </div>
       <button
         type="button"
         onPointerDown={tap}
-        className={`flex min-h-80 flex-1 touch-none select-none items-center justify-center rounded-[20px] border border-line text-2xl font-semibold ${
+        className={`flex min-h-80 flex-1 touch-none select-none items-center justify-center rounded-tile border border-line text-2xl font-semibold ${
           phase === "go" ? "bg-accent text-accent-fg" : "bg-surface text-fg-muted"
         }`}
       >

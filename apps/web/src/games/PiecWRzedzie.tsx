@@ -48,7 +48,7 @@ export function PiecWRzedzie({ view, players, canMove, onMove }: Props) {
             // Wiersz i kolumna wybranego pola: celownik na gęstej siatce.
             const cross = x === px || y === py;
             const background = win.has(i)
-              ? "color-mix(in srgb, var(--color-accent) 28%, var(--color-surface-inset))"
+              ? `color-mix(in srgb, ${colorOf(cell!)} 28%, var(--color-surface-inset))`
               : cross
                 ? `color-mix(in srgb, ${myColor} 14%, var(--color-surface-inset))`
                 : undefined;

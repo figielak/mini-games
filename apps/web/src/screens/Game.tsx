@@ -262,7 +262,7 @@ export function Game({ view, me, dropped, send }: Props) {
 
       {def.id === "panstwa-miasta" && (
         <PanstwaMiasta
-          key={(game.view as PanstwaMiastaView).letters.join("")}
+          key={(game.view as PanstwaMiastaView).nonce}
           view={game.view as PanstwaMiastaView}
           me={me}
           players={view.players}
@@ -355,14 +355,14 @@ function Countdown({ game, total, tense, color }: { game: NonNullable<RoomView["
             style={{ width: `${Math.min(1, left) * 100}%`, backgroundColor: seconds > 10 ? color : undefined }}
           />
         </div>
-        <span className={`w-8 text-right font-mono text-xs ${seconds <= 10 ? "text-warning" : "text-fg-muted"}`}>{seconds}s</span>
+        <span className={`w-10 text-right font-mono text-xs ${seconds <= 10 ? "text-warning" : "text-fg-muted"}`}>{seconds} s</span>
       </div>
     );
   }
   return (
     <span className={`flex items-center gap-1 font-mono text-sm ${seconds <= 10 ? "text-warning" : "text-fg-muted"}`}>
       <Timer size={16} aria-hidden />
-      {seconds}s
+      {seconds} s
     </span>
   );
 }

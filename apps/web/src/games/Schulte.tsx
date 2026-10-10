@@ -94,7 +94,7 @@ export function Schulte({ view, me, players, ranking, onMove }: Props) {
             key={n}
             type="button"
             onPointerDown={() => press(n)}
-            className={`touch-none select-none rounded-[10px] border font-mono text-2xl font-semibold transition-colors duration-100 ${
+            className={`touch-none select-none rounded-inset border font-mono text-2xl font-semibold transition-colors duration-100 ${
               n < target
                 ? "border-transparent bg-surface-inset text-fg-subtle"
                 : n === wrong

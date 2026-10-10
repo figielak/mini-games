@@ -81,7 +81,7 @@ export function Stoper({ view, me, players, ranking, onMove }: Props) {
     <button
       type="button"
       onPointerDown={stop}
-      className="flex min-h-80 flex-1 touch-none select-none flex-col items-center justify-center gap-2 rounded-[20px] border border-line bg-surface"
+      className="flex min-h-80 flex-1 touch-none select-none flex-col items-center justify-center gap-2 rounded-tile border border-line bg-surface"
     >
       <span className="font-mono text-6xl font-semibold tabular-nums">{elapsed < STOPER_VISIBLE_MS ? seconds(elapsed) : "?,??"}</span>
       <span className="text-fg-muted">Dotknij przy 10,00 s</span>

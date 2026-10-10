@@ -55,8 +55,8 @@ export function Statki({ view, me, players, canMove, onMove }: Props) {
     (incoming.result === "miss"
       ? { icon: <Drop size={18} weight="fill" aria-hidden />, text: `${nick(enemyId)} pudłuje (${spot})` }
       : incoming.result === "hit"
-        ? { icon: <Fire size={18} weight="fill" aria-hidden />, text: `${nick(enemyId)} trafił w ${spot}!` }
-        : { icon: <Skull size={20} weight="fill" aria-hidden />, text: `${nick(enemyId)} zatopił twój statek (${spot})!`, loud: true });
+        ? { icon: <Fire size={18} weight="fill" aria-hidden />, text: `${nick(enemyId)} trafia w ${spot}!` }
+        : { icon: <Skull size={20} weight="fill" aria-hidden />, text: `${nick(enemyId)} zatapia twój statek (${spot})!`, loud: true });
 
   const enemy = (
     <Battle

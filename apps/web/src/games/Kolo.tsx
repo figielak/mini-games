@@ -107,7 +107,7 @@ export function Kolo({ view, me, players, ranking, onMove }: Props) {
         </p>
         <svg
           viewBox="0 0 1 1"
-          className="aspect-square w-full touch-none select-none rounded-[20px] border border-line bg-surface [-webkit-touch-callout:none]"
+          className="aspect-square w-full touch-none select-none rounded-tile border border-line bg-surface [-webkit-touch-callout:none]"
           onPointerDown={down}
           onPointerMove={move}
           onPointerUp={up}
@@ -149,7 +149,7 @@ export function Kolo({ view, me, players, ranking, onMove }: Props) {
                   ] as const
                 ).map(([label, attempt]) => (
                   <figure key={label} className="flex flex-col gap-1">
-                    <svg viewBox="0 0 1 1" className="aspect-square w-full rounded-[10px] bg-bg" aria-label={`${label} koło gracza ${r.nick}`}>
+                    <svg viewBox="0 0 1 1" className="aspect-square w-full rounded-inset bg-bg" aria-label={`${label} koło gracza ${r.nick}`}>
                       <Drawing points={attempt.points} color={r.color} />
                     </svg>
                     <figcaption className="flex justify-between gap-2 text-sm text-fg-muted">

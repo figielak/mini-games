@@ -105,7 +105,7 @@ export function Quiz({ view, me, players, ranking, intro, question, onMove }: Pr
     <div className="flex flex-1 flex-col gap-3">
       <div className="flex justify-between font-mono text-sm text-fg-muted">
         <span>Trafienia: {run.current.times.length}</span>
-        <span>{left}s</span>
+        <span>{left} s</span>
       </div>
       <div className="tile flex min-h-40 flex-1 items-center justify-center p-4">
         {phase === "wrong" ? <span className="text-2xl font-semibold text-warning">Źle!</span> : q.prompt}
@@ -117,7 +117,7 @@ export function Quiz({ view, me, players, ranking, intro, question, onMove }: Pr
             type="button"
             disabled={phase !== "play"}
             onPointerDown={() => answer(i)}
-            className="flex min-h-20 touch-none select-none items-center justify-center gap-2 rounded-[20px] border border-line bg-surface text-xl font-semibold disabled:opacity-40"
+            className="flex min-h-20 touch-none select-none items-center justify-center gap-2 rounded-tile border border-line bg-surface text-xl font-semibold disabled:opacity-40"
           >
             {option}
           </button>

@@ -33,7 +33,7 @@ function Pairs({ targets, guesses }: { targets: Hsb[]; guesses: Hsb[] }) {
     <div className="grid grid-cols-5 gap-2">
       {targets.map((t, i) => (
         <div key={i} className="flex flex-col items-center gap-1">
-          <div className="flex h-14 w-full overflow-hidden rounded-[10px] border border-line">
+          <div className="flex h-14 w-full overflow-hidden rounded-inset border border-line">
             <span className="flex-1" style={{ backgroundColor: css(t) }} />
             <span className="flex-1" style={{ backgroundColor: css(guesses[i]) }} />
           </div>
@@ -117,7 +117,7 @@ export function Kolor({ view, me, players, ranking, onMove }: Props) {
     return (
       <section className="flex flex-1 flex-col gap-2">
         {counter}
-        <div className="min-h-80 flex-1 rounded-[20px] border border-line" style={{ backgroundColor: css(view.targets[index]) }} />
+        <div className="min-h-80 flex-1 rounded-tile border border-line" style={{ backgroundColor: css(view.targets[index]) }} />
       </section>
     );
   }
@@ -125,7 +125,7 @@ export function Kolor({ view, me, players, ranking, onMove }: Props) {
   return (
     <section className="flex flex-1 flex-col gap-4">
       {counter}
-      <div className="h-40 rounded-[20px] border border-line" style={{ backgroundColor: css(current) }} />
+      <div className="h-40 rounded-tile border border-line" style={{ backgroundColor: css(current) }} />
       {SLIDERS.map(({ key, label, max, track }) => (
         <label key={key} className="flex flex-col gap-1">
           <span className="text-sm text-fg-muted">{label}</span>

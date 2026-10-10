@@ -18,7 +18,7 @@ function Answers({ counts, answers }: { counts: number[]; answers: number[] }) {
   return (
     <div className="grid grid-cols-5 gap-2">
       {counts.map((n, i) => (
-        <div key={i} className="flex flex-col items-center rounded-[10px] border border-line py-1 font-mono">
+        <div key={i} className="flex flex-col items-center rounded-inset border border-line py-1 font-mono">
           <span>{n}</span>
           <span className={answers[i] === n ? "text-success" : "text-fg-muted"}>{answers[i]}</span>
         </div>
