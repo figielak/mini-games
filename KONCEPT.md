@@ -72,6 +72,13 @@ Po partii ekran podsumowania (`KampusSummary.tsx`): wykres majątku, zapłacone 
   nadwyżka oczek do domku przepada, dodatkowy rzut za zbicie i wejście do domku, koniec po pierwszym graczu z 3 pionkami, 20 s, szybsze animacje).
 - Klasyczny toczy się do pełnego rankingu (`isOver` zwraca `ranking`). Jedyny możliwy ruch wykonuje się sam.
 
+### 2.3b Memory (spoza pierwotnego planu)
+
+- 2-6 graczy, wspólna plansza zakrytych kart z ikonami; w turze odkrywasz dwie karty. Para zostaje u ciebie i daje kolejny ruch,
+  po pudle karty widać 1,5 s, a tura od razu przechodzi dalej. Wygrywa najwięcej par, remis na górze bez zwycięzcy.
+- Trzy tryby w lobby: Mała (4×4, 8 par), Średnia (4×6, 12 par, domyślna) i Duża (6×6, 18 par).
+- Układ kart zna tylko serwer: `playerView` pokazuje symbole kart zebranych, pierwszej karty tury i ostatniego pudła.
+
 ### 2.4 Mini-gry (przerywniki)
 
 - **Refleks**: dotknij pola, gdy zmieni kolor; 30 s, wynik = liczba trafień (remis: niższa średnia reakcja), falstart kosztuje czas.
@@ -240,7 +247,7 @@ podpięcie w `screens/Game.tsx` i ikona w `screens/Lobby.tsx`.
 | 5 | Kampus Tour: dodatki (Kolokwium, Juwenalia, karty, wykupienie, Bilet MPK, monopol) | Pełna wersja (gotowe) |
 | 6 | Poprawka | Gra karciana (do zrobienia) |
 | 7 | PWA, animacje, statystyki, szlify | Polerka (PWA i ranking po nicku gotowe) |
-| + | Chińczyk, mini-gry (13 sztuk), Państwa-miasta | Poza planem (gotowe) |
+| + | Chińczyk, Memory, mini-gry (13 sztuk), Państwa-miasta | Poza planem (gotowe) |
 | dalej | Zapis stanu pokoi w SQLite | Do zrobienia |
 
 ## 8a. Sposób pracy
