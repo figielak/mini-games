@@ -26,6 +26,7 @@ Reguły platformy (limit tury, rewanż, walkower, obserwatorzy) są w `KONCEPT.m
 | Stój! | `stoj` | 1-6 | 60 s | mini-gra |
 | Śledzenie | `sledzenie` | 1-6 | 300 s | mini-gra |
 | Wieża | `wieza` | 1-6 | 180 s | mini-gra |
+| Rytm | `rytm` | 1-6 | 60 s | mini-gra |
 | Inny element | `inny` | 1-6 | 90 s | mini-gra |
 
 Nazwy w UI zmieniały się (2026-10-10), `id`, nazwy plików i typów zostały stare: Sekwencja = `simon`, Kolor liter = `stroop`,
@@ -37,14 +38,14 @@ Odcień = `kolor`, Gomoku = `piec-w-rzedzie`. Ranking w SQLite jest po `id`, wi�
   więc nic nie jest ukryte (da się podejrzeć; świadoma decyzja, komentarze `ponytail:`).
 - Partia toczy się na kliencie. Każdy gracz wysyła jeden ruch `{ type: "result", ... }`; drugi ruch tego samego gracza jest odrzucany.
   Wyjątki: Narysuj koło (do 10 ruchów na gracza), Tabela Schultego, Policz kropki, Który rok? i Wieża (dodatkowy ruch `progress` po każdym trafieniu, rundzie albo klocku).
-- Serwer odrzuca tylko nierealne wartości. Wynik liczy serwer tam, gdzie się da (Narysuj koło, Odcień, Policz kropki, Który rok?, Środek, Stój!, Śledzenie, Wieża),
+- Serwer odrzuca tylko nierealne wartości. Wynik liczy serwer tam, gdzie się da (Narysuj koło, Odcień, Policz kropki, Który rok?, Środek, Stój!, Śledzenie, Wieża, Rytm),
   w reszcie ufa klientowi.
 - Partia zaczyna się ekranem instrukcji (platforma, nie zasady gry): każdy klika „Start” osobno (wiadomość pokoju `begin`) i gra od razu,
   po `INTRO_SECONDS` (15 s) gra rusza sama. Limit tury startuje, gdy wystartują wszyscy albo minie 15 s; wynik oddany wcześniej go nie uruchamia.
 - `waitingFor` = gracze bez wyniku. Po limicie `timeoutMove` wpisuje najgorszy możliwy wynik.
 - Koniec, gdy wszyscy oddali wynik. Ranking liczy `rankResults` (core.ts): zwycięzca tylko przy 2+ graczach i bez remisu
   na pierwszym miejscu; gra solo nie ma zwycięzcy (nie nabija statystyk).
-- Odświeżenie strony w trakcie = partia od nowa na kliencie. `nonce` w stanie (Stoper, Narysuj koło) służy tylko do tego,
+- Odświeżenie strony w trakcie = partia od nowa na kliencie. `nonce` w stanie (Stoper, Narysuj koło, Rytm) służy tylko do tego,
   żeby rewanż zamontował komponent od nowa.
 
 ### Refleks (`refleks`)
@@ -240,6 +241,29 @@ Wspólne zasady w `quiz.ts`, wspólny ekran `Quiz.tsx` (dzieli je też Inny elem
   który został, albo „Pudło”. Statystyki: wysokość, szerokość i seria (trafienia idealne z rzędu). Pod kaflem jedno zdanie podpowiedzi.
   Pudło to wibracja 60 i po 1 s wynik.
   Ruch klocka jest treścią gry, więc działa także przy `prefers-reduced-motion`.
+
+### Rytm (`rytm`)
+- Po „Start” 1 s ciszy, potem metronom gra 8 uderzeń (`BEATS`, 2 takty po 4) i cichnie, a gracz stuka dalej w tym samym tempie
+  przez 10 s (`TAP_MS`), licząc od ostatniego uderzenia metronomu.
+- Tempo losuje serwer: 70-130 BPM co 5 (13 wartości), to samo dla wszystkich. W stanie jest `interval = round(60000 / BPM)` ms (462-857)
+  i `nonce` (rewanż może wylosować to samo tempo).
+- Jeden ruch z `taps`: czasy stuknięć w ms (int) od ostatniego uderzenia metronomu. Stuknięcia przed nim i po 10 s ekran ignoruje.
+- Wynik liczy serwer (`deviation`): odstępy to różnice kolejnych czasów, pierwszy liczy się od ostatniego uderzenia metronomu.
+  Błąd odstępu = różnica względem `interval`, ucięta do `interval`. Oczekiwana liczba odstępów to `floor(10 000 / interval) − 1`
+  (`expected`; jedno uderzenie zapasu, żeby grający odrobinę za wolno nie tracił ostatniego stuknięcia o włos); każdy brakujący
+  liczy się jak najgorszy, czyli `interval`. Wynik = suma błędów podzielona przez większą z liczb: oczekiwaną i faktyczną liczbę odstępów,
+  zaokrąglona do ms.
+- Odchyłka liczy się z odstępów, nie od idealnej siatki metronomu: przy siatce mały błąd tempa kumuluje się i po rozjechaniu
+  o pół uderzenia wynik jest przypadkowy.
+- Skutki: pominięte uderzenie to jeden odstęp z pełnym błędem, klepanie na oślep daje wynik bliski `interval`,
+  a dwa idealne stuknięcia i koniec nie wygrywają.
+- Wynik = średnia odchyłka w ms (int, od 0 do `interval`), mniej lepiej; równe to remis.
+- Walidacja: najwyżej 60 czasów (`MAX_TAPS`), każdy całkowity 1-10 000, ściśle rosnące. Pusta lista = limit czasu = wynik równy `interval`.
+- Grający nie widzi limitu tury po starcie (jak w Stoperze: pasek tykający co sekundę podawałby tempo 60 BPM); ekran stukania
+  nie ma licznika sekund, tylko płynny pasek.
+- Jedyna gra z dźwiękiem: metronom klika (WebAudio), błyska polem (pierwsze uderzenie taktu mocniej) i wibruje 30. Bez gestu
+  (start sam po 15 s instrukcji) albo przy wyciszonym telefonie zostaje błysk i wibracja, więc gra jest grywalna z samym błyskiem.
+- Ekran: całe pole reaguje na dotyk i błyska kolorem gracza. Ekran końcowy: kafel z własnym tempem w BPM obok celu i tabela z odchyłkami.
 
 ### Inny element (`inny`)
 Wynik, walidacja, ranking i ekran końcowy jak w Kolorze liter (`quiz.ts`, `Quiz.tsx`); inne jest tylko to, co widać na planszy.
