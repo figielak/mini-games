@@ -30,8 +30,20 @@ type Phase = "intro" | "play" | "wrong" | "sent";
 /** Od sekundy w górę w sekundach („1,29 s”), poniżej w milisekundach. */
 const duration = (ms: number) => (ms >= 1000 ? `${(ms / 1000).toFixed(2).replace(".", ",")} s` : `${ms} ms`);
 
-/** Wyniki: miejsce, trafienia, średni czas i błędy w kolumnach, pod spodem jak liczony jest ranking. */
-function Results({ view, me, players, ranking, winner }: Pick<Props, "view" | "me" | "players" | "ranking" | "winner">) {
+/**
+ * Wyniki: miejsce, trafienia, średni czas i błędy w kolumnach, pod spodem jak liczony jest ranking.
+ * Gra, w której błędy odejmują punkty (Stój!), podaje `points`: kolumna „Punkty” zastępuje trafienia
+ * (czwarta kolumna liczb nie mieści się na 360 px) i po niej idą miejsca; do tego własna notka.
+ */
+export function Results({
+  view,
+  me,
+  players,
+  ranking,
+  winner,
+  points,
+  note = "Wygrywa najwięcej trafień, przy remisie niższy średni czas. Błędy nie odejmują trafień, każdy kosztował sekundę blokady.",
+}: Pick<Props, "view" | "me" | "players" | "ranking" | "winner"> & { points?: (res: Props["view"]["results"][string]) => number; note?: string }) {
   const rows = (ranking ?? view.players).map((id) => {
     const p = players.find((pl) => pl.id === id);
     const res = view.results[id];
@@ -43,11 +55,12 @@ function Results({ view, me, players, ranking, winner }: Pick<Props, "view" | "m
       avg: res?.times.length ? Math.round(res.times.reduce((a, b) => a + b, 0) / res.times.length) : null,
     };
   });
-  // Remis (te same trafienia i średnia) to to samo miejsce.
+  // Remis (te same trafienia albo punkty i średnia) to to samo miejsce.
+  const main = (r: (typeof rows)[number]) => r.res && (points ? points(r.res) : r.res.times.length);
   const places: number[] = [];
   rows.forEach((r, i) => {
     const prev = rows[i - 1];
-    places.push(prev && prev.res?.times.length === r.res?.times.length && prev.avg === r.avg ? places[i - 1] : i + 1);
+    places.push(prev && main(prev) === main(r) && prev.avg === r.avg ? places[i - 1] : i + 1);
   });
 
   return (
@@ -56,7 +69,7 @@ function Results({ view, me, players, ranking, winner }: Pick<Props, "view" | "m
         <thead>
           <tr className="label text-right">
             <th className="w-full px-2 text-left font-normal">Gracz</th>
-            <th className="px-1.5 font-normal">Trafienia</th>
+            <th className="px-1.5 font-normal">{points ? "Punkty" : "Trafienia"}</th>
             <th className="px-1.5 font-normal">Śr. czas</th>
             <th className="px-1.5 font-normal">Błędy</th>
           </tr>
@@ -98,7 +111,7 @@ function Results({ view, me, players, ranking, winner }: Pick<Props, "view" | "m
                     </td>
                   ) : (
                     <>
-                      <td className="px-1.5">{r.res.times.length}</td>
+                      <td className="px-1.5">{main(r)}</td>
                       <td className="px-1.5">{duration(r.avg)}</td>
                     </>
                   )}
@@ -109,9 +122,7 @@ function Results({ view, me, players, ranking, winner }: Pick<Props, "view" | "m
           ))}
         </tbody>
       </table>
-      <p className="text-sm text-fg-muted">
-        Wygrywa najwięcej trafień, przy remisie niższy średni czas. Błędy nie odejmują trafień, każdy kosztował sekundę blokady.
-      </p>
+      <p className="text-sm text-fg-muted">{note}</p>
     </section>
   );
 }

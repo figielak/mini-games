@@ -10,6 +10,7 @@ import {
   Eyedropper,
   GlobeHemisphereEast,
   GridNine,
+  HandPalm,
   HandWaving,
   type Icon,
   Lightning,
@@ -275,6 +276,7 @@ const ICONS: Record<string, Icon> = {
   kolor: Eyedropper,
   kropki: DotsNine,
   srodek: LineSegment,
+  stoj: HandPalm,
 };
 
 function seats(g: { minPlayers: number; maxPlayers: number }) {
@@ -298,6 +300,7 @@ const BLURBS: Record<string, string> = {
   kolor: "Widzisz kolor przez 2 s, potem odtwarzasz go suwakami. 5 kolorów, wygrywa najmniejszy błąd.",
   kropki: "Kropki migają przez 1,5 s, wpisujesz, ile ich było. 10 rund, wygrywa najmniejsza suma błędów.",
   srodek: "Odcinek pod losowym kątem, dotykasz dokładnie jego środka. 10 rund, wygrywa najmniejsza suma błędów.",
+  stoj: "Zielone pole dotykasz, czerwonego nie wolno. 30 s, tempo rośnie, błąd zabiera 2 punkty.",
 };
 
 /** Nazwy kolorów z PLAYER_COLORS (ta sama kolejność), dla czytników ekranu. */
