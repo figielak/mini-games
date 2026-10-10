@@ -7,6 +7,7 @@ import { kolor } from "./kolor.ts";
 import { kropki } from "./kropki.ts";
 import { liczenie } from "./liczenie.ts";
 import { memory } from "./memory.ts";
+import { obrot } from "./obrot.ts";
 import { panstwaMiasta } from "./panstwa-miasta.ts";
 import { piecWRzedzie } from "./piec-w-rzedzie.ts";
 import { refleks } from "./refleks.ts";
@@ -62,6 +63,7 @@ export { VISIBLE_MS as STOPER_VISIBLE_MS, type View as StoperView } from "./stop
 export { COLORS as STROOP_COLORS, type View as StroopView } from "./stroop.ts";
 export type { View as LiczenieView } from "./liczenie.ts";
 export type { Symbol as InnySymbol, View as InnyView } from "./inny.ts";
+export { type Cells as ObrotCells, score as obrotScore, type View as ObrotView } from "./obrot.ts";
 export { ATTEMPTS as KOLO_ATTEMPTS, judge as koloJudge, MAX_POINTS as KOLO_MAX_POINTS, type Point as KoloPoint, type View as KoloView } from "./kolo.ts";
 export { COUNT as KOLOR_COUNT, distance as kolorDistance, type Hsb, hints as kolorHints, hsbToRgb as kolorHsbToRgb, SHOW_MS as KOLOR_SHOW_MS, type View as KolorView } from "./kolor.ts";
 export { ROUNDS as KROPKI_ROUNDS, SHOW_MS as KROPKI_SHOW_MS, type View as KropkiView } from "./kropki.ts";
@@ -98,5 +100,6 @@ export const GAMES: Record<string, GameDefinition<any, any>> = Object.assign(Obj
   [wieza.id]: wieza,
   [rytm.id]: rytm,
   [inny.id]: inny,
+  [obrot.id]: obrot,
   [panstwaMiasta.id]: panstwaMiasta,
 });

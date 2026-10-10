@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { average, type GameDefinition, type PlayerId, rankResults, shuffle } from "./core.ts";
+import { byScoreThenAverage, type GameDefinition, type PlayerId, rankResults, shuffle } from "./core.ts";
 
 export const DURATION_MS = 30_000;
 /** Odstęp między bodźcami maleje liniowo z czasem partii: to jest „tempo rośnie”. */
@@ -34,9 +34,6 @@ export interface State {
 export type View = State;
 
 export const score = ({ times, errors }: Result) => Math.max(0, times.length - ERROR_COST * errors);
-
-/** Więcej punktów wyżej, przy równych niższa średnia reakcji; dwa wyniki bez trafień to remis (Infinity − Infinity dałoby NaN). */
-const compare = (a: Result, b: Result) => score(b) - score(a) || (a.times.length || b.times.length ? average(a.times) - average(b.times) : 0);
 
 // ponytail: reakcje mierzy klient (opóźnienie Wi-Fi zjadłoby pomiar), da się je podrobić;
 // serwer zna kolejność bodźców, więc sam liczy trafienia i błędy i odrzuca nierealne czasy.
@@ -80,7 +77,7 @@ export const stoj: GameDefinition<State, Move> = {
 
   playerView: (state): View => state,
 
-  isOver: (state) => rankResults(state.players, state.results, compare),
+  isOver: (state) => rankResults(state.players, state.results, byScoreThenAverage(score)),
 
   waitingFor: (state) => state.players.filter((p) => !(p in state.results)),
 
