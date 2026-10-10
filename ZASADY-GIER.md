@@ -534,3 +534,26 @@ Przebieg, walidacja i ekran końcowy jak w Kolorze liter (`quiz.ts`, `Quiz.tsx`)
 - Limit 60 s na każde odkrycie. Limit czasu: losowa zakryta karta.
 - **Ukrywanie stanu**: `playerView` jest taki sam dla wszystkich (także obserwatora) i zawiera symbole tylko kart zebranych,
   `first` i `miss`. Symbol z `miss` zostaje w widoku także po zakryciu kart na ekranie (każdy go już widział).
+
+## 8. Turniej (`turniej`)
+
+Seria mini-gier puszczana po kolei w jednym pokoju. To nie jest gra z rejestru `GAMES`: każda gra turnieju to zwykła partia mini-gry
+(instrukcja, limit, wynik i ranking jak w sekcji 1), a pokój sumuje punkty. Zasady w `turniej.ts`, przebieg w `LobbyRoom.ts`.
+
+- Gracze: wszyscy z miejscem (1-6). Skład jest stały na cały turniej; kto dołączy w trakcie, ogląda.
+- Konfiguracja gospodarza `{ length, must, skip }` (wiadomość pokoju `pickTournament`, sprawdza ją `cleanConfig`):
+  - `length`: liczba gier, od `MIN_LENGTH` (3) do liczby niewykluczonych mini-gier, domyślnie `DEFAULT_LENGTH` (8); wartość spoza zakresu jest przycinana,
+  - `must`: gry, które będą na pewno; gdy jest ich więcej niż `length`, długość rośnie do ich liczby,
+  - `skip`: gry wykluczone; po wykluczeniu muszą zostać co najmniej 3 gry,
+  - nieznane `id`, gra jednocześnie w `must` i `skip` albo niecałkowita długość: konfiguracja odrzucona.
+- Losowanie na starcie (`draw`): wszystkie `must` i losowe z reszty puli, bez powtórzeń, w potasowanej kolejności.
+- Punkty za grę (`gamePoints`): liczba graczy ze ściśle gorszym miejscem. Przy 4 graczach bez remisów 3/2/1/0, remisujący dostają tyle samo.
+  Miejsca z remisami podaje `places` mini-gry (`rankPlaces` w core.ts). Gra przerwana (ktoś wyszedł, błąd) daje wszystkim 0.
+- Tabela (`standings`): suma punktów malejąco, potem liczba wygranych gier. Wygrana gra to samodzielne 1. miejsce przy 2+ graczach.
+- Między grami: wyniki gry i tabela; następna gra rusza, gdy wszyscy grający klikną „Dalej”, najpóźniej po `NEXT_SECONDS` (15 s).
+- Koniec po ostatniej grze. Zwycięzcą jest samodzielny lider tabeli (punkty, potem wygrane gry). Przy remisie na szczycie dolosowywana jest
+  jedna gra dogrywki: spoza rozegranych i wykluczonych, a gdy takich nie ma, dowolna niewykluczona. Po dogrywce remis zostaje bez zwycięzcy.
+  Turniej solo nie ma zwycięzcy ani dogrywki.
+- Wyjście gracza: bieżąca gra kończy się bez punktów, gracz znika z tabeli, turniej trwa dalej z pozostałymi.
+- Zakończyć turniej przed czasem może tylko gospodarz. Rewanż po turnieju losuje gry od nowa z tą samą konfiguracją.
+- Ranking w SQLite: pojedyncze gry zapisują się jak poza turniejem, zwycięzca turnieju dodatkowo pod `id` `turniej`.
