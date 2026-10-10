@@ -138,8 +138,11 @@ Wspólne zasady w `quiz.ts`, wspólny ekran `Quiz.tsx`.
   niezależnie od telefonu, odległość dotknięcia od środka w każdej rundzie ucięta do 150 px, suma zapisana w dziesiątych częściach (int).
   Mniej lepiej.
 - Pusta lista = limit czasu = 10 × 150 px.
-- Ekran: kwadratowy kafel z odcinkiem. Po dotknięciu przez 1 s widać prawdziwy środek, własny punkt (kolor gracza) i odległość,
-  potem sama wskakuje następna runda; po dziesiątej wynik idzie na serwer. Na końcu odległości z każdej rundy u wszystkich graczy.
+- Ekran: kwadratowy kafel z odcinkiem (poprzeczne kreski na końcach). Liczy się miejsce podniesienia palca: punkt można przytrzymać
+  i przesunąć, a przy dotyku nad kaflem jest lupa ok. 1,7× (mysz jej nie ma). Po puszczeniu przez 1 s widać własny punkt (kolor gracza),
+  prawdziwy środek (pierścień), łączącą je linię i odległość; kolor według celności: do 5 px zielony z „Idealnie!”, do 20 px zwykły,
+  dalej ostrzegawczy. Potem sama wskakuje następna runda; po dziesiątej wynik idzie na serwer.
+  Na końcu odległości z każdej rundy u wszystkich graczy, w tych samych kolorach.
 
 ## 2. Gomoku (`piec-w-rzedzie`)
 
