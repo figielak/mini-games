@@ -117,7 +117,7 @@ Wspólne zasady w `quiz.ts`, wspólny ekran `Quiz.tsx`.
   nad parami legenda „wzór | odpowiedź”; wszystkie procenty z jednym miejscem po przecinku.
 
 ### Policz kropki (`kropki`)
-- 10 rund, w każdej 8-40 kropek (bez nakładania, odstęp środków ≥ 0,08) widocznych 0,5 s, potem gracz wpisuje liczbę.
+- 10 rund, w każdej 8-40 kropek (bez nakładania, odstęp środków ≥ 0,08) widocznych 1,5 s, potem gracz wpisuje liczbę.
 - Jeden ruch z 10 odpowiedziami (int 0-99). Wynik liczy serwer: suma |odpowiedź − liczba kropek|, mniej lepiej.
 - Pusta lista = limit czasu, liczona jak same zera (czyli błąd = suma kropek).
 - Bez tolerancji: każda kropka różnicy to 1 punkt karny, w obie strony tak samo.

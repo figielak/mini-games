@@ -94,7 +94,7 @@ export function Kropki({ view, me, players, ranking, onMove }: Props) {
     return (
       <section className="tile flex flex-col gap-4 p-4">
         <p>
-          {KROPKI_ROUNDS} rund. W każdej na pół sekundy pojawią się kropki, potem wpisz, ile ich było. Za każdą rundę dostajesz tyle punktów
+          {KROPKI_ROUNDS} rund. W każdej na półtorej sekundy pojawią się kropki, potem wpisz, ile ich było. Za każdą rundę dostajesz tyle punktów
           karnych, o ile się pomylisz (było 42, wpisujesz 38: 4 punkty). Nie ma tolerancji, wygrywa najmniejsza suma.
         </p>
         <button type="button" className="btn btn-primary w-full" onClick={() => setPhase("wait")}>

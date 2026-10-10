@@ -5,7 +5,7 @@ export const ROUNDS = 10;
 export const MIN = 8;
 export const MAX = 40;
 /** Tyle ms widać kropki. */
-export const SHOW_MS = 500;
+export const SHOW_MS = 1500;
 /** Minimalna odległość środków kropek (pole 0-1), żeby się nie nakładały. */
 export const GAP = 0.08;
 const MARGIN = 0.05;
