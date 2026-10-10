@@ -38,6 +38,25 @@ test("działania: poprawna odpowiedź, 4 różne nieujemne opcje, wszystkie rodz
   expect(new Set(problems.map((p) => p.answer)).size).toBe(4);
 });
 
+test("złe odpowiedzi: blisko poprawnej, a liczby z działania nie ma wśród opcji", () => {
+  for (let seed = 1; seed <= 50; seed++) {
+    const { problems } = game.setup([A], createRng(seed));
+    for (const p of problems) {
+      const [a, op, b] = p.text.split(" ");
+      const correct = p.options[p.answer];
+      const wrong = p.options.filter((o) => o !== correct);
+      expect(new Set(p.options).size, p.text).toBe(4);
+      // Wynik widoczny w zadaniu (49 : 7 = 7) dałoby się wskazać bez liczenia, a zły taki sam od razu odrzucić.
+      expect(p.options, p.text).not.toContain(Number(a));
+      expect(p.options, p.text).not.toContain(Number(b));
+      expect(wrong.every((o) => o > 0), p.text).toBe(true);
+      // Przy dzieleniu wyniki to 2-12, więc „+10” (17 zamiast 7) odpada na oko: tylko sąsiedzi.
+      const reach = op === ":" ? 3 : op === "×" ? 12 : 20;
+      expect(Math.max(...wrong.map((o) => Math.abs(o - correct))), p.text).toBeLessThanOrEqual(reach);
+    }
+  }
+});
+
 describe("walidacja", () => {
   const s = game.setup([A, B], createRng(1));
   test.each([
