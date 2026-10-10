@@ -14,7 +14,7 @@ const MIN_TURN = 0.9;
 /** Tyle obwodu przerwy między początkiem a końcem nie kosztuje (palec rzadko domyka idealnie). */
 const GAP_FREE = 0.03;
 /** Jak ostro kara rośnie z błędem promienia; do strojenia na rysunkach z telefonu. */
-const STRICTNESS = 5;
+const STRICTNESS = 4;
 
 /** Pusty rysunek kończy pozostałe próby (zostaje najlepsza, bez żadnej 0 pkt). */
 export type Move = { type: "result"; points: Point[] };
@@ -83,17 +83,18 @@ function fit(points: Point[]) {
 }
 
 /** Ocena rysunku; klient woła to samo przed wysłaniem, żeby niedokończone koło nie spaliło próby. */
-export function judge(points: Point[]): Result & { status: "ok" | "unfinished" | "small" } {
+export function judge(points: Point[]): Result & { status: "ok" | "unfinished" | "small"; circle?: { cx: number; cy: number; r: number } } {
   if (points.length < MIN_POINTS) return { status: "unfinished", score: 0, points };
   const cut = points.slice(0, sweep(points, mean(points.map((p) => p[0])), mean(points.map((p) => p[1]))).end);
   const { cx, cy, r } = fit(cut);
   if (!Number.isFinite(r) || r > 10 || Math.abs(sweep(cut, cx, cy).angle) < MIN_TURN * TURN) return { status: "unfinished", score: 0, points: cut };
-  if (r < MIN_RADIUS) return { status: "small", score: 0, points: cut };
+  const circle = { cx, cy, r };
+  if (r < MIN_RADIUS) return { status: "small", score: 0, points: cut, circle };
   const err = mean(cut.map(([px, py]) => Math.abs(Math.hypot(px - cx, py - cy) - r))) / r;
   const accuracy = Math.max(0, 1 - STRICTNESS * err) ** 2;
   const [first, last] = [cut[0], cut[cut.length - 1]];
   const gap = Math.max(0, Math.hypot(first[0] - last[0], first[1] - last[1]) / (TURN * r) - GAP_FREE);
-  return { status: "ok", score: Math.round(1000 * accuracy * Math.max(0, 1 - gap)), points: cut };
+  return { status: "ok", score: Math.round(1000 * accuracy * Math.max(0, 1 - gap)), points: cut, circle };
 }
 
 const inCanvas = (v: number) => v >= 0 && v <= 1;
@@ -141,6 +142,13 @@ export const kolo: GameDefinition<State, Move> = {
   isOver: (state) => (kolo.waitingFor(state).length ? null : rankResults(state.players, state.best, (a, b) => b.score - a.score)),
 
   waitingFor: (state) => state.players.filter((p) => (state.attempts[p] ?? 0) < ATTEMPTS),
+
+  // 120 s na wszystkie próby, także gdy rysuje już tylko jeden gracz (bez tego każda jego próba odnawiałaby limit);
+  // licznik rusza od nowa dopiero, gdy ktoś skończy.
+  turn: (state) => {
+    const waiting = kolo.waitingFor(state);
+    return { key: waiting.join(), seconds: waiting.length ? kolo.turnSeconds! : 0 };
+  },
 
   timeoutMove: () => ({ type: "result", points: [] }),
 };

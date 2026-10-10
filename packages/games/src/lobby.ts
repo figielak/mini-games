@@ -6,6 +6,8 @@ export const PLAYER_COLORS = ["#3b9eff", "#ffc53d", "#46a758", "#8e7cff", "#0ac5
 
 export const MAX_PLAYERS = PLAYER_COLORS.length;
 export const NICK_MAX = 16;
+/** Tyle trwa ekran instrukcji mini-gry; potem gra rusza sama, żeby nikt nie blokował pozostałych. */
+export const INTRO_SECONDS = 15;
 
 export interface LobbyPlayer {
   id: PlayerId;
@@ -24,6 +26,8 @@ export interface RoomView {
   players: LobbyPlayer[];
   phase: Phase;
   gameId: string | null;
+  /** Tryb wybranej gry (id z `modes`); null, gdy gra nie ma trybów. */
+  mode: string | null;
   /** Kto gra w wybranej grze, w kolejności ruchów. Reszta ogląda. */
   seats: PlayerId[];
   /** Wygrane partie w tym pokoju. */
@@ -34,6 +38,10 @@ export interface RoomView {
     waitingFor: PlayerId[];
     /** Ile zostało do końca tury; liczone od chwili odebrania wiadomości (zegary telefonu i serwera się różnią). */
     msLeft: number | null;
+    /** Trwa ekran instrukcji mini-gry: limit jeszcze nie ruszył, a msLeft liczy czas do automatycznego startu. */
+    intro: boolean;
+    /** Kto kliknął już „Start” na ekranie instrukcji. */
+    began: PlayerId[];
     result: GameResult | null;
   } | null;
 }
@@ -48,10 +56,13 @@ export function cleanNick(raw: unknown): string | null {
 /** Schematy wiadomości od klienta do pokoju; serwer odrzuca wszystko, co do nich nie pasuje. */
 export const ROOM_MESSAGES = {
   pickGame: z.object({ gameId: z.string() }),
+  pickMode: z.object({ mode: z.string() }),
   toggleSeat: z.object({ id: z.string() }),
   pickColor: z.object({ color: z.enum(PLAYER_COLORS) }),
   ready: z.object({ ready: z.boolean() }),
   start: z.unknown(),
+  // „Start” na ekranie instrukcji mini-gry.
+  begin: z.unknown(),
   rematch: z.unknown(),
   toLobby: z.unknown(),
   // Kształt ruchu sprawdza moveSchema wybranej gry.

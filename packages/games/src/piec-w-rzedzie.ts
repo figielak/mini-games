@@ -48,7 +48,7 @@ function lineThrough(board: State["board"], x: number, y: number): Move[] | null
 
 export const piecWRzedzie: GameDefinition<State, Move> = {
   id: "piec-w-rzedzie",
-  name: "Pięć w rzędzie",
+  name: "Gomoku",
   minPlayers: 2,
   maxPlayers: 2,
   turnSeconds: 60,

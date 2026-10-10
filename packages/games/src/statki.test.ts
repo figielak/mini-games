@@ -1,12 +1,15 @@
 import { describe, expect, test } from "vitest";
 import { createRng } from "./core.ts";
-import { isValidFleet, type Move, randomFleet, type Ship, statki as game, type State, type View } from "./statki.ts";
+import { isValidFleet, MODES, type Move, randomFleet, type Ship, statki as game, type State, type View } from "./statki.ts";
 
 // Testy napisane przed implementacją (etap 3). Ustalają zasady:
 // - plansza 10×10, flota 1×4, 2×3, 3×2, 4×1, statki nie stykają się (także rogami),
 // - na start flota losowa; w fazie rozstawiania można ją wymienić ruchem `place`, potem `ready`,
+//   a `unready` cofa gotowość; całe rozstawianie ma jeden licznik 90 s, który się nie odnawia,
 // - bitwa startuje, gdy obaj gotowi; strzela players[0]; trafienie = kolejny strzał, pudło oddaje turę,
 // - zatopienie odsłania statek i oznacza pola wokół jako "around",
+// - tryby (wybierane w lobby): klasyczny 10×10, hasbro 10×10 z flotą 5-4-3-3-2 i stykaniem (bez "around" po zatopieniu),
+//   flota 12×12 z flotą 6-5-4-4-3-3-2-2, szybki 8×8 z flotą 4-3-2-2; testy bez podanego trybu dotyczą klasycznego,
 // - widok: boards[id].ships to wszystkie statki właściciela, a dla innych tylko zatopione.
 
 const A = "ania";
@@ -153,6 +156,25 @@ describe("rozstawianie", () => {
     expect(game.validateMove(s, B, { type: "place", ships: FLEET })).toBe(true);
   });
 
+  test("gotowość można cofnąć i wtedy znów przestawiać flotę", () => {
+    let s = apply(game.setup([A, B], rng), A, { type: "ready" });
+    s = apply(s, A, { type: "unready" });
+    expect(view(s, B).boards[A].ready).toBe(false);
+    expect([...game.waitingFor(s)].sort()).toEqual([A, B].sort());
+    s = apply(s, A, { type: "place", ships: FLEET });
+    expect(view(s, A).boards[A].ships).toEqual(FLEET);
+    expect(view(s, A).phase).toBe("placing");
+  });
+
+  test("cofnąć gotowość może tylko gotowy gracz i tylko w rozstawianiu", () => {
+    const s = game.setup([A, B], rng);
+    expect(game.validateMove(s, A, { type: "unready" }), "niegotowy").toBe(false);
+    expect(game.validateMove(apply(s, A, { type: "ready" }), B, { type: "unready" }), "gotowy jest ktoś inny").toBe(false);
+    expect(game.validateMove(apply(s, A, { type: "ready" }), "obcy", { type: "unready" }), "obcy").toBe(false);
+    expect(game.validateMove(battle(), A, { type: "unready" }), "bitwa").toBe(false);
+    expect(game.validateMove(sinkAll(battle()), A, { type: "unready" }), "koniec").toBe(false);
+  });
+
   test("w rozstawianiu nie można strzelać", () => {
     const s = game.setup([A, B], rng);
     expect(game.validateMove(s, A, { type: "shoot", x: 0, y: 0 })).toBe(false);
@@ -241,6 +263,23 @@ describe("koniec gry", () => {
     expect(view(s, A).phase).toBe("over");
   });
 
+  test("wygrywa też drugi gracz", () => {
+    let s = shoot(battle(), A, 9, 5); // pudło A, tura B
+    for (const c of allCells(FLEET)) s = shoot(s, B, c.x, c.y);
+    expect(game.isOver(s)).toEqual({ winner: B });
+    expect(view(s, "").shooter).toBeNull();
+    // Po końcu przegrany dalej nie widzi niezatopionych statków zwycięzcy.
+    expect(view(s, A).boards[B].ships).toEqual([]);
+  });
+
+  test("pole wokół zatopionego, w które już padło pudło, nie dostaje drugiego znacznika", () => {
+    let s = shoot(battle(), A, 2, 8); // pudło tuż obok jedynki B na (3,9)
+    s = shoot(s, B, 9, 1); // pudło B
+    s = shoot(s, A, 3, 9); // zatopiona
+    const at = view(s, A).boards[B].shots.filter((sh) => sh.x === 2 && sh.y === 8);
+    expect(at).toEqual([{ x: 2, y: 8, result: "miss" }]);
+  });
+
   test("po końcu nikt nie strzela", () => {
     const s = sinkAll(battle());
     expect(game.validateMove(s, A, { type: "shoot", x: 9, y: 0 })).toBe(false);
@@ -291,6 +330,142 @@ describe("ukrywanie informacji", () => {
   });
 });
 
+describe("tryby", () => {
+  const mode = (id: string) => MODES.find((m) => m.id === id)!;
+  const start = (id?: string) => game.setup([A, B], createRng(7), id);
+  /** Flota hasbro: piątka i czwórka stykają się bokiem, trójki rogiem. */
+  const TOUCHING: Ship[] = [
+    { x: 0, y: 0, length: 5, vertical: false },
+    { x: 0, y: 1, length: 4, vertical: false },
+    { x: 7, y: 5, length: 3, vertical: false },
+    { x: 4, y: 6, length: 3, vertical: false },
+    { x: 9, y: 8, length: 2, vertical: true },
+  ];
+  /** Reszta floty 12×12 (bez szóstki), w górnych rzędach z przerwami. */
+  const FLOTA_REST: Ship[] = [
+    { x: 0, y: 0, length: 5, vertical: false },
+    { x: 6, y: 0, length: 4, vertical: false },
+    { x: 0, y: 2, length: 4, vertical: false },
+    { x: 5, y: 2, length: 3, vertical: false },
+    { x: 9, y: 2, length: 3, vertical: false },
+    { x: 0, y: 4, length: 2, vertical: false },
+    { x: 3, y: 4, length: 2, vertical: false },
+  ];
+  /** Bitwa hasbro: obaj mają flotę TOUCHING. */
+  function hasbroBattle(): State {
+    let s = start("hasbro");
+    for (const p of [A, B]) s = apply(s, p, { type: "place", ships: TOUCHING });
+    return apply(apply(s, A, { type: "ready" }), B, { type: "ready" });
+  }
+
+  test("gra ogłasza cztery tryby od najkrótszej partii do najdłuższej, domyślny to klasyczny", () => {
+    expect(game.modes!.map((m) => m.id)).toEqual(["szybki", "hasbro", "klasyczny", "flota"]);
+    const cells = MODES.map((m) => m.lengths.reduce((a, b) => a + b));
+    expect(cells).toEqual([...cells].sort((a, b) => a - b));
+    expect(game.modes!.filter((m) => m.default).map((m) => m.id)).toEqual(["klasyczny"]);
+    for (const m of game.modes!) expect(m.name.length > 0 && m.hint.length > 0, m.id).toBe(true);
+  });
+
+  test("bez trybu i z nieznanym trybem gra jest klasyczna", () => {
+    for (const id of [undefined, "nie-ma", "constructor"]) {
+      const v = view(start(id), A);
+      expect(v.mode, String(id)).toBe("klasyczny");
+      expect(v.size).toBe(10);
+      expect(v.lengths).toEqual([4, 3, 3, 2, 2, 2, 1, 1, 1, 1]);
+      expect(v.touching).toBe(false);
+    }
+  });
+
+  test.each([
+    ["szybki", 8, [4, 3, 2, 2], false],
+    ["hasbro", 10, [5, 4, 3, 3, 2], true],
+    ["flota", 12, [6, 5, 4, 4, 3, 3, 2, 2], false],
+  ] as const)("%s: rozmiar, flota i stykanie w widoku każdego, losowa flota poprawna", (id, size, lengths, touching) => {
+    const s = start(id);
+    for (const viewer of [A, B, ""]) {
+      const v = view(s, viewer);
+      expect([v.mode, v.size, v.lengths, v.touching]).toEqual([id, size, lengths, touching]);
+    }
+    for (const p of [A, B]) {
+      const ships = view(s, p).boards[p].ships;
+      expect(ships.map((sh) => sh.length).sort((a, b) => b - a)).toEqual(lengths);
+      expect(isValidFleet(ships, mode(id))).toBe(true);
+    }
+    for (let seed = 0; seed < 100; seed++) expect(isValidFleet(randomFleet(createRng(seed), mode(id)), mode(id)), `seed ${seed}`).toBe(true);
+  });
+
+  test("hasbro: statki mogą się stykać, ale nie nakładać", () => {
+    const s = start("hasbro");
+    expect(isValidFleet(TOUCHING, mode("klasyczny")), "to nie jest flota klasyczna").toBe(false);
+    expect(game.validateMove(s, A, { type: "place", ships: TOUCHING })).toBe(true);
+    const overlap = TOUCHING.map((sh, i) => (i === 1 ? { ...sh, y: 0 } : sh));
+    expect(game.validateMove(s, A, { type: "place", ships: overlap })).toBe(false);
+    expect(game.validateMove(s, A, { type: "place", ships: FLEET }), "flota klasyczna ma zły skład").toBe(false);
+    expect(game.validateMove(start(), A, { type: "place", ships: TOUCHING }), "w klasycznym odrzucona").toBe(false);
+  });
+
+  test("hasbro: zatopienie nie oznacza pól wokół i można w nie strzelać", () => {
+    const s = shoot(shoot(hasbroBattle(), A, 9, 8), A, 9, 9); // dwójka w rogu
+    const shots = view(s, A).boards[B].shots;
+    expect(shots).toEqual([
+      { x: 9, y: 8, result: "sunk" },
+      { x: 9, y: 9, result: "sunk" },
+    ]);
+    expect(view(s, A).boards[B].ships).toEqual([TOUCHING[4]]);
+    expect(game.validateMove(s, A, { type: "shoot", x: 8, y: 8 }), "pole obok zatopionego").toBe(true);
+    expect(game.waitingFor(s)).toEqual([A]);
+  });
+
+  test("hasbro: zatopienie całej stykającej się floty kończy grę", () => {
+    let s = hasbroBattle();
+    for (const c of allCells(TOUCHING)) s = shoot(s, A, c.x, c.y);
+    expect(game.isOver(s)).toEqual({ winner: A });
+  });
+
+  test("flota: plansza 12×12, pola 10 i 11 są na planszy, 12 już nie", () => {
+    const s = start("flota");
+    const ships = view(s, A).boards[A].ships;
+    const moved = (x: number, y: number) => ships.map((sh, i) => (i === 0 ? { ...sh, x, y, vertical: false } : sh));
+    // Szóstka w ostatnim rzędzie i do ostatniej kolumny: poprawność zależy tylko od reszty floty, więc sprawdzamy samą planszę.
+    expect(isValidFleet([{ x: 6, y: 11, length: 6, vertical: false }, ...FLOTA_REST], mode("flota"))).toBe(true);
+    expect(isValidFleet([{ x: 7, y: 11, length: 6, vertical: false }, ...FLOTA_REST], mode("flota"))).toBe(false);
+    expect(game.validateMove(s, A, { type: "place", ships: moved(7, 11) }), "wystaje za kolumnę 11").toBe(false);
+    let b = apply(apply(s, A, { type: "ready" }), B, { type: "ready" });
+    expect(game.validateMove(b, A, { type: "shoot", x: 11, y: 11 })).toBe(true);
+    expect(game.validateMove(b, A, { type: "shoot", x: 12, y: 0 })).toBe(false);
+    expect(game.validateMove(b, A, { type: "shoot", x: 0, y: 12 })).toBe(false);
+    expect(game.validateMove(battle(), A, { type: "shoot", x: 10, y: 0 }), "klasyczny kończy się na 9").toBe(false);
+    b = shoot(b, A, 11, 11);
+    expect(view(b, A).boards[B].shots).toHaveLength(1);
+  });
+
+  test("szybki: plansza 8×8 kończy się na polu 7, statki dalej nie mogą się stykać", () => {
+    const quick: Ship[] = [
+      { x: 4, y: 7, length: 4, vertical: false },
+      { x: 0, y: 0, length: 3, vertical: false },
+      { x: 0, y: 2, length: 2, vertical: false },
+      { x: 3, y: 2, length: 2, vertical: false },
+    ];
+    expect(isValidFleet(quick, mode("szybki"))).toBe(true);
+    expect(isValidFleet(quick.map((sh, i) => (i === 0 ? { ...sh, x: 5 } : sh)), mode("szybki")), "wystaje").toBe(false);
+    expect(isValidFleet(quick.map((sh, i) => (i === 3 ? { ...sh, x: 2 } : sh)), mode("szybki")), "styk").toBe(false);
+    let s = start("szybki");
+    s = apply(apply(s, A, { type: "ready" }), B, { type: "ready" });
+    expect(game.validateMove(s, A, { type: "shoot", x: 7, y: 7 })).toBe(true);
+    expect(game.validateMove(s, A, { type: "shoot", x: 8, y: 0 })).toBe(false);
+  });
+
+  test.each(["klasyczny", "szybki", "hasbro", "flota"])("%s: ruch po limicie czasu jest dozwolony w obu fazach", (id) => {
+    let s = start(id);
+    for (const p of [A, B]) s = apply(s, p, game.timeoutMove!(s, p, rng));
+    expect(view(s, A).phase).toBe("battle");
+    for (let seed = 0; seed < 30; seed++) {
+      const move = game.timeoutMove!(s, A, createRng(seed));
+      expect(game.validateMove(s, A, move), JSON.stringify(move)).toBe(true);
+    }
+  });
+});
+
 describe("tura i limit czasu", () => {
   test("waitingFor: obaj w rozstawianiu, potem niegotowy, w bitwie strzelający", () => {
     let s = game.setup([A, B], rng);
@@ -299,6 +474,33 @@ describe("tura i limit czasu", () => {
     expect(game.waitingFor(s)).toEqual([B]);
     s = apply(s, B, { type: "ready" });
     expect(game.waitingFor(s)).toEqual([A]);
+  });
+
+  test("licznik: całe rozstawianie ma jeden limit 90 s, w bitwie każdy strzał daje nowe 60 s", () => {
+    const key = (s: State) => game.turn!(s).key;
+    let s = game.setup([A, B], rng);
+    expect(game.turn!(s).seconds).toBe(90);
+    const start = key(s);
+    s = apply(s, A, { type: "place", ships: FLEET });
+    expect(key(s), "przestawienie").toBe(start);
+    s = apply(s, A, { type: "ready" });
+    expect(key(s), "gotowość").toBe(start);
+    s = apply(s, A, { type: "unready" });
+    expect(key(s), "cofnięcie gotowości nie przedłuża czasu").toBe(start);
+    s = apply(s, A, { type: "ready" });
+    s = apply(s, B, { type: "place", ships: FLEET_B });
+    expect(key(s), "ostatni niegotowy nie przedłuża sobie czasu").toBe(start);
+    expect(game.turn!(s).seconds).toBe(90);
+    s = apply(s, B, { type: "ready" });
+    const battleStart = key(s);
+    expect(battleStart).not.toBe(start);
+    expect(game.turn!(s).seconds).toBe(game.turnSeconds);
+    s = shoot(s, A, 0, 5); // trafienie: ten sam gracz, nowy limit
+    const afterHit = key(s);
+    expect(afterHit).not.toBe(battleStart);
+    s = shoot(s, A, 9, 0); // pudło
+    expect(key(s)).not.toBe(afterHit);
+    expect(game.turn!(sinkAll(battle())).seconds).toBe(0);
   });
 
   test("po limicie w rozstawianiu gracz zgłasza gotowość z obecną flotą", () => {
@@ -339,6 +541,7 @@ describe("stan", () => {
   test("schemat ruchu odrzuca śmieci z sieci", () => {
     expect(game.moveSchema.safeParse({ type: "shoot", x: 1, y: 2 }).success).toBe(true);
     expect(game.moveSchema.safeParse({ type: "ready" }).success).toBe(true);
+    expect(game.moveSchema.safeParse({ type: "unready" }).success).toBe(true);
     expect(game.moveSchema.safeParse({ type: "place", ships: FLEET }).success).toBe(true);
     expect(game.moveSchema.safeParse({ type: "shoot", x: "1", y: 2 }).success).toBe(false);
     expect(game.moveSchema.safeParse({ type: "fly" }).success).toBe(false);

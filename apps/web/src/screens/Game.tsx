@@ -1,10 +1,11 @@
-import { ArrowCounterClockwise, Timer, UsersThree } from "@phosphor-icons/react";
-import { CHINCZYK_TRACK, type ChinczykView, GAMES, type KampusTourView, type KolorView, type KoloView, type LiczenieView, type PanstwaMiastaView, type PiecWRzedzieView, type RefleksView, type RoomView, type SchulteView, type SimonView, type StatkiView, type StoperView, type StroopView } from "@mini-games/games";
+import { ArrowCounterClockwise, Check, Timer, UsersThree } from "@phosphor-icons/react";
+import { CHINCZYK_TRACK, type ChinczykView, GAMES, type KampusTourView, type KolorView, type KoloView, type KropkiView, type LiczenieView, type PanstwaMiastaView, type PiecWRzedzieView, type RefleksView, type RoomView, KROPKI_ROUNDS, SCHULTE_SIZE, type SchulteView, type SimonView, type StatkiView, type StoperView, type StroopView } from "@mini-games/games";
 import { useEffect, useMemo, useState } from "react";
 import { Chinczyk } from "../games/Chinczyk.tsx";
 import { KampusTour } from "../games/KampusTour.tsx";
 import { Kolo } from "../games/Kolo.tsx";
 import { Kolor } from "../games/Kolor.tsx";
+import { Kropki } from "../games/Kropki.tsx";
 import { Liczenie } from "../games/Liczenie.tsx";
 import { PanstwaMiasta } from "../games/PanstwaMiasta.tsx";
 import { PiecWRzedzie } from "../games/PiecWRzedzie.tsx";
@@ -14,7 +15,7 @@ import { Simon } from "../games/Simon.tsx";
 import { FleetLeft, Statki } from "../games/Statki.tsx";
 import { Stoper } from "../games/Stoper.tsx";
 import { Stroop } from "../games/Stroop.tsx";
-import { Screen, type Send } from "./ui.tsx";
+import { IntroContext, Screen, type Send } from "./ui.tsx";
 
 interface Props {
   view: RoomView;
@@ -36,6 +37,18 @@ export function Game({ view, me, dropped, send }: Props) {
     if (myTurn) navigator.vibrate?.(40);
   }, [myTurn]);
 
+  // Quizy (Kolor liter, Liczenie) mają w rundzie własny zegar „Do końca”; limit platformy obok niego tylko myli.
+  const [inRound, setInRound] = useState(false);
+  // Poświata tła w kolorze gracza, na którego czekamy; poza turą jednej osoby zostaje akcent.
+  const turnColor = view.phase === "playing" && game.waitingFor.length === 1 ? view.players.find((p) => p.id === game.waitingFor[0])?.color : undefined;
+  useEffect(() => {
+    if (!turnColor) return;
+    document.body.style.setProperty("--ambient", turnColor);
+    return () => {
+      document.body.style.removeProperty("--ambient");
+    };
+  }, [turnColor]);
+
   // Kampus Tour ma własny, poziomy układ na cały ekran: gracze w rogach, licznik i rewanż w środku planszy.
   if (def.id === "kampus-tour") {
     return (
@@ -55,9 +68,15 @@ export function Game({ view, me, dropped, send }: Props) {
 
   // Wspólny nagłówek: wyraźne „Twój ruch!” w kolorze gracza i pasek czasu. Chińczyk zamiast punktów pokazuje pionki w domu.
   const ludo = def.id === "chinczyk" ? (game.view as ChinczykView) : null;
-  // Statki w bitwie zamiast punktów pokazują pozostałą flotę.
-  const fleet = def.id === "statki" && (game.view as StatkiView).phase === "battle" ? (game.view as StatkiView) : null;
+  // Statki w trakcie partii zamiast punktów pokazują flotę (w bitwie: pozostałą).
+  const fleet = def.id === "statki" && view.phase === "playing" ? (game.view as StatkiView) : null;
+  // Tabela Schultego w trakcie partii zamiast punktów pokazuje postęp każdego gracza.
+  const schulte = def.id === "schulte" && view.phase === "playing" ? (game.view as SchulteView) : null;
+  // Policz kropki tak samo: numer rundy każdego gracza.
+  const kropki = def.id === "kropki" && view.phase === "playing" ? (game.view as KropkiView) : null;
   const myColor = view.players.find((p) => p.id === me)?.color;
+  const winner = view.phase === "over" ? game.result?.winner : undefined;
+  const winnerColor = view.players.find((p) => p.id === winner)?.color;
 
   // Państwa-miasta w trakcie partii mają własny nagłówek: runda, pasek czasu fazy, litera.
   const ownHeader = def.id === "panstwa-miasta" && view.phase === "playing";
@@ -74,217 +93,278 @@ export function Game({ view, me, dropped, send }: Props) {
       : myTurn
         ? (game.view as { phase?: string }).phase === "placing"
           ? "Ustaw statki"
-          : "Twój ruch!"
+          : MINI_GAMES.has(def.id)
+            ? def.name // wszyscy grają naraz, więc to nie jest niczyj „ruch”
+            : "Twój ruch!"
         : `Czekamy na: ${waitingNicks}`;
 
+  const intro = {
+    game,
+    others: view.seats.filter((id) => id !== me).map((id) => ({ id, nick: nick(id), color: view.players.find((p) => p.id === id)?.color ?? "", began: game.began.includes(id) })),
+    begin: () => send("begin"),
+  };
+
   return (
-    <Screen dropped={dropped}>
-      {!ownHeader && (
-        <header className="tile flex flex-col gap-3 p-4">
-          <div className="flex items-center justify-between gap-3">
-            <h1 className="text-xl font-semibold" style={myTurn ? { color: myColor } : undefined}>
-              {status}
-            </h1>
+    <IntroContext.Provider value={intro}>
+      <Screen dropped={dropped}>
+        {!ownHeader && (
+          <header className="tile flex flex-col gap-3 p-4">
+            <div className="flex items-center justify-between gap-3">
+              {/* Koniec partii: tytuł w kolorze zwycięzcy; podbicie tylko u niego, przegrany dostaje spokojną wersję. */}
+              <h1
+                className={`origin-left text-xl font-semibold ${winner === me ? "animate-[title-pop_0.5s_cubic-bezier(0.2,0.8,0.4,1)]" : ""}`}
+                style={{ color: winner ? winnerColor : myTurn ? myColor : undefined }}
+              >
+                {status}
+              </h1>
+            </div>
+            {/* Na ekranie instrukcji limit jeszcze nie ruszył. Stoper: tykający limit zdradzałby upływ sekund, więc grający go nie widzi. */}
+            {view.phase === "playing" && !game.intro && !(def.id === "stoper" && myTurn) && !inRound && (
+              <Countdown game={game} total={def.turn?.(game.view).seconds ?? def.turnSeconds} color={myTurn ? myColor : undefined} label={MINI_GAMES.has(def.id) ? "Limit" : undefined} />
+            )}
+            <ul className="flex flex-wrap gap-2">
+              {view.seats.map((id) => {
+                const p = view.players.find((pl) => pl.id === id);
+                const active = id === winner || (view.phase === "playing" && game.waitingFor.includes(id));
+                return (
+                  <li
+                    key={id}
+                    className={`flex min-h-9 items-center gap-2 rounded-full border px-3 text-sm transition-colors ${fleet ? "w-full" : ""} ${
+                      active ? "" : "border-transparent text-fg-muted"
+                    }`}
+                    style={active ? { borderColor: p?.color, backgroundColor: `color-mix(in srgb, ${p?.color} 16%, transparent)` } : undefined}
+                  >
+                    <span className="size-2.5 rounded-full" style={{ backgroundColor: p?.color }} aria-hidden />
+                    {nick(id)}
+                    {id === me && " (ty)"}
+                    {fleet?.phase === "placing" && fleet.boards[id].ready && <Check size={14} weight="bold" aria-label="gotowy" />}
+                    {ludo ? (
+                      <span className="flex gap-1" aria-label={`W domu: ${ludo.pawns[id].filter((p) => p >= CHINCZYK_TRACK).length} z 4`}>
+                        {[...ludo.pawns[id]].sort((a, b) => b - a).map((pos, i) => (
+                          <span
+                            key={i}
+                            className="size-2.5 rounded-full border"
+                            style={{ borderColor: p?.color, backgroundColor: pos >= CHINCZYK_TRACK ? p?.color : undefined }}
+                            aria-hidden
+                          />
+                        ))}
+                      </span>
+                    ) : fleet ? (
+                      <FleetLeft board={fleet.boards[id]} lengths={fleet.lengths} color={p?.color ?? "#8b8b92"} />
+                    ) : schulte ? (
+                      <Progress done={id in schulte.results ? SCHULTE_LAST : (schulte.progress[id] ?? 0)} total={SCHULTE_LAST} color={p?.color} />
+                    ) : kropki ? (
+                      <Progress done={id in kropki.results ? KROPKI_ROUNDS : (kropki.progress[id] ?? 0)} total={KROPKI_ROUNDS} color={p?.color} />
+                    ) : (
+                      // Klucz z wyniku: po wygranej liczba montuje się od nowa i wskakuje.
+                      <span
+                        key={view.scores[id] ?? 0}
+                        className={`text-base font-semibold text-fg tabular-nums ${id === winner ? "animate-[stone-pop_0.5s_ease-out]" : ""}`}
+                      >
+                        {view.scores[id] ?? 0}
+                      </span>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+            {!seated && (
+              <p className="flex items-center gap-2 text-sm text-fg-muted">
+                <UsersThree size={16} aria-hidden />
+                Oglądasz
+              </p>
+            )}
+          </header>
+        )}
+
+        {def.id === "piec-w-rzedzie" && (
+          <PiecWRzedzie
+            view={game.view as PiecWRzedzieView}
+            players={view.players}
+            canMove={myTurn}
+            onMove={(move) => send("move", move)}
+          />
+        )}
+
+        {def.id === "statki" && (
+          <Statki
+            view={game.view as StatkiView}
+            me={me}
+            players={view.players}
+            canMove={myTurn}
+            onMove={(move) => send("move", move)}
+          />
+        )}
+
+        {def.id === "chinczyk" && (
+          <Chinczyk
+            view={game.view as ChinczykView}
+            me={me}
+            players={view.players}
+            canMove={myTurn}
+            onMove={(move) => send("move", move)}
+          />
+        )}
+
+        {/* Klucz z wylosowanego wyzwania: rewanż montuje grę od nowa, bez stanu poprzedniej partii. */}
+        {def.id === "refleks" && (
+          <Refleks
+            key={(game.view as RefleksView).delays.join()}
+            view={game.view as RefleksView}
+            me={me}
+            players={view.players}
+            ranking={game.result?.ranking}
+            winner={winner}
+            onMove={(move) => send("move", move)}
+          />
+        )}
+
+        {def.id === "stoper" && (
+          <Stoper
+            key={(game.view as StoperView).nonce}
+            view={game.view as StoperView}
+            me={me}
+            players={view.players}
+            ranking={game.result?.ranking}
+            onMove={(move) => send("move", move)}
+          />
+        )}
+
+        {def.id === "kolo" && (
+          <Kolo
+            key={(game.view as KoloView).nonce}
+            view={game.view as KoloView}
+            me={me}
+            players={view.players}
+            ranking={game.result?.ranking}
+            onMove={(move) => send("move", move)}
+          />
+        )}
+
+        {def.id === "kolor" && (
+          <Kolor
+            key={JSON.stringify((game.view as KolorView).targets)}
+            view={game.view as KolorView}
+            me={me}
+            players={view.players}
+            ranking={game.result?.ranking}
+            onMove={(move) => send("move", move)}
+          />
+        )}
+
+        {def.id === "kropki" && (
+          <Kropki
+            key={JSON.stringify((game.view as KropkiView).rounds)}
+            view={game.view as KropkiView}
+            me={me}
+            players={view.players}
+            ranking={game.result?.ranking}
+            onMove={(move) => send("move", move)}
+          />
+        )}
+
+        {def.id === "schulte" && (
+          <Schulte
+            key={(game.view as SchulteView).grid.join()}
+            view={game.view as SchulteView}
+            me={me}
+            players={view.players}
+            ranking={game.result?.ranking}
+            onMove={(move) => send("move", move)}
+          />
+        )}
+
+        {def.id === "stroop" && (
+          <Stroop
+            key={(game.view as StroopView).trials.map((t) => t.word * 4 + t.ink).join("")}
+            view={game.view as StroopView}
+            me={me}
+            players={view.players}
+            ranking={game.result?.ranking}
+            winner={winner}
+            onMove={(move) => send("move", move)}
+            onRound={setInRound}
+          />
+        )}
+
+        {def.id === "liczenie" && (
+          <Liczenie
+            key={(game.view as LiczenieView).problems.map((p) => p.text).join()}
+            view={game.view as LiczenieView}
+            me={me}
+            players={view.players}
+            ranking={game.result?.ranking}
+            winner={winner}
+            onMove={(move) => send("move", move)}
+            onRound={setInRound}
+          />
+        )}
+
+        {def.id === "simon" && (
+          <Simon
+            key={(game.view as SimonView).sequence.join("")}
+            view={game.view as SimonView}
+            me={me}
+            players={view.players}
+            ranking={game.result?.ranking}
+            onMove={(move) => send("move", move)}
+          />
+        )}
+
+        {def.id === "panstwa-miasta" && (
+          <PanstwaMiasta
+            key={(game.view as PanstwaMiastaView).nonce}
+            view={game.view as PanstwaMiastaView}
+            me={me}
+            players={view.players}
+            waitingFor={game.waitingFor}
+            ranking={game.result?.ranking}
+            timer={ownHeader && <Countdown game={game} total={def.turn?.(game.view).seconds} tense />}
+            onMove={(move) => send("move", move)}
+          />
+        )}
+
+        {/* Mini-gry pokazują ranking same, razem z wynikami. */}
+        {view.phase === "over" && !MINI_GAMES.has(def.id) && game.result?.ranking && game.result.ranking.length > 2 && (
+          <ol className="tile flex flex-col gap-1 p-4">
+            {game.result.ranking.map((id, i) => (
+              <li key={id} className="flex items-center gap-3">
+                <span className="w-5 font-mono text-fg-muted">{i + 1}.</span>
+                <span className="size-2.5 rounded-full" style={{ backgroundColor: view.players.find((p) => p.id === id)?.color }} aria-hidden />
+                {nick(id)}
+                {id === me && <span className="text-fg-muted"> (ty)</span>}
+              </li>
+            ))}
+          </ol>
+        )}
+
+        {view.phase === "over" && (
+          <div className="mt-auto flex flex-col gap-2 pt-4">
+            <OverActions view={view} me={me} send={send} />
           </div>
-          {view.phase === "playing" && <Countdown game={game} total={def.turnSeconds} color={myTurn ? myColor : undefined} />}
-          <ul className="flex flex-wrap gap-2">
-            {view.seats.map((id) => {
-              const p = view.players.find((pl) => pl.id === id);
-              const active = view.phase === "playing" && game.waitingFor.includes(id);
-              return (
-                <li
-                  key={id}
-                  className={`flex min-h-9 items-center gap-2 rounded-full border px-3 text-sm transition-colors ${fleet ? "w-full" : ""} ${
-                    active ? "border-line-hover bg-surface" : "border-transparent text-fg-muted"
-                  }`}
-                >
-                  <span className="size-2.5 rounded-full" style={{ backgroundColor: p?.color }} aria-hidden />
-                  {nick(id)}
-                  {id === me && " (ty)"}
-                  {ludo ? (
-                    <span className="flex gap-1" aria-label={`W domu: ${ludo.pawns[id].filter((p) => p >= CHINCZYK_TRACK).length} z 4`}>
-                      {[...ludo.pawns[id]].sort((a, b) => b - a).map((pos, i) => (
-                        <span
-                          key={i}
-                          className="size-2.5 rounded-full border"
-                          style={{ borderColor: p?.color, backgroundColor: pos >= CHINCZYK_TRACK ? p?.color : undefined }}
-                          aria-hidden
-                        />
-                      ))}
-                    </span>
-                  ) : fleet ? (
-                    <FleetLeft board={fleet.boards[id]} color={p?.color ?? "#8b8b92"} />
-                  ) : (
-                    <span className="font-mono">{view.scores[id] ?? 0}</span>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-          {!seated && (
-            <p className="flex items-center gap-2 text-sm text-fg-muted">
-              <UsersThree size={16} aria-hidden />
-              Oglądasz
-            </p>
-          )}
-        </header>
-      )}
-
-      {def.id === "piec-w-rzedzie" && (
-        <PiecWRzedzie
-          view={game.view as PiecWRzedzieView}
-          players={view.players}
-          canMove={myTurn}
-          onMove={(move) => send("move", move)}
-        />
-      )}
-
-      {def.id === "statki" && (
-        <Statki
-          view={game.view as StatkiView}
-          me={me}
-          players={view.players}
-          canMove={myTurn}
-          onMove={(move) => send("move", move)}
-        />
-      )}
-
-      {def.id === "chinczyk" && (
-        <Chinczyk
-          view={game.view as ChinczykView}
-          me={me}
-          players={view.players}
-          canMove={myTurn}
-          onMove={(move) => send("move", move)}
-        />
-      )}
-
-      {/* Klucz z wylosowanego wyzwania: rewanż montuje grę od nowa, bez stanu poprzedniej partii. */}
-      {def.id === "refleks" && (
-        <Refleks
-          key={(game.view as RefleksView).delays.join()}
-          view={game.view as RefleksView}
-          me={me}
-          players={view.players}
-          ranking={game.result?.ranking}
-          onMove={(move) => send("move", move)}
-        />
-      )}
-
-      {def.id === "stoper" && (
-        <Stoper
-          key={(game.view as StoperView).nonce}
-          view={game.view as StoperView}
-          me={me}
-          players={view.players}
-          ranking={game.result?.ranking}
-          onMove={(move) => send("move", move)}
-        />
-      )}
-
-      {def.id === "kolo" && (
-        <Kolo
-          key={(game.view as KoloView).nonce}
-          view={game.view as KoloView}
-          me={me}
-          players={view.players}
-          ranking={game.result?.ranking}
-          onMove={(move) => send("move", move)}
-        />
-      )}
-
-      {def.id === "kolor" && (
-        <Kolor
-          key={JSON.stringify((game.view as KolorView).targets)}
-          view={game.view as KolorView}
-          me={me}
-          players={view.players}
-          ranking={game.result?.ranking}
-          onMove={(move) => send("move", move)}
-        />
-      )}
-
-      {def.id === "schulte" && (
-        <Schulte
-          key={(game.view as SchulteView).grid.join()}
-          view={game.view as SchulteView}
-          me={me}
-          players={view.players}
-          ranking={game.result?.ranking}
-          onMove={(move) => send("move", move)}
-        />
-      )}
-
-      {def.id === "stroop" && (
-        <Stroop
-          key={(game.view as StroopView).trials.map((t) => t.word * 4 + t.ink).join("")}
-          view={game.view as StroopView}
-          me={me}
-          players={view.players}
-          ranking={game.result?.ranking}
-          onMove={(move) => send("move", move)}
-        />
-      )}
-
-      {def.id === "liczenie" && (
-        <Liczenie
-          key={(game.view as LiczenieView).problems.map((p) => p.text).join()}
-          view={game.view as LiczenieView}
-          me={me}
-          players={view.players}
-          ranking={game.result?.ranking}
-          onMove={(move) => send("move", move)}
-        />
-      )}
-
-      {def.id === "simon" && (
-        <Simon
-          key={(game.view as SimonView).sequence.join("")}
-          view={game.view as SimonView}
-          me={me}
-          players={view.players}
-          ranking={game.result?.ranking}
-          onMove={(move) => send("move", move)}
-        />
-      )}
-
-      {def.id === "panstwa-miasta" && (
-        <PanstwaMiasta
-          key={(game.view as PanstwaMiastaView).letters.join("")}
-          view={game.view as PanstwaMiastaView}
-          me={me}
-          players={view.players}
-          waitingFor={game.waitingFor}
-          ranking={game.result?.ranking}
-          timer={ownHeader && <Countdown game={game} total={def.turn?.(game.view).seconds} tense />}
-          onMove={(move) => send("move", move)}
-        />
-      )}
-
-      {/* Mini-gry pokazują ranking same, razem z wynikami. */}
-      {view.phase === "over" && !MINI_GAMES.has(def.id) && game.result?.ranking && game.result.ranking.length > 2 && (
-        <ol className="tile flex flex-col gap-1 p-4">
-          {game.result.ranking.map((id, i) => (
-            <li key={id} className="flex items-center gap-3">
-              <span className="w-5 font-mono text-fg-muted">{i + 1}.</span>
-              <span className="size-2.5 rounded-full" style={{ backgroundColor: view.players.find((p) => p.id === id)?.color }} aria-hidden />
-              {nick(id)}
-              {id === me && <span className="text-fg-muted"> (ty)</span>}
-            </li>
-          ))}
-        </ol>
-      )}
-
-      {view.phase === "over" && (
-        <div className="mt-auto flex flex-col gap-2 pt-4">
-          <OverActions view={view} me={me} send={send} />
-        </div>
-      )}
-    </Screen>
+        )}
+      </Screen>
+    </IntroContext.Provider>
   );
 }
 
-const MINI_GAMES = new Set(["refleks", "simon", "stoper", "schulte", "stroop", "liczenie", "kolo", "kolor", "panstwa-miasta"]);
+const MINI_GAMES = new Set(["refleks", "simon", "stoper", "schulte", "stroop", "liczenie", "kolo", "kolor", "kropki", "panstwa-miasta"]);
+
+const SCHULTE_LAST = SCHULTE_SIZE * SCHULTE_SIZE;
+
+/** Cienki pasek i licznik postępu (znalezione liczby, rundy) w pigułce gracza. */
+function Progress({ done, total, color }: { done: number; total: number; color?: string }) {
+  return (
+    <>
+      <span className="h-1 w-10 overflow-hidden rounded-full bg-line" aria-hidden>
+        <span className="block h-full rounded-full transition-[width] duration-200" style={{ width: `${(done / total) * 100}%`, backgroundColor: color }} />
+      </span>
+      <span className="font-mono text-xs text-fg tabular-nums">
+        {done}/{total}
+      </span>
+    </>
+  );
+}
 
 /** Rewanż rusza, gdy kliknie go każdy grający; „Do lobby” od jednej osoby kończy serię. */
 function OverActions({ view, me, send }: { view: RoomView; me: string; send: Send }) {
@@ -294,16 +374,20 @@ function OverActions({ view, me, send }: { view: RoomView; me: string; send: Sen
   const iWant = wants.some((p) => p.id === me);
   return (
     <>
-      {wants.length > 0 && (
-        <p className="basis-full text-center text-sm text-fg-muted" role="status">
-          Rewanż chce: {wants.map((p) => p.nick).join(", ")}
-          {waiting.length > 0 && <> · czekamy na: {waiting.map((p) => p.nick).join(", ")}</>}
+      {wants.length > 0 && !iWant && (
+        <p className="basis-full text-center text-sm" role="status">
+          {wants.map((p) => p.nick).join(", ")} {wants.length === 1 ? "chce" : "chcą"} rewanżu
         </p>
       )}
       {view.seats.includes(me) && (
-        <button type="button" className="btn btn-primary flex-1" disabled={iWant} onClick={() => send("rematch")}>
+        <button
+          type="button"
+          className={`btn btn-primary flex-1 ${wants.length > 0 && !iWant ? "animate-[ring-pulse_1.2s_ease-in-out_infinite] outline-2 outline-accent" : ""}`}
+          disabled={iWant}
+          onClick={() => send("rematch")}
+        >
           <ArrowCounterClockwise size={18} weight="bold" aria-hidden />
-          {iWant ? "Czekamy na resztę" : "Rewanż"}
+          {iWant ? `Czekamy na: ${waiting.map((p) => p.nick).join(", ")}…` : "Rewanż"}
         </button>
       )}
       <button type="button" className="btn btn-ghost flex-1" onClick={() => send("toLobby")}>
@@ -320,8 +404,9 @@ function OverActions({ view, me, send }: { view: RoomView; me: string; send: Sen
 /**
  * `tense`: pasek w kolorze akcentu (gra na czas, np. Państwa-miasta), a nie spokojny szary.
  * `color`: pasek w kolorze gracza (moja tura). Czerwień i tak przychodzi na ostatnie 10 s.
+ * `label`: podpis przed paskiem (mini-gry mają własny zegar partii, więc limit platformy musi być nazwany).
  */
-function Countdown({ game, total, tense, color }: { game: NonNullable<RoomView["game"]>; total?: number; tense?: boolean; color?: string }) {
+function Countdown({ game, total, tense, color, label }: { game: NonNullable<RoomView["game"]>; total?: number; tense?: boolean; color?: string; label?: string }) {
   const deadline = useMemo(() => (game.msLeft === null ? null : Date.now() + game.msLeft), [game]);
   const [now, setNow] = useState(Date.now);
 
@@ -337,20 +422,21 @@ function Countdown({ game, total, tense, color }: { game: NonNullable<RoomView["
     const left = Math.max(0, deadline - now) / (total * 1000);
     return (
       <div className="flex items-center gap-2">
+        {label && <span className="label">{label}</span>}
         <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-line" role="progressbar" aria-label="Czas tury" aria-valuenow={seconds}>
           <div
             className={`h-full rounded-full transition-[width] duration-300 ease-linear ${seconds <= 10 ? "animate-pulse bg-warning" : tense ? "bg-accent" : "bg-fg-muted"}`}
             style={{ width: `${Math.min(1, left) * 100}%`, backgroundColor: seconds > 10 ? color : undefined }}
           />
         </div>
-        <span className={`w-8 text-right font-mono text-xs ${seconds <= 10 ? "text-warning" : "text-fg-muted"}`}>{seconds}s</span>
+        <span className={`w-10 text-right text-sm font-medium tabular-nums ${seconds <= 10 ? "text-warning" : "text-fg"}`}>{seconds} s</span>
       </div>
     );
   }
   return (
     <span className={`flex items-center gap-1 font-mono text-sm ${seconds <= 10 ? "text-warning" : "text-fg-muted"}`}>
       <Timer size={16} aria-hidden />
-      {seconds}s
+      {seconds} s
     </span>
   );
 }

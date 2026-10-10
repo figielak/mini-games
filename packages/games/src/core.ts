@@ -14,7 +14,10 @@ export interface GameDefinition<State, Move> {
   maxPlayers: number;
   /** Kształt ruchu przychodzącego z sieci; reguły sprawdza dopiero validateMove. */
   moveSchema: z.ZodType<Move>;
-  setup(players: PlayerId[], rng: Rng): State;
+  /** Tryby do wyboru w lobby, w kolejności wyświetlania; domyślny ma `default` (bez flagi: pierwszy). Gra bez trybów pomija to pole. */
+  modes?: { id: string; name: string; hint: string; default?: boolean }[];
+  /** `mode` to id z `modes` wybrane przez gospodarza; nieznane albo brak oznacza tryb domyślny. */
+  setup(players: PlayerId[], rng: Rng, mode?: string): State;
   validateMove(state: State, player: PlayerId, move: Move): boolean;
   applyMove(state: State, player: PlayerId, move: Move, rng: Rng): State;
   /** Widok stanu dla konkretnego gracza: tu ukrywamy informacje. Obserwator dostaje widok dla "". */
@@ -78,4 +81,5 @@ export const average = (times: number[]) => (times.length ? times.reduce((a, b) 
 
 /** Porównanie wyników „na trafienia”: więcej trafień wyżej, przy równej liczbie niższa średnia czasu. */
 export const byHitsThenAverage = (a: { times: number[] }, b: { times: number[] }) =>
-  b.times.length - a.times.length || average(a.times) - average(b.times);
+  // Dwa puste wyniki to remis: Infinity - Infinity dałoby NaN, a NaN !== 0 robiło zwycięzcę z pierwszego gracza.
+  b.times.length - a.times.length || (a.times.length ? average(a.times) - average(b.times) : 0);

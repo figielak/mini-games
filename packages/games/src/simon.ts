@@ -19,7 +19,7 @@ export type View = State;
 // ponytail: wynik liczony na kliencie (sekwencja i tak jest w widoku), serwer sprawdza tylko zakres.
 export const simon: GameDefinition<State, Move> = {
   id: "simon",
-  name: "Simon",
+  name: "Sekwencja",
   minPlayers: 1,
   maxPlayers: 6,
   turnSeconds: 300,

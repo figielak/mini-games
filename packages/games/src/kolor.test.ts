@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { createRng } from "./core.ts";
-import { COUNT, distance, type Hsb, kolor as game, type Move, type State } from "./kolor.ts";
+import { COUNT, distance, type Hsb, hints, kolor as game, type Move, type State } from "./kolor.ts";
 
 // Testy napisane przed implementacją. Ustalają zasady:
 // - 1-6 graczy naraz, każdy odtwarza te same 5 kolorów (HSB, całkowite: H 0-359, S i B 0-100),
@@ -92,5 +92,26 @@ describe("koniec", () => {
   test("po limicie czasu pusta odpowiedź", () => {
     const s = game.setup([A, B], createRng(1));
     expect(game.timeoutMove!(s, A, createRng(1))).toEqual(result([]));
+  });
+});
+
+describe("Odcień: podpowiedzi po zatwierdzeniu", () => {
+  const t: Hsb = { h: 30, s: 60, b: 60 };
+
+  test("blisko wzoru nie ma podpowiedzi", () => {
+    expect(hints(t, { h: 35, s: 65, b: 56 })).toEqual([]);
+  });
+
+  test("jasność i nasycenie", () => {
+    expect(hints(t, { ...t, b: 40 })).toEqual(["za ciemny"]);
+    expect(hints(t, { ...t, b: 80, s: 40 })).toEqual(["za jasny", "za mało nasycony"]);
+    expect(hints(t, { ...t, s: 90 })).toEqual(["zbyt nasycony"]);
+  });
+
+  test("barwa: kierunek do najbliższej barwy podstawowej, także przez 0°", () => {
+    expect(hints(t, { ...t, h: 50 })).toEqual(["za bardzo w stronę żółci"]);
+    expect(hints(t, { ...t, h: 10 })).toEqual(["za bardzo w stronę czerwieni"]);
+    expect(hints({ ...t, h: 0 }, { ...t, h: 340 })).toEqual(["za bardzo w stronę magenty"]);
+    expect(hints({ ...t, h: 350 }, { ...t, h: 20 })).toEqual(["za bardzo w stronę czerwieni"]);
   });
 });

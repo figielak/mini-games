@@ -1,6 +1,6 @@
-import { Check, HandPalm, ThumbsDown } from "@phosphor-icons/react";
-import { type LobbyPlayer, type PanstwaMiastaMove, type PanstwaMiastaView, PM_ANSWER_MAX, PM_CATEGORIES, pmFits, pmNormalize } from "@mini-games/games";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { Check, HandPalm, ThumbsDown, X } from "@phosphor-icons/react";
+import { type LobbyPlayer, type PanstwaMiastaMove, type PanstwaMiastaView, PM_ANSWER_MAX, PM_CATEGORIES, pmFits } from "@mini-games/games";
+import { Fragment, type ReactNode, useEffect, useRef, useState } from "react";
 import { Scores, StickyBar } from "../screens/ui.tsx";
 
 interface Props {
@@ -16,6 +16,7 @@ interface Props {
 }
 
 const DRAFT_MS = 500;
+const PHASE = { write: "Wpisywanie", vote: "Sprawdzanie odpowiedzi", summary: "Wyniki rundy", over: "" };
 
 export function PanstwaMiasta({ view, me, players, waitingFor, ranking, timer, onMove }: Props) {
   const player = (id: string) => players.find((p) => p.id === id);
@@ -27,15 +28,16 @@ export function PanstwaMiasta({ view, me, players, waitingFor, ranking, timer, o
       {timer && (
         <header className="flex items-center gap-4">
           <span
-            className="flex size-24 shrink-0 items-center justify-center rounded-[20px] border border-line-hover bg-surface text-7xl font-semibold"
+            className="flex size-24 shrink-0 items-center justify-center rounded-tile border border-line-hover bg-surface text-7xl font-semibold"
             aria-label={`Litera ${letter}`}
           >
             {letter}
           </span>
-          <div className="flex min-w-0 flex-1 flex-col gap-3">
-            <h1 className="text-2xl font-semibold">
+          <div className="flex min-w-0 flex-1 flex-col gap-2">
+            <span className="label">
               Runda {view.round + 1}/{view.letters.length}
-            </h1>
+            </span>
+            <h1 className="text-xl leading-tight font-semibold">{PHASE[view.phase]}</h1>
             {timer}
           </div>
         </header>
@@ -76,13 +78,18 @@ export function PanstwaMiasta({ view, me, players, waitingFor, ranking, timer, o
         ) : (
           <>
             <p className="tile p-4 text-fg-muted">Czekamy na głosy reszty.</p>
-            <Answers view={view} player={player} />
+            <Answers
+              view={view}
+              player={player}
+              me={me}
+              rejected={new Set(view.votes[me]?.map((x) => `${x.category}:${x.player}`))}
+            />
           </>
         ))}
 
       {(view.phase === "summary" || view.phase === "over") && (
         <>
-          <Answers view={view} player={player} scored />
+          <Answers view={view} player={player} me={me} scored />
           <Scores
             rows={(ranking ?? view.players).map((id) => ({
               id,
@@ -232,7 +239,7 @@ function Voting({ view, me, player, onMove }: { view: PanstwaMiastaView; me: str
 
   return (
     <>
-      <p className="text-sm text-fg-muted">Dotknij cudzej odpowiedzi, która się nie liczy. Odpada, gdy odrzuci ją ponad połowa pozostałych.</p>
+      <p className="text-sm text-fg-muted">Dotknij cudzej odpowiedzi, żeby ją odrzucić.</p>
       <Answers view={view} player={player} me={me} rejected={rejected} onToggle={toggle} />
       <StickyBar>
         <button type="button" className="btn btn-primary w-full" onClick={submit}>
@@ -244,8 +251,9 @@ function Voting({ view, me, player, onMove }: { view: PanstwaMiastaView; me: str
 }
 
 /**
- * Odpowiedzi wszystkich, po kategoriach. Z `onToggle`: cudze ważne odpowiedzi da się odrzucić.
- * Ze `scored`: punkty z ostatniej rundy.
+ * Odpowiedzi wszystkich w tabeli: kategorie w wierszach, gracze w kolumnach (przy 4+ graczach przewija się w bok).
+ * Nazwa kategorii leży nad wierszem, nie w osobnej kolumnie: na telefonie każda kolumna jest na wagę złota.
+ * Z `onToggle`: cudze ważne odpowiedzi to przyciski do odrzucania. Ze `scored`: punkty i werdykt z ostatniej rundy.
  */
 function Answers({
   view,
@@ -264,44 +272,86 @@ function Answers({
 }) {
   const letter = view.letters[view.round];
   return (
-    <>
-      {PM_CATEGORIES.map((category, c) => {
-        const valid = view.players.filter((p) => pmFits(letter, view.answers[p]?.[c] ?? ""));
-        return (
-          <section key={category} className="tile flex flex-col gap-1 p-3">
-            <h3 className="px-2 pb-1 font-semibold">{category}</h3>
-            {view.players.map((id) => {
-              const answer = view.answers[id]?.[c]?.trim() ?? "";
-              const fits = valid.includes(id);
-              const key = `${c}:${id}`;
-              const struck = !fits || rejected?.has(key) || (scored && view.roundScores[id]?.[c] === 0);
-              const same = fits ? valid.filter((q) => pmNormalize(view.answers[q][c]) === pmNormalize(answer)).length : 0;
-              // Cudze głosy są jawne dopiero w podsumowaniu.
-              const against = scored ? view.players.filter((v) => view.votes[v]?.some((x) => x.player === id && x.category === c)).length : 0;
-              const canToggle = onToggle && fits && id !== me;
-              const Row = canToggle ? "button" : "div";
-              return (
-                <Row
-                  key={id}
-                  {...(canToggle && { type: "button" as const, onClick: () => onToggle(key), "aria-pressed": rejected?.has(key) })}
-                  className={`flex min-h-10 items-center gap-3 rounded-[10px] px-2 text-left ${canToggle ? "active:bg-surface" : ""}`}
-                >
-                  <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: player(id)?.color }} aria-label={player(id)?.nick} />
-                  <span className={`flex-1 ${struck ? "text-fg-subtle line-through" : ""}`}>{answer || "brak"}</span>
-                  {same > 1 && !struck && <span className="font-mono text-xs text-fg-muted">x{same}</span>}
-                  {against > 0 && (
-                    <span className="flex items-center gap-1 font-mono text-xs text-fg-muted" aria-label={`Przeciw: ${against}`}>
-                      <ThumbsDown size={14} aria-hidden />
-                      {against}
-                    </span>
-                  )}
-                  {scored && <span className="w-8 text-right font-mono">{view.roundScores[id]?.[c] ?? 0}</span>}
-                </Row>
-              );
-            })}
-          </section>
-        );
-      })}
-    </>
+    <div className="tile overflow-x-auto p-2">
+      <table className="w-full table-fixed border-separate border-spacing-1 text-sm" style={{ minWidth: `${view.players.length * 6}rem` }}>
+        <thead>
+          <tr>
+            {view.players.map((id) => (
+              <th key={id} scope="col" className="px-1 pb-1 text-left text-xs font-medium">
+                <span className="flex items-center gap-1.5">
+                  <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: player(id)?.color }} aria-hidden />
+                  <span className="truncate">{player(id)?.nick ?? "Gracz"}</span>
+                  {id === me && <span className="text-fg-muted">(ty)</span>}
+                </span>
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {PM_CATEGORIES.map((category, c) => (
+            <Fragment key={category}>
+              <tr>
+                <th scope="colgroup" colSpan={view.players.length} className="label px-1 pt-2 text-left font-normal">
+                  <span className="sticky left-1">{category}</span>
+                </th>
+              </tr>
+              <tr>
+              {view.players.map((id) => {
+                const answer = view.answers[id]?.[c]?.trim() ?? "";
+                const fits = pmFits(letter, answer);
+                const key = `${c}:${id}`;
+                const canToggle = onToggle && fits && id !== me;
+                // Mój głos (w trakcie głosowania) albo ostateczny werdykt (w podsumowaniu).
+                const voted = rejected?.has(key);
+                const out = scored && fits && view.roundScores[id]?.[c] === 0;
+                // Cudze głosy są jawne dopiero w podsumowaniu.
+                const against = scored ? view.players.filter((v) => view.votes[v]?.some((x) => x.player === id && x.category === c)).length : 0;
+                const Cell = canToggle ? "button" : "div";
+                return (
+                  <td key={id} className="p-0 align-top">
+                    <Cell
+                      {...(canToggle && {
+                        type: "button" as const,
+                        onClick: () => onToggle(key),
+                        "aria-pressed": voted,
+                        "aria-label": `${player(id)?.nick ?? "Gracz"}, ${category}: ${answer}. ${voted ? "Odrzucasz" : "Uznajesz"}`,
+                      })}
+                      className={`flex min-h-11 w-full items-center gap-1.5 rounded-inset border px-2 py-1.5 text-left ${
+                        voted || out ? "bg-accent-soft" : canToggle ? "bg-surface-inset" : ""
+                      } ${canToggle ? (voted ? "border-accent" : "border-line-hover") : "border-transparent"} ${onToggle && id === me ? "opacity-50" : ""}`}
+                    >
+                      {answer ? (
+                        <span className={`min-w-0 flex-1 break-words ${!fits || out ? "text-fg-muted line-through" : ""}`}>{answer}</span>
+                      ) : (
+                        <span className="flex-1 text-fg-subtle" aria-label="brak odpowiedzi">
+                          —
+                        </span>
+                      )}
+                      {voted ? (
+                        <X size={16} weight="bold" className="shrink-0 text-warning" aria-hidden />
+                      ) : (
+                        canToggle && <Check size={16} weight="bold" className="shrink-0 text-success" aria-hidden />
+                      )}
+                      {scored && (
+                        <span className="flex shrink-0 flex-col items-end font-mono">
+                          {view.roundScores[id]?.[c] ?? 0}
+                          {against > 0 && (
+                            <span className="flex items-center gap-0.5 text-xs text-fg-muted" aria-label={`Przeciw: ${against}`}>
+                              <ThumbsDown size={12} aria-hidden />
+                              {against}
+                            </span>
+                          )}
+                        </span>
+                      )}
+                    </Cell>
+                  </td>
+                );
+              })}
+              </tr>
+            </Fragment>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

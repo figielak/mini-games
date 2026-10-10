@@ -1,7 +1,7 @@
 import { Circle, type Icon, Square, Star, Triangle } from "@phosphor-icons/react";
 import type { LobbyPlayer, SimonView } from "@mini-games/games";
 import { useEffect, useRef, useState } from "react";
-import { Scores } from "../screens/ui.tsx";
+import { Intro, Scores, Stats } from "../screens/ui.tsx";
 
 interface Props {
   view: SimonView;
@@ -20,6 +20,24 @@ const PADS: { color: string; icon: Icon }[] = [
 ];
 const LIT_MS = 450;
 const GAP_MS = 150;
+
+/** Podgląd na ekranie instrukcji: pola zapalają się po kolei. */
+const PREVIEW_ORDER = [0, 3, 1, 2];
+
+function Preview() {
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      {PADS.map(({ color }, i) => (
+        <span key={color} className="relative size-12 rounded-inset" style={{ backgroundColor: `color-mix(in srgb, ${color} 22%, var(--color-bg))` }}>
+          <span
+            className="absolute inset-0 animate-[preview-quarter_2.4s_linear_infinite] rounded-inset opacity-0"
+            style={{ backgroundColor: color, animationDelay: `${PREVIEW_ORDER.indexOf(i) * 0.6 - 2.4}s` }}
+          />
+        </span>
+      ))}
+    </div>
+  );
+}
 
 type Phase = "intro" | "show" | "input" | "sent";
 
@@ -71,21 +89,24 @@ export function Simon({ view, me, players, ranking, onMove }: Props) {
 
   if (phase === "intro") {
     return (
-      <section className="tile flex flex-col gap-4 p-4">
-        <p>Zapamiętaj sekwencję i powtórz ją. Co rundę dochodzi jeden krok, pierwsza pomyłka kończy grę.</p>
-        <button type="button" className="btn btn-primary w-full" onClick={() => show(1)}>
-          Start
-        </button>
-      </section>
+      <Intro
+        preview={<Preview />}
+        time="Bez pośpiechu: co rundę dochodzi jeden krok"
+        task="Zapamiętaj sekwencję i powtórz ją"
+        score="Liczy się najdłuższa seria, pierwsza pomyłka kończy grę"
+        onStart={() => show(1)}
+      />
     );
   }
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex justify-between font-mono text-sm text-fg-muted">
-        <span>Seria: {length - 1}</span>
-        <span>{phase === "show" ? "Patrz" : "Powtórz"}</span>
-      </div>
+      <Stats
+        items={[
+          { label: "Seria", value: length - 1 },
+          { label: "Teraz", value: phase === "show" ? "Patrz" : "Powtórz" },
+        ]}
+      />
       <div className="grid aspect-square grid-cols-2 gap-3">
         {PADS.map(({ color, icon: PadIcon }, i) => (
           <button
@@ -94,7 +115,7 @@ export function Simon({ view, me, players, ranking, onMove }: Props) {
             aria-label={`Pole ${i + 1}`}
             disabled={phase !== "input"}
             onPointerDown={() => press(i)}
-            className="flex touch-none select-none items-center justify-center rounded-[20px] transition-colors duration-100"
+            className="flex touch-none select-none items-center justify-center rounded-tile transition-colors duration-100"
             style={{
               backgroundColor: lit === i ? color : `color-mix(in srgb, ${color} 22%, var(--color-bg))`,
               color: lit === i ? "var(--color-accent-fg)" : color,

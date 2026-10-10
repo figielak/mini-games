@@ -3,6 +3,7 @@ import { chinczyk } from "./chinczyk.ts";
 import { kampusTour } from "./kampus-tour.ts";
 import { kolo } from "./kolo.ts";
 import { kolor } from "./kolor.ts";
+import { kropki } from "./kropki.ts";
 import { liczenie } from "./liczenie.ts";
 import { panstwaMiasta } from "./panstwa-miasta.ts";
 import { piecWRzedzie } from "./piec-w-rzedzie.ts";
@@ -48,16 +49,18 @@ export type { View as PiecWRzedzieView } from "./piec-w-rzedzie.ts";
 export { DURATION_MS as REFLEKS_DURATION_MS, type View as RefleksView } from "./refleks.ts";
 export type { View as SimonView } from "./simon.ts";
 export { PENALTY_MS as SCHULTE_PENALTY_MS, SIZE as SCHULTE_SIZE, total as schulteTotal, type View as SchulteView } from "./schulte.ts";
-export { TARGET_MS as STOPER_TARGET_MS, VISIBLE_MS as STOPER_VISIBLE_MS, type View as StoperView } from "./stoper.ts";
+export { VISIBLE_MS as STOPER_VISIBLE_MS, type View as StoperView } from "./stoper.ts";
 export { COLORS as STROOP_COLORS, type View as StroopView } from "./stroop.ts";
 export type { View as LiczenieView } from "./liczenie.ts";
 export { ATTEMPTS as KOLO_ATTEMPTS, judge as koloJudge, MAX_POINTS as KOLO_MAX_POINTS, type Point as KoloPoint, type View as KoloView } from "./kolo.ts";
-export { COUNT as KOLOR_COUNT, distance as kolorDistance, type Hsb, hsbToRgb as kolorHsbToRgb, SHOW_MS as KOLOR_SHOW_MS, type View as KolorView } from "./kolor.ts";
+export { COUNT as KOLOR_COUNT, distance as kolorDistance, type Hsb, hints as kolorHints, hsbToRgb as kolorHsbToRgb, SHOW_MS as KOLOR_SHOW_MS, type View as KolorView } from "./kolor.ts";
+export { ROUNDS as KROPKI_ROUNDS, SHOW_MS as KROPKI_SHOW_MS, type View as KropkiView } from "./kropki.ts";
 export { DURATION_MS as QUIZ_DURATION_MS, type QuizMove } from "./quiz.ts";
-export { FLEET_LENGTHS, isValidFleet, randomFleet, SIZE as STATKI_SIZE, type Ship, shipCells, type Shot, type View as StatkiView } from "./statki.ts";
+export { around as shipAround, isValidFleet, MODES as STATKI_MODES, randomFleet, type Rules as StatkiRules, type Ship, shipCells, type Shot, type View as StatkiView } from "./statki.ts";
 
 // ponytail: `any`, bo każda gra ma inny stan i ruch; platforma rozmawia z nimi tylko przez GameDefinition
-export const GAMES: Record<string, GameDefinition<any, any>> = {
+// Bez prototypu: gameId przychodzi z sieci, a GAMES["constructor"] na zwykłym obiekcie zwróciłoby funkcję zamiast gry.
+export const GAMES: Record<string, GameDefinition<any, any>> = Object.assign(Object.create(null), {
   [piecWRzedzie.id]: piecWRzedzie,
   [statki.id]: statki,
   [chinczyk.id]: chinczyk,
@@ -70,5 +73,6 @@ export const GAMES: Record<string, GameDefinition<any, any>> = {
   [liczenie.id]: liczenie,
   [kolo.id]: kolo,
   [kolor.id]: kolor,
+  [kropki.id]: kropki,
   [panstwaMiasta.id]: panstwaMiasta,
-};
+});

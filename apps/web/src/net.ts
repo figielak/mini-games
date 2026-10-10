@@ -17,8 +17,10 @@ export const fetchRanking = (): Promise<Record<string, RankingRow[]>> =>
     .then((r) => (r.ok ? r.json() : {}))
     .catch(() => ({}));
 
-const TOKEN_KEY = "mg.token";
-const NICK_KEY = "mg.nick";
+// Tryb testowy (/dev): każda ramka ma swój slot z adresu (`?dev=2`), więc własny token i nick.
+const slot = import.meta.env.DEV ? (new URLSearchParams(location.search).get("dev") ?? "") : "";
+const TOKEN_KEY = `mg.token${slot}`;
+const NICK_KEY = `mg.nick${slot}`;
 
 // localStorage potrafi rzucić (tryb prywatny, zablokowane dane), a bez niego aplikacja dalej ma działać.
 function read(key: string): string | null {
@@ -68,7 +70,18 @@ export const joinRoom = async (code: string, nick: string) =>
 
 /** Wraca do pokoju sprzed odświeżenia strony. Jedna próba na załadowanie strony: token działa tylko raz. */
 let resuming: Promise<Room | null> | undefined;
-export const resumeRoom = () => (resuming ??= tryResume());
+export const resumeRoom = () => (resuming ??= tryResume().then((room) => room ?? devRoom()));
+
+/** Ramka trybu testowego wchodzi sama: z kodem dołącza, bez kodu zakłada pokój. */
+async function devRoom(): Promise<Room | null> {
+  if (!slot) return null;
+  const nick = `Gracz ${slot}`;
+  try {
+    return await (codeFromUrl() ? joinRoom(codeFromUrl(), nick) : createRoom(nick));
+  } catch {
+    return null;
+  }
+}
 
 /** Kod z linku udostępnienia (`/?kod=ABCD`). */
 export const codeFromUrl = () => new URLSearchParams(location.search).get("kod")?.toUpperCase() ?? "";

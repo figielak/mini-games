@@ -48,14 +48,15 @@ html {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Poświata jak na dashboardzie figielak.dev, ale słabsza i nieruchoma: telefon na wykładzie nie ma świecić. */
+/* Poświata jak na dashboardzie figielak.dev, ale słabsza i nieruchoma: telefon na wykładzie nie ma świecić.
+   W partii --ambient (ustawiane w Game.tsx) to kolor gracza, który ma ruch. */
 body::before {
   content: "";
   position: fixed;
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  background: radial-gradient(60vmax 60vmax at 85% -10%, rgb(255 36 69 / 0.16), transparent 70%);
+  background: radial-gradient(60vmax 60vmax at 85% -10%, color-mix(in srgb, var(--ambient, var(--color-accent)) 16%, transparent), transparent 70%);
 }
 
 @layer components {
@@ -198,12 +199,11 @@ body::before {
   }
 }
 
-/* Chińczyk: pionek, którym można się ruszyć, pulsuje obwódką. */
+/* Chińczyk: pionek, którym można się ruszyć, pulsuje obwódką w kolorze gracza (outline-color z elementu). */
 @keyframes ring-pulse {
   0%,
   100% {
     outline-offset: 1px;
-    outline-color: var(--color-accent);
   }
   50% {
     outline-offset: 4px;
@@ -215,6 +215,47 @@ body::before {
 @keyframes stone-pop {
   from {
     transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+/* Pięć w rzędzie: zwycięska linia dorysowuje się od pierwszego do ostatniego kamienia (pathLength=1). */
+@keyframes line-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+}
+
+/*
+ * Podglądy na ekranie instrukcji mini-gier, w pętli: element widać przez pierwszą połowę (albo ćwierć) cyklu.
+ * Kolejność ustawia ujemny animation-delay; element z późniejszej części cyklu ma bazowo opacity 0.
+ */
+@keyframes preview-half {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes preview-quarter {
+  0%,
+  20% {
+    opacity: 1;
+  }
+  25%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Nagłówek gry: „Wygrywasz!” u zwycięzcy. */
+@keyframes title-pop {
+  from {
+    transform: scale(1.25);
     opacity: 0;
   }
 }
@@ -254,6 +295,40 @@ body::before {
     opacity: 0;
     transform: translateY(-32px);
   }
+}
+
+/* Tabela Schultego: zielony błysk trafionego kafelka, czerwony z potrząśnięciem przy pomyłce. */
+@keyframes tile-hit {
+  from {
+    background-color: var(--color-success);
+    color: var(--color-bg);
+  }
+}
+
+@keyframes tile-miss {
+  0% {
+    background-color: var(--color-warning);
+    color: var(--color-bg);
+  }
+  20% {
+    transform: translateX(-5px);
+  }
+  40% {
+    transform: translateX(5px);
+  }
+  60% {
+    transform: translateX(-3px);
+  }
+  80% {
+    transform: translateX(3px);
+  }
+}
+
+/* Statki: zamiana plansz między turami, duża i mała przelatują na swoje miejsca. */
+::view-transition-group(statki-own),
+::view-transition-group(statki-enemy) {
+  animation-duration: 350ms;
+  animation-timing-function: ease-out;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -4,15 +4,16 @@ import { useEffect, useState } from "react";
 import type { Room } from "@colyseus/sdk";
 import { codeFromUrl, createRoom, errorText, fetchRanking, joinRoom, type RankingRow, savedNick } from "../net.ts";
 
+/** Wklejony link `/?kod=ABCD` daje sam kod, nie litery z adresu. */
 const onlyCodeChars = (s: string) =>
-  [...s.toUpperCase()].filter((c) => ROOM_CODE_ALPHABET.includes(c)).join("").slice(0, ROOM_CODE_LENGTH);
+  [...(s.match(/kod=(\w+)/i)?.[1] ?? s).toUpperCase()].filter((c) => ROOM_CODE_ALPHABET.includes(c)).join("").slice(0, ROOM_CODE_LENGTH);
 
 export function Home({ onRoom, notice }: { onRoom: (room: Room) => void; notice?: string }) {
   const [nick, setNick] = useState(savedNick);
   const [code, setCode] = useState(() => onlyCodeChars(codeFromUrl()));
   const [nickError, setNickError] = useState("");
   const [roomError, setRoomError] = useState(notice ?? "");
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<"create" | "join" | null>(null);
   const [ranking, setRanking] = useState<Record<string, RankingRow[]>>({});
 
   useEffect(() => {
@@ -24,13 +25,13 @@ export function Home({ onRoom, notice }: { onRoom: (room: Room) => void; notice?
     setNickError(clean ? "" : `Wpisz nick (do ${NICK_MAX} znaków).`);
     setRoomError("");
     if (!clean) return;
-    setBusy(true);
+    setBusy(action);
     try {
       onRoom(action === "create" ? await createRoom(clean) : await joinRoom(code, clean));
       history.replaceState(null, "", "/");
     } catch (e) {
       setRoomError(errorText(e));
-      setBusy(false);
+      setBusy(null);
     }
   }
 
@@ -86,9 +87,9 @@ export function Home({ onRoom, notice }: { onRoom: (room: Room) => void; notice?
             aria-describedby="room-error"
             onChange={(e) => setCode(onlyCodeChars(e.target.value))}
           />
-          <button type="submit" className="btn btn-primary shrink-0" disabled={busy || code.length !== ROOM_CODE_LENGTH}>
-            Dołącz
-            <ArrowRight size={18} weight="bold" aria-hidden />
+          <button type="submit" className="btn btn-primary shrink-0" disabled={!!busy || code.length !== ROOM_CODE_LENGTH}>
+            {busy === "join" ? "Łączenie…" : "Dołącz"}
+            {busy !== "join" && <ArrowRight size={18} weight="bold" aria-hidden />}
           </button>
         </div>
         <p id="room-error" role="alert" className="text-sm text-accent empty:hidden">
@@ -96,14 +97,18 @@ export function Home({ onRoom, notice }: { onRoom: (room: Room) => void; notice?
         </p>
       </form>
 
-      <Ranking ranking={ranking} me={cleanNick(nick)} />
+      <button type="button" className="btn btn-ghost w-full" disabled={!!busy} onClick={() => go("create")}>
+        {busy === "create" ? (
+          "Tworzenie pokoju…"
+        ) : (
+          <>
+            <Plus size={18} weight="bold" aria-hidden />
+            Utwórz pokój
+          </>
+        )}
+      </button>
 
-      <div className="mt-auto pt-6">
-        <button type="button" className="btn btn-ghost w-full" disabled={busy} onClick={() => go("create")}>
-          <Plus size={18} weight="bold" aria-hidden />
-          Utwórz pokój
-        </button>
-      </div>
+      <Ranking ranking={ranking} me={cleanNick(nick)} />
     </main>
   );
 }

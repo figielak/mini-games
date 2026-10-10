@@ -67,6 +67,20 @@ describe("koniec", () => {
     expect(game.isOver(s)).toEqual({ ranking: [A, B] });
   });
 
+  test("nikt nie trafił (np. dwa limity czasu): remis bez zwycięzcy", () => {
+    let s = game.setup([A, B], createRng(1));
+    s = send(s, A, game.timeoutMove!(s, A, createRng(1)));
+    s = send(s, B, result([], 2));
+    expect(game.isOver(s)).toEqual({ ranking: [A, B] });
+  });
+
+  test("falstarty nie wpływają na ranking", () => {
+    let s = game.setup([A, B], createRng(1));
+    s = send(s, A, result([300], 9));
+    s = send(s, B, result([400]));
+    expect(game.isOver(s)).toEqual({ winner: A, ranking: [A, B] });
+  });
+
   test("solo: bez zwycięzcy", () => {
     const s = send(game.setup([A], createRng(1)), A, result([300]));
     expect(game.isOver(s)).toEqual({ ranking: [A] });

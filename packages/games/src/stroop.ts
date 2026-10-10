@@ -21,10 +21,11 @@ export type View = State;
 
 export const stroop: GameDefinition<State, Move> = {
   id: "stroop",
-  name: "Stroop",
+  name: "Kolor liter",
   minPlayers: 1,
   maxPlayers: 6,
-  turnSeconds: 60,
+  // 30 s rundy + zapas na przeczytanie zasad i Start; przy 60 s późny Start ucinał rundę w połowie.
+  turnSeconds: 90,
   moveSchema: quizMoveSchema,
 
   setup: (players, rng) => ({

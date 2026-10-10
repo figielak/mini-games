@@ -354,6 +354,46 @@ describe("długi i bankructwo", () => {
   });
 });
 
+describe("bankructwo: przypadki brzegowe", () => {
+  test("bankructwo przez opłatę: gotówka przepada w banku", () => {
+    const s = roll(with2(two(), { cash: { [A]: 1 }, positions: { [A]: 24 } }), A, 1, 3); // Opłata za akademik 15 zł
+    expect(view(s).bankrupt).toEqual([A]);
+    expect(view(s).cash).toEqual({ [A]: 0, [B]: START_CASH });
+    expect(game.isOver(s)).toEqual({ winner: B, ranking: [B, A] });
+  });
+
+  test("dług równy gotówce to nie bankructwo ani sprzedaż", () => {
+    const s = roll(with2(two(), { cash: { [A]: 15 }, positions: { [A]: 24 } }), A, 1, 3);
+    expect(view(s).cash[A]).toBe(0);
+    expect(view(s).bankrupt).toEqual([]);
+    expect(game.waitingFor(s)).toEqual([B]);
+  });
+
+  test("dwa bankructwa: wygrywa ostatni żywy, bankruci w rankingu od ostatniego", () => {
+    let s = with2(three(), { cash: { [A]: 1, [B]: 1 }, owners: { 30: C, 31: C }, positions: { [A]: 26, [B]: 26 } });
+    s = roll(s, A, 1, 3);
+    expect(game.isOver(s)).toBeNull();
+    s = roll(s, B, 1, 3);
+    expect(view(s).bankrupt).toEqual([A, B]);
+    expect(view(s).cash[C]).toBe(START_CASH + 2);
+    expect(game.isOver(s)).toEqual({ winner: C, ranking: [C, B, A] });
+    expect(game.waitingFor(s)).toEqual([]);
+  });
+
+  test("sprzedaż kilku pól po kolei, aż starczy na dług", () => {
+    // Czynsz na Rynku z kompletem: 10 zł; A ma 1 zł i dwa pola po 5 zł ze sprzedaży.
+    let s = with2(two(), { cash: { [A]: 1 }, owners: { 1: A, 2: A, 30: B, 31: B }, positions: { [A]: 26 } });
+    s = roll(s, A, 1, 3);
+    s = play(s, A, { type: "sell", tile: 1 });
+    expect(view(s).phase).toBe("sell");
+    expect(view(s).debt).toEqual({ amount: 10, to: [B] });
+    s = play(s, A, { type: "sell", tile: 2 });
+    expect(view(s).cash).toEqual({ [A]: 1, [B]: START_CASH + 10 });
+    expect(view(s).bankrupt).toEqual([]);
+    expect(game.waitingFor(s)).toEqual([B]);
+  });
+});
+
 describe("historia zdarzeń", () => {
   test("ostatnie zdarzenia zostają po kolejnych ruchach, najwyżej 4", () => {
     let s = roll(two(), A, 1, 2); // A na 3
@@ -729,6 +769,47 @@ describe("koniec gry", () => {
     expect(game.waitingFor(s)).toEqual([]);
     expect(view(s).turn).toBeNull();
     expect(game.validateMove(s, A, { type: "roll" })).toBe(false);
+  });
+});
+
+describe("koniec gry: przypadki brzegowe", () => {
+  test("limit rund z bankrutem na końcu kolejki: runda kończy się na ostatnim żywym, bankrut ostatni w rankingu", () => {
+    let s: State = { ...with2(three(), { round: ROUNDS, cash: { [A]: 50, [B]: 60, [C]: 0 } }), bankrupt: [C] };
+    s = roll(s, A, 5, 6);
+    expect(game.isOver(s)).toBeNull();
+    s = roll(s, B, 5, 6);
+    expect(game.isOver(s)).toEqual({ winner: B, ranking: [B, A, C] });
+  });
+
+  test("równy majątek na górze po limicie rund: remis bez zwycięzcy", () => {
+    // B ma mniej gotówki, ale Rynek (50 zł) wyrównuje majątek; C jest niżej.
+    let s = with2(three(), { round: ROUNDS, cash: { [A]: 100, [B]: 50, [C]: 60 }, owners: { 31: B } });
+    for (const p of [A, B, C]) s = roll(s, p, 5, 6);
+    expect(game.isOver(s)).toEqual({ ranking: [A, B, C] });
+  });
+
+  test("remis poniżej pierwszego miejsca nie odbiera wygranej", () => {
+    let s = with2(three(), { round: ROUNDS, cash: { [A]: 60, [B]: 60, [C]: 100 } });
+    for (const p of [A, B, C]) s = roll(s, p, 5, 6);
+    expect(game.isOver(s)).toEqual({ winner: C, ranking: [C, A, B] });
+  });
+
+  test("dublet w ostatniej turze: najpierw dodatkowy rzut, potem koniec", () => {
+    let s = with2(two(), { round: ROUNDS, positions: { [B]: 7 } });
+    s = roll(s, A, 5, 6);
+    s = roll(s, B, 2, 2); // Kolokwium w odwiedzinach
+    expect(game.isOver(s)).toBeNull();
+    expect(game.waitingFor(s)).toEqual([B]);
+    s = roll(s, B, 1, 4); // Juwenalia bez własnych pól
+    expect(game.isOver(s)).not.toBeNull();
+    expect(view(s).round).toBe(ROUNDS);
+  });
+
+  test("monopolista wygrywa z bogatszym także przy 3 graczach, reszta wg majątku", () => {
+    const owners = { 30: A, 31: A, 1: A, 2: A, 3: A, 4: A };
+    let s = roll(with2(three(), { owners, positions: { [A]: 1 }, cash: { [B]: 300, [C]: 900 } }), A, 2, 3);
+    s = play(s, A, { type: "buy" });
+    expect(game.isOver(s)).toEqual({ winner: A, ranking: [A, C, B] });
   });
 });
 
