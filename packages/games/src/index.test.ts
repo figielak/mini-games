@@ -5,7 +5,8 @@ import { createRng, GAMES, ROOM_MESSAGES } from "./index.ts";
 // - ruch po limicie czasu każdego gracza, na którego czekamy, przechodzi przez moveSchema i validateMove,
 // - ten sam ruch od kogoś spoza gry albo od gracza, na którego nie czekamy, jest odrzucany,
 // - partia się kończy, po końcu nikt nie może już nic zrobić, a wynik wskazuje tylko graczy tej partii,
-// - widok każdego gracza i obserwatora ("") da się wysłać jako JSON na każdym etapie.
+// - widok każdego gracza i obserwatora ("") da się wysłać jako JSON na każdym etapie,
+// - mini-gra podaje po końcu miejsca z remisami (`places`), zgodne z rankingiem i zwycięzcą.
 
 const STRANGER = "obcy";
 const SEEDS = [1, 2, 3];
@@ -84,6 +85,14 @@ describe.each(CASES)("$name: kontrakt", ({ game, mode }) => {
       if (ranking) {
         expect([...ranking].sort(), `seed ${seed}: ranking to wszyscy gracze, każdy raz`).toEqual([...players].sort());
         if (winner !== undefined) expect(ranking[0]).toBe(winner);
+      }
+      if (game.minPlayers === 1) {
+        const places = game.places!(s);
+        expect(Object.keys(places).sort(), `seed ${seed}: miejsca wszystkich graczy`).toEqual([...players].sort());
+        const order = ranking!.map((p) => places[p]);
+        expect(order, `seed ${seed}: miejsca rosną wzdłuż rankingu`).toEqual([...order].sort((a, b) => a - b));
+        expect(order[0]).toBe(1);
+        expect(winner !== undefined, `seed ${seed}: zwycięzca tylko przy samodzielnym 1. miejscu`).toBe(n > 1 && order.filter((x) => x === 1).length === 1);
       }
       for (const move of seen.values()) {
         for (const player of [...players, STRANGER]) {
