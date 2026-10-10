@@ -19,6 +19,7 @@ import { statki } from "./statki.ts";
 import { stoj } from "./stoj.ts";
 import { stoper } from "./stoper.ts";
 import { stroop } from "./stroop.ts";
+import { wieza } from "./wieza.ts";
 
 export * from "./core.ts";
 export * from "./lobby.ts";
@@ -65,6 +66,7 @@ export { COUNT as KOLOR_COUNT, distance as kolorDistance, type Hsb, hints as kol
 export { ROUNDS as KROPKI_ROUNDS, SHOW_MS as KROPKI_SHOW_MS, type View as KropkiView } from "./kropki.ts";
 export { MAX_YEAR as ROK_MAX_YEAR, MIN_YEAR as ROK_MIN_YEAR, REVEAL_MS as ROK_REVEAL_MS, ROUND_MS as ROK_ROUND_MS, ROUNDS as ROK_ROUNDS, type Event as RokEvent, type View as RokView } from "./rok.ts";
 export { BALLS, MOVE_MS, RADIUS, ROUNDS, SHOW_MS, SPEED_START, SPEED_STEP, TARGETS, position as sledzeniePosition, type Ball as SledzenieBall, type Move as SledzenieMove, type Result as SledzenieResult, type State as SledzenieState, type View as SledzenieView } from "./sledzenie.ts";
+export { BASE as WIEZA_BASE, build as wiezaBuild, left as wiezaLeft, LEVELS as WIEZA_LEVELS, MAX_STOP_MS as WIEZA_MAX_STOP_MS, START_WIDTH as WIEZA_START_WIDTH, type View as WiezaView } from "./wieza.ts";
 export { ACCEPT_PX as SRODEK_ACCEPT_PX, error as srodekError, offset as srodekOffset, type Point as SrodekPoint, project as srodekProject, ROUNDS as SRODEK_ROUNDS, type View as SrodekView } from "./srodek.ts";
 export { DURATION_MS as STOJ_DURATION_MS, SCHEDULE as STOJ_SCHEDULE, score as stojScore, VISIBLE as STOJ_VISIBLE, type View as StojView } from "./stoj.ts";
 export { DURATION_MS as QUIZ_DURATION_MS, type QuizMove } from "./quiz.ts";
@@ -91,6 +93,7 @@ export const GAMES: Record<string, GameDefinition<any, any>> = Object.assign(Obj
   [srodek.id]: srodek,
   [stoj.id]: stoj,
   [sledzenie.id]: sledzenie,
+  [wieza.id]: wieza,
   [inny.id]: inny,
   [panstwaMiasta.id]: panstwaMiasta,
 });
